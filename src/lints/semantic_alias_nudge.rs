@@ -1,6 +1,6 @@
 //! Lint: advisory warn on raw arvo primitives at public API boundaries.
 //! Encourages flipping `QWord` → `RecordIndex`, `UFixed<I32, F0, Hot>` →
-//! `SlotId`, etc. — a semantic alias reads better than the primitive.
+//! `SlotId`, etc. A semantic alias reads better than the primitive.
 //!
 //! Default severity: ADVISORY (warn everywhere, blocks nothing).
 
@@ -56,7 +56,7 @@ fn check_fn(node: Node, ctx: &LintContext, out: &mut Vec<LintError>) {
                 ctx.crate_name.to_string(),
                 line,
                 "semantic-alias-nudge",
-                format!("`{name}` exposes raw `{prim}` in its signature — consider a domain alias (NodeId / SlotId / RecordIndex / etc.) for readability"),
+                format!("`{name}` exposes raw `{prim}` in its signature. Consider a domain alias (NodeId / SlotId / RecordIndex / etc.) for readability"),
             ));
             return;
         }

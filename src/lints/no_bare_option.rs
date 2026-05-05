@@ -51,7 +51,7 @@ impl Lint for NoBareOption {
                         idx + 1,
                         "no-bare-option",
                         format!(
-                            "bare `Option` in {} line {} — use notko::Maybe<T>. Option does not exist in this stack",
+                            "bare `Option` in {} line {}. Use notko::Maybe<T>. Option does not exist in this stack",
                             rel_path,
                             idx + 1,
                         ),

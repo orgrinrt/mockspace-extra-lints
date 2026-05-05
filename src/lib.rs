@@ -1,4 +1,4 @@
-//! Mockspace lint pack for the hilavitkutin / arvo / notko / clause stack.
+//! Mockspace lint pack for the hilavitkutin / arvo / notko / vehje stack.
 //!
 //! Consumed by each repo's `mockspace.toml` via:
 //!
@@ -8,7 +8,7 @@
 //! ```
 //!
 //! Every lint is emitted from one place so severity policy stays in sync
-//! across arvo, hilavitkutin, clause, and notko.
+//! across arvo, hilavitkutin, vehje, and notko.
 
 mod util;
 

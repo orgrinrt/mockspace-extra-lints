@@ -2,7 +2,7 @@
 //!
 //! arvo is the exclusive numeric substrate. Bare Rust primitives
 //! (`u8..u128`, `i8..i128`, `f32`, `f64`, `usize`, `isize`, `bool`)
-//! do not exist in this stack — "as if they don't exist". Any
+//! do not exist in this stack: "as if they don't exist". Any
 //! appearance of such a token anywhere in source is drift, not just
 //! in public API.
 //!
@@ -22,7 +22,7 @@
 //! - tuple-field declarations (`pub struct Str(u32)`)
 //!
 //! Escape hatch (single line): `// lint:allow(arvo-types-only) reason: ...; tracked: #N`
-//! — only appropriate for foreign-crate boundary where the crate
+//! is only appropriate for foreign-crate boundary where the crate
 //! demands a specific primitive and no arvo impl of its contract is
 //! possible. Prefer dropping the crate over a long-lived allowance.
 
@@ -50,7 +50,7 @@ impl Lint for ArvoTypesOnly {
         if crate_introduces_category(ctx, categories::NUMERIC) { return Vec::new(); }
         let mut out = Vec::new();
 
-        // Scan every .rs file under src/ — module files (bits.rs,
+        // Scan every .rs file under src/. Module files (bits.rs,
         // prim.rs, ufixed_impl.rs, ...) are where drift usually
         // lives. Fall back to ctx.source only if the context carried
         // no all_sources (older mockspace version).
@@ -79,7 +79,7 @@ impl Lint for ArvoTypesOnly {
                             idx + 1,
                             "arvo-types-only",
                             format!(
-                                "bare `{prim}` in {} line {} — the stack has no bare numeric/bool primitives. Use an arvo type (UFixed / IFixed / FastFloat / StrictFloat / USize / Cap / Bool) or a domain alias grounded on one",
+                                "bare `{prim}` in {} line {}. The stack has no bare numeric/bool primitives. Use an arvo type (UFixed / IFixed / FastFloat / StrictFloat / USize / Cap / Bool) or a domain alias grounded on one",
                                 rel_path,
                                 idx + 1,
                             ),
@@ -145,7 +145,7 @@ fn strip_string_and_char_literals(line: &str) -> String {
     out
 }
 
-/// Drop content after a `//` line-comment marker (outside strings —
+/// Drop content after a `//` line-comment marker (outside strings;
 /// this runs AFTER `strip_string_and_char_literals`).
 fn strip_line_comment(line: &str) -> String {
     if let Some(idx) = line.find("//") {

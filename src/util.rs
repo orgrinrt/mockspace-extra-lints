@@ -8,14 +8,14 @@ use tree_sitter::Node;
 /// categories) of substrate it protects via the `Lint::categories`
 /// helper; the `[primitive-introductions]` section in a consumer's
 /// mockspace.toml lists the categories that each crate introduces.
-/// When the two intersect, the lint self-exempts for that crate —
-/// the crate is the one bringing the substrate to the table, so
+/// When the two intersect, the lint self-exempts for that crate.
+/// The crate is the one bringing the substrate to the table, so
 /// whatever it does internally to define it is legitimate.
 ///
 /// Categories (not specific arvo type names) keep the map stable as
 /// the stack evolves. Adding a new arvo type (e.g. a new strategy
 /// marker, a new arithmetic kind, a new opaque-bit container) just
-/// means tagging its introducing crate with the right category — no
+/// means tagging its introducing crate with the right category. No
 /// lint pack change, no recompile. Categories change only when a
 /// genuinely new substrate DOMAIN appears (rare; e.g. if a "temporal
 /// substrate" layer ever joined, a new lint would carry its own
@@ -51,7 +51,7 @@ pub mod categories {
 /// an empty violation set for that crate, unconditionally.
 ///
 /// Matching is exact string compare against the crate's list. Adding
-/// an unknown category to a crate's list has no effect — no lint
+/// an unknown category to a crate's list has no effect; no lint
 /// watches that category. Adding `"numeric"` or `"fallibility"` to a
 /// crate's list is an auditable architectural claim (the crate must
 /// actually define the substrate types) rather than a list of

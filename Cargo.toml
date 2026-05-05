@@ -2,7 +2,7 @@
 name = "mockspace-hilavitkutin-stack-lints"
 version = "0.1.0"
 edition = "2021"
-description = "Mockspace lint pack for the hilavitkutin / arvo / notko / clause stack"
+description = "Mockspace lint pack for the hilavitkutin / arvo / notko / vehje stack"
 license = "MPL-2.0"
 publish = false
 

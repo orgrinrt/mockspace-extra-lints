@@ -166,7 +166,7 @@ fn check_text(content: &str, crate_name: &str, out: &mut Vec<LintError>) {
                 crate_name.to_string(),
                 line,
                 "writing-style",
-                format!("greeting opener `{opener}` — state the first fact instead"),
+                format!("greeting opener `{opener}`. State the first fact instead"),
                 Severity::PUSH_GATE,
             ));
         }
