@@ -56,6 +56,7 @@ pub mod categories {
 /// crate's list is an auditable architectural claim (the crate must
 /// actually define the substrate types) rather than a list of
 /// forbidden tokens to bypass.
+#[must_use]
 pub fn crate_introduces_category(ctx: &LintContext, category: &str) -> bool {
     ctx.primitive_introductions
         .get(ctx.crate_name)
