@@ -34,8 +34,6 @@ impl Lint for NoBareString {
         };
 
         if crate_introduces_category(ctx, categories::STRING) { return Vec::new(); }
-        let check_string = true;
-        let check_str = true;
         for (rel_path, source) in sources {
             for (idx, raw_line) in source.lines().enumerate() {
                 let trimmed = raw_line.trim_start();
@@ -45,7 +43,7 @@ impl Lint for NoBareString {
                 let scan = strip_strings_and_chars(raw_line);
                 let scan = strip_line_comment(&scan);
 
-                if check_string && contains_bare_string_type(&scan) {
+                if contains_bare_string_type(&scan) {
                     out.push(err(
                         ctx,
                         idx + 1,
@@ -58,7 +56,7 @@ impl Lint for NoBareString {
                     ));
                     continue;
                 }
-                if check_str && contains_non_static_str_ref(&scan) {
+                if contains_non_static_str_ref(&scan) {
                     out.push(err(
                         ctx,
                         idx + 1,
