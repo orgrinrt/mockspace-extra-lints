@@ -2,7 +2,7 @@
 //!
 //! Historically scoped to public fn signatures; now scans the entire
 //! source to match the "arvo is the exclusive numeric substrate" rule
-//! verbatim — bare `u*`/`i*`/`f*`/`usize`/`isize`/`bool` do not exist
+//! verbatim. Bare `u*`/`i*`/`f*`/`usize`/`isize`/`bool` do not exist
 //! in this stack, not in pub API, not in private fields, not in
 //! expressions, not in casts, not in literal suffixes.
 //!
@@ -59,7 +59,7 @@ impl Lint for NoBareNumeric {
                             idx + 1,
                             "no-bare-numeric",
                             format!(
-                                "bare `{prim}` in {} line {} — arvo is the exclusive numeric substrate. Wrap in UFixed / IFixed / FastFloat / StrictFloat / USize / Cap / Bool or a domain alias; bare primitives do not exist in this stack",
+                                "bare `{prim}` in {} line {}. arvo is the exclusive numeric substrate. Wrap in UFixed / IFixed / FastFloat / StrictFloat / USize / Cap / Bool or a domain alias; bare primitives do not exist in this stack",
                                 rel_path,
                                 idx + 1,
                             ),

@@ -1,6 +1,6 @@
 //! Lint: every public `UFixed<I, F>` / `IFixed<I, F>` numeric type
-//! position must carry an explicit `S: Strategy` marker — `Hot`, `Warm`,
-//! `Cold`, `Precise`, or a bound. A bare `UFixed<I32, F0>` without `S`
+//! position must carry an explicit `S: Strategy` marker (`Hot`, `Warm`,
+//! `Cold`, `Precise`, or a bound). A bare `UFixed<I32, F0>` without `S`
 //! signals a sloppy signature where the caller can't choose container
 //! speed.
 

@@ -5,7 +5,7 @@
 //! `u32`, `bool`, `String`, `Vec<T>`, `Option<T>`, etc. signals
 //! the "primitives don't exist in this stack" rule being broken.
 //!
-//! Scope is universal — both pub and private fields, both pub and
+//! Scope is universal: both pub and private fields, both pub and
 //! private structs. The historical name `no-public-raw-field` is
 //! retained for config compatibility; the scope is no longer
 //! restricted to public fields.
@@ -18,7 +18,7 @@ use crate::util::{categories, crate_introduces_category, err, for_each_struct, t
 /// Forbidden field types paired with the substrate category each
 /// falls under. When a crate is tagged as introducing a category,
 /// the check skips forbidden types in that category but continues
-/// scanning types in other categories — a `["numeric"]`-tagged
+/// scanning types in other categories. A `["numeric"]`-tagged
 /// crate still gets its `String` fields flagged.
 const FORBIDDEN_FIELD_TYPES: &[(&str, &str)] = &[
     ("u8",    categories::NUMERIC),
@@ -188,7 +188,7 @@ fn report_if_forbidden(
                 line,
                 "no-public-raw-field",
                 format!(
-                    "field `{field_name}: {type_text}` in {rel_path} uses raw `{forbidden}` — wrap in a domain newtype or arvo primitive. Bare primitives do not exist in this stack (pub or private field, no exception)"
+                    "field `{field_name}: {type_text}` in {rel_path} uses raw `{forbidden}`. Wrap in a domain newtype or arvo primitive. Bare primitives do not exist in this stack (pub or private field, no exception)"
                 ),
             ));
             return;

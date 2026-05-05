@@ -1,5 +1,5 @@
 //! Coverage test: the tightened `no-bare-*` and `arvo-types-only`
-//! lints fire on drift ANYWHERE in source — not just public fn
+//! lints fire on drift ANYWHERE in source, not just public fn
 //! signatures.
 //!
 //! Every case here captures a real leak in the pre-tightening lints:
@@ -394,7 +394,7 @@ fn arvo_types_only_fires_on_non_introducer_crate() {
 #[test]
 fn arvo_types_only_ignores_unknown_category() {
     // Adding a string that isn't a known category (e.g. a raw std
-    // primitive name) has no effect — the lint only matches known
+    // primitive name) has no effect; the lint only matches known
     // categories. This is the anti-bypass property: you can't just
     // add "u32" to your list to silence the lint.
     let ctx = ctx_with_crate_and_introductions(
@@ -443,7 +443,7 @@ fn no_bare_option_fires_on_non_fallibility_crate() {
 #[test]
 fn no_public_raw_field_numeric_introducer_still_flags_string_fields() {
     // Numeric introducer gets numeric field types exempted, but a
-    // bare `String` field still fires — the crate doesn't introduce
+    // bare `String` field still fires; the crate doesn't introduce
     // the string substrate.
     let ctx = ctx_with_crate_and_introductions(
         "arvo",

@@ -10,11 +10,11 @@
 //!   enclosing item / module / file). Debug-only diagnostics and Debug
 //!   impl bodies live there; release builds drop them.
 //! - Post-`hilavitkutin-str` crates (hilavitkutin engine + consumers,
-//!   clause) use `hilavitkutin_str::Str` interning via `str_const!()` at
+//!   vehje) use `hilavitkutin_str::Str` interning via `str_const!()` at
 //!   the call site instead of a bare literal.
 //!
 //! `hilavitkutin-str` itself introduces the `static-string` substrate
-//! category and is exempt from the lint — it is the source-of-truth for
+//! category and is exempt from the lint; it is the source-of-truth for
 //! compile-time string handles.
 //!
 //! Implementation: tree-sitter walk of `const_item` and `static_item`
@@ -25,7 +25,7 @@
 //! present.
 //!
 //! Escape hatch: inline `// lint:allow(no-bare-static-str) reason: ...;
-//! tracked: #N` — only when a foreign contract or macro-expansion path
+//! tracked: #N`: only when a foreign contract or macro-expansion path
 //! genuinely requires a bare literal at runtime.
 
 use mockspace_lint_rules::{Lint, LintContext, LintError, Severity};
@@ -42,7 +42,7 @@ impl Lint for NoBareStaticStr {
 
     fn check(&self, ctx: &LintContext) -> Vec<LintError> {
         if ctx.should_skip_proc_macro_source_lint() { return Vec::new(); }
-        // hilavitkutin-str introduces this category — it is the interning
+        // hilavitkutin-str introduces this category; it is the interning
         // home and its own internals are the legitimate site for static
         // string tables.
         if crate_introduces_category(ctx, categories::STATIC_STRING) {
@@ -119,7 +119,7 @@ fn walk(
                                 line,
                                 "no-bare-static-str",
                                 format!(
-                                    "bare `{keyword} {name}: &str` in {rel_path} line {line} — gate behind `#[cfg(debug_assertions)]` (pre-hilavitkutin-str crates) or use `hilavitkutin_str::Str::const!()` interning (post-hilavitkutin-str crates). Static &str does not exist in this stack outside debug builds"
+                                    "bare `{keyword} {name}: &str` in {rel_path} line {line}. Gate behind `#[cfg(debug_assertions)]` (pre-hilavitkutin-str crates) or use `hilavitkutin_str::Str::const!()` interning (post-hilavitkutin-str crates). Static &str does not exist in this stack outside debug builds"
                                 ),
                             ));
                         }
@@ -228,7 +228,7 @@ fn attribute_is_debug_gate(attr: Node, source: &str) -> bool {
     if !text.contains("debug_assertions") {
         return false;
     }
-    // Reject `#[cfg(not(debug_assertions))]` — opposite meaning.
+    // Reject `#[cfg(not(debug_assertions))]`: opposite meaning.
     if text.contains("not(debug_assertions)") {
         return false;
     }

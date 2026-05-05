@@ -51,7 +51,7 @@ impl Lint for NoBareString {
                         idx + 1,
                         "no-bare-string",
                         format!(
-                            "bare `String` in {} line {} — use hilavitkutin_str::Str. String is heap-allocated and does not exist in this stack",
+                            "bare `String` in {} line {}. Use hilavitkutin_str::Str. String is heap-allocated and does not exist in this stack",
                             rel_path,
                             idx + 1,
                         ),
@@ -64,7 +64,7 @@ impl Lint for NoBareString {
                         idx + 1,
                         "no-bare-string",
                         format!(
-                            "non-static `&str` in {} line {} — use `&'static str` or hilavitkutin_str::Str. Unowned borrowed strings do not cross API boundaries",
+                            "non-static `&str` in {} line {}. Use `&'static str` or hilavitkutin_str::Str. Unowned borrowed strings do not cross API boundaries",
                             rel_path,
                             idx + 1,
                         ),
@@ -150,7 +150,7 @@ fn strip_strings_and_chars(line: &str) -> String {
                 i += 1;
             }
         } else if b == b'\'' {
-            // Don't consume the tick here — char literals are recognised
+            // Don't consume the tick here. Char literals are recognised
             // above, lifetimes start with a tick that's NOT a char-literal
             // opener (no closing tick on the line). Treat identical to
             // the numeric lint.

@@ -5,7 +5,7 @@
 //! // lint:allow(<rule>) reason: <why>; tracked: #<task-id>
 //! ```
 //!
-//! Loose forms — no reason, no tracked id — get rejected. This ensures
+//! Loose forms (no reason, no tracked id) get rejected. This ensures
 //! every escape becomes an auditable piece of debt.
 
 use mockspace_lint_rules::{Lint, LintContext, LintError, Severity};
