@@ -46,6 +46,7 @@ fn ctx(crate_name: &'static str, introductions: Vec<(&'static str, Vec<&'static 
         shame_doc: None,
         workspace_root: std::path::Path::new("/tmp"),
         proc_macro_crates: &[],
+        lint_proc_macro_source: false,
         crate_prefix: "test",
         primitive_introductions: introductions_leaked,
     }
