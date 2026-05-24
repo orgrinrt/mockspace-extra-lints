@@ -32,6 +32,7 @@ use mockspace_lint_rules::{Lint, LintContext, LintError, Severity};
 use tree_sitter::{Node, Parser, Tree};
 
 use crate::util::{categories, crate_introduces_category, err, txt};
+use crate::util::line_lint_allowed;
 
 pub struct NoBareStaticStr;
 
@@ -108,7 +109,7 @@ fn walk(
                     if !is_debug_gated(node, source) {
                         let line = node.start_position().row + 1;
                         let raw_line = source.lines().nth(node.start_position().row).unwrap_or("");
-                        if !raw_line.contains("lint:allow(no-bare-static-str)") {
+                        if !line_lint_allowed(raw_line, "no-bare-static-str") {
                             let name = node
                                 .child_by_field_name("name")
                                 .map(|n| txt(n, source).to_string())

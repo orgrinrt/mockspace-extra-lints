@@ -8,6 +8,7 @@ use mockspace_lint_rules::{Lint, LintContext, LintError, Severity};
 use tree_sitter::Node;
 
 use crate::util::{err, for_each_fn, is_public, txt};
+use crate::util::line_lint_allowed;
 
 pub struct StrategyMarkerRequired;
 
@@ -30,7 +31,7 @@ impl Lint for StrategyMarkerRequired {
 fn check_fn(node: Node, ctx: &LintContext, out: &mut Vec<LintError>) {
     let line = node.start_position().row + 1;
     let src_line = ctx.source.lines().nth(node.start_position().row).unwrap_or("");
-    if src_line.contains("lint:allow(strategy-marker-required)") { return; }
+    if line_lint_allowed(src_line, "strategy-marker-required") { return; }
 
     let mut sig = String::new();
     if let Some(params) = node.child_by_field_name("parameters") {

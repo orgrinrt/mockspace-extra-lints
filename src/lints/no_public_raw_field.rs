@@ -14,6 +14,7 @@ use mockspace_lint_rules::{Lint, LintContext, LintError, Severity};
 use tree_sitter::{Node, Parser, Tree};
 
 use crate::util::{categories, crate_introduces_category, err, for_each_struct, txt};
+use crate::util::line_lint_allowed;
 
 /// Forbidden field types paired with the substrate category each
 /// falls under. When a crate is tagged as introducing a category,
@@ -122,7 +123,7 @@ fn scan_named_body(
             .lines()
             .nth(field.start_position().row)
             .unwrap_or("");
-        if src_line.contains("lint:allow(no-public-raw-field)") { continue; }
+        if line_lint_allowed(src_line, "no-public-raw-field") { continue; }
 
         let type_text = match field.child_by_field_name("type") {
             Some(t) => txt(t, source).trim().to_string(),
@@ -161,7 +162,7 @@ fn scan_tuple_body(
             .lines()
             .nth(field.start_position().row)
             .unwrap_or("");
-        if src_line.contains("lint:allow(no-public-raw-field)") { continue; }
+        if line_lint_allowed(src_line, "no-public-raw-field") { continue; }
 
         let type_text = txt(field, source).trim().to_string();
         if type_text.is_empty() { continue; }

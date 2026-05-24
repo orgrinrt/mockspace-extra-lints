@@ -29,6 +29,7 @@
 use mockspace_lint_rules::{Lint, LintContext, LintError, Severity};
 
 use crate::util::{categories, crate_introduces_category, err};
+use crate::util::line_lint_allowed;
 
 const BARE_PRIMITIVES: &[&str] = &[
     "u8", "u16", "u32", "u64", "u128",
@@ -67,7 +68,7 @@ impl Lint for ArvoTypesOnly {
             for (idx, raw_line) in source.lines().enumerate() {
                 let trimmed_start = raw_line.trim_start();
                 if trimmed_start.starts_with("//") { continue; }
-                if raw_line.contains("lint:allow(arvo-types-only)") { continue; }
+                if line_lint_allowed(raw_line, "arvo-types-only") { continue; }
 
                 let scan = strip_string_and_char_literals(raw_line);
                 let scan = strip_line_comment(&scan);
