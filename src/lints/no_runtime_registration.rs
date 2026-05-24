@@ -6,6 +6,7 @@
 use mockspace_lint_rules::{Lint, LintContext, LintError, Severity};
 
 use crate::util::err;
+use crate::util::line_lint_allowed;
 
 const PATTERNS: &[&str] = &[
     "lazy_static!",
@@ -34,7 +35,7 @@ impl Lint for NoRuntimeRegistration {
         for (idx, line) in ctx.source.lines().enumerate() {
             let trimmed = line.trim_start();
             if trimmed.starts_with("//") { continue; }
-            if line.contains("lint:allow(no-runtime-registration)") { continue; }
+            if line_lint_allowed(line, "no-runtime-registration") { continue; }
             for p in PATTERNS {
                 if line.contains(p) {
                     out.push(err(

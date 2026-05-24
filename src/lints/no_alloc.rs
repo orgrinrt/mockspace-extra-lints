@@ -9,6 +9,7 @@
 use mockspace_lint_rules::{Lint, LintContext, LintError, Severity};
 
 use crate::util::err;
+use crate::util::line_lint_allowed;
 
 const ALLOC_PATHS: &[&str] = &[
     "alloc::",
@@ -51,7 +52,7 @@ impl Lint for NoAlloc {
             if trimmed.starts_with("//") {
                 continue;
             }
-            if line.contains("lint:allow(no-alloc)") {
+            if line_lint_allowed(line, "no-alloc") {
                 continue;
             }
             let lineno = idx + 1;

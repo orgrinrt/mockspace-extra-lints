@@ -6,6 +6,7 @@
 use mockspace_lint_rules::{Lint, LintContext, LintError, Severity};
 
 use crate::util::err;
+use crate::util::line_lint_allowed;
 
 pub struct NoDynDispatch;
 
@@ -20,7 +21,7 @@ impl Lint for NoDynDispatch {
         for (idx, line) in ctx.source.lines().enumerate() {
             let trimmed = line.trim_start();
             if trimmed.starts_with("//") { continue; }
-            if line.contains("lint:allow(no-dyn-dispatch)") { continue; }
+            if line_lint_allowed(line, "no-dyn-dispatch") { continue; }
             if contains_dyn_type(line) {
                 out.push(err(
                     ctx,

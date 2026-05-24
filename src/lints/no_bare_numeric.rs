@@ -13,6 +13,7 @@
 use mockspace_lint_rules::{Lint, LintContext, LintError, Severity};
 
 use crate::util::{categories, crate_introduces_category, err};
+use crate::util::line_lint_allowed;
 
 const BARE_NUMERICS: &[&str] = &[
     "u8", "u16", "u32", "u64", "u128",
@@ -47,7 +48,7 @@ impl Lint for NoBareNumeric {
             for (idx, raw_line) in source.lines().enumerate() {
                 let trimmed = raw_line.trim_start();
                 if trimmed.starts_with("//") { continue; }
-                if raw_line.contains("lint:allow(no-bare-numeric)") { continue; }
+                if line_lint_allowed(raw_line, "no-bare-numeric") { continue; }
 
                 let scan = strip_strings_and_chars(raw_line);
                 let scan = strip_line_comment(&scan);

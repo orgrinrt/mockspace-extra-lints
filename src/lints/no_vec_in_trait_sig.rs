@@ -6,6 +6,7 @@ use mockspace_lint_rules::{Lint, LintContext, LintError, Severity};
 use tree_sitter::Node;
 
 use crate::util::{err, for_each_trait, txt};
+use crate::util::line_lint_allowed;
 
 const FORBIDDEN_IN_TRAIT: &[&str] = &["Vec<", "HashMap<", "BTreeMap<", "HashSet<", "BTreeSet<", "VecDeque<", "String"];
 
@@ -39,7 +40,7 @@ fn check_trait(node: Node, ctx: &LintContext, out: &mut Vec<LintError>) {
         }
         let line = item.start_position().row + 1;
         let src_line = ctx.source.lines().nth(item.start_position().row).unwrap_or("");
-        if src_line.contains("lint:allow(no-vec-in-trait-sig)") { continue; }
+        if line_lint_allowed(src_line, "no-vec-in-trait-sig") { continue; }
 
         let name = item.child_by_field_name("name")
             .map(|n| txt(n, ctx.source))

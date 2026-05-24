@@ -7,6 +7,7 @@
 use mockspace_lint_rules::{Lint, LintContext, LintError, Severity};
 
 use crate::util::err;
+use crate::util::line_lint_allowed;
 
 pub struct NoStd;
 
@@ -22,7 +23,7 @@ impl Lint for NoStd {
         // first 20 lines to opt out for test / proc-macro crates).
         let head: String = ctx.source.lines().take(30).collect::<Vec<_>>().join("\n");
         let has_no_std = head.contains("#![no_std]");
-        let allowed_at_root = head.contains("lint:allow(no-std)");
+        let allowed_at_root = line_lint_allowed(&head, "no-std");
         if !has_no_std && !allowed_at_root && !ctx.is_proc_macro_crate() {
             out.push(err(
                 ctx,
@@ -37,7 +38,7 @@ impl Lint for NoStd {
             if line.trim_start().starts_with("//") {
                 continue;
             }
-            if line.contains("lint:allow(no-std)") {
+            if line_lint_allowed(line, "no-std") {
                 continue;
             }
             let has_use_std = line.contains("use std::");
