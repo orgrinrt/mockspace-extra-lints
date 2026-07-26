@@ -77,3 +77,96 @@ fn collecting_twice_accumulates_rather_than_replacing() {
     pack::collect(&mut p);
     assert_eq!(p.crate_lints.len(), first * 2);
 }
+
+/// Every preset names a lint the pack actually contributes.
+///
+/// A preset naming a lint that does not exist is silently inert: the project
+/// imports it, sees no error, and gets none of the enforcement it asked for.
+/// That is the failure class this whole arc exists to remove, so it is checked
+/// mechanically rather than by review.
+#[test]
+fn every_preset_names_a_lint_the_pack_contributes() {
+    let p = collected();
+    let contributed: Vec<&str> = all_lints(&p).iter().map(|l| l.name()).collect();
+
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("presets");
+    let mut checked = 0;
+    for entry in std::fs::read_dir(&dir).expect("presets dir") {
+        let path = entry.expect("dir entry").path();
+        if path.extension().and_then(|e| e.to_str()) != Some("toml") {
+            continue;
+        }
+        let text = std::fs::read_to_string(&path).expect("read preset");
+        let name = text
+            .lines()
+            .find_map(|l| l.strip_prefix("name = "))
+            .map(|v| v.trim().trim_matches('"').to_string())
+            .unwrap_or_else(|| panic!("{} has no top-level name", path.display()));
+        assert!(
+            contributed.contains(&name.as_str()),
+            "preset {} names lint `{name}`, which the pack does not contribute: {contributed:?}",
+            path.file_name().unwrap().to_string_lossy()
+        );
+        checked += 1;
+    }
+    assert!(checked > 0, "no presets were checked; the glob found nothing");
+}
+
+/// Every config key a preset sets is one its lint declares.
+///
+/// A typo in a preset key is otherwise silently ignored, leaving the knob at its
+/// default while the project believes it was set.
+///
+/// Currently red, and deliberately left so. 14 of the 15 pre-existing presets set
+/// keys their lint declares nothing for, because the pack's lints are hand-written
+/// Rust with the knobs hardcoded inside them, while the presets describe a
+/// primitive-driven design (`primitive = "token-scan"` and friends) that was never
+/// built. Nothing reads the `presets/` directory at all. Closing this means
+/// implementing those primitive kinds so the lints become configured instances.
+/// The assertion states the intended behaviour rather than the present one, so it
+/// flips to green when that lands.
+#[test]
+#[ignore = "catalogue: 14 of 15 presets set keys their lint ignores; the primitive \
+            layer the presets presume is not implemented and presets/ is never loaded"]
+fn every_preset_config_key_is_declared_by_its_lint() {
+    let p = collected();
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("presets");
+    for entry in std::fs::read_dir(&dir).expect("presets dir") {
+        let path = entry.expect("dir entry").path();
+        if path.extension().and_then(|e| e.to_str()) != Some("toml") {
+            continue;
+        }
+        let text = std::fs::read_to_string(&path).expect("read preset");
+        let Some(name) = text
+            .lines()
+            .find_map(|l| l.strip_prefix("name = "))
+            .map(|v| v.trim().trim_matches('"').to_string())
+        else {
+            continue;
+        };
+        let Some(lint) = all_lints(&p).into_iter().find(|l| l.name() == name) else {
+            continue; // covered by the test above
+        };
+        let declared = lint.config_keys();
+
+        // keys inside the [config] table only
+        let mut in_config = false;
+        for line in text.lines() {
+            let t = line.trim();
+            if t.starts_with('[') {
+                in_config = t == "[config]";
+                continue;
+            }
+            if !in_config || t.is_empty() || t.starts_with('#') {
+                continue;
+            }
+            let Some((key, _)) = t.split_once('=') else { continue };
+            let key = key.trim();
+            assert!(
+                declared.contains(&key),
+                "preset {} sets `{key}` on lint `{name}`, which declares only {declared:?}",
+                path.file_name().unwrap().to_string_lossy()
+            );
+        }
+    }
+}

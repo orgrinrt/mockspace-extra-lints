@@ -1,0 +1,15 @@
+schema_version = "1.0"
+name = "message-attribution"
+primitive = "message-attribution"
+description = "attribution policy for a project whose headless runs are Copilot: permits the Copilot provenance byline under autonomous mode, still no adverts"
+
+[config]
+assistant = ""
+autonomous = "*copilot*[bot]*"
+adverts = ""
+extra_patterns = "generated with [copilot"
+
+[severity]
+commit = "error"
+build = "error"
+push = "error"

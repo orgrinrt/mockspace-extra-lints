@@ -1,0 +1,18 @@
+schema_version = "1.0"
+name = "message-attribution"
+primitive = "message-attribution"
+description = "attribution policy for a project whose headless runs are Claude: permits the Claude provenance byline under autonomous mode, still no adverts"
+
+# Import this INSTEAD of message-attribution when headless runs should record
+# provenance. The advert axis stays denied: provenance is warranted when nobody
+# was watching, an advert is unwarranted regardless of who was.
+[config]
+assistant = ""
+autonomous = "Claude *<noreply@anthropic.com>"
+adverts = ""
+extra_patterns = "claude-session:,generated with [claude"
+
+[severity]
+commit = "error"
+build = "error"
+push = "error"

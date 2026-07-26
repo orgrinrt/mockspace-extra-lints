@@ -1,0 +1,19 @@
+schema_version = "1.0"
+name = "commit-style"
+primitive = "commit-message"
+description = "conventional commits as specified: a type prefix from the standard vocabulary, an optional parenthesised scope, `!` for breaking"
+
+# Constrains the type vocabulary and nothing else, so importing this does not
+# silently also adopt case, length or punctuation rules a project has not asked
+# for. Add those knobs explicitly if they are wanted.
+[config]
+types = "feat,fix,docs,style,refactor,perf,test,build,ci,chore,revert"
+separator = ": "
+breaking_marker = "!"
+require_type = "true"
+allow_scope = "true"
+
+[severity]
+commit = "error"
+build = "error"
+push = "error"

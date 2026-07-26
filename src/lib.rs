@@ -24,6 +24,8 @@ pub mod lints {
     //! `mockspace_lint_rules::CrateLint` or `WorkspaceLint`, over the shared
     //! `Lint` supertrait.
 
+    pub mod commit_style;
+    pub mod message_attribution;
     pub mod no_alloc;
     pub mod no_std;
     pub mod no_bare_option;
@@ -45,7 +47,9 @@ pub mod lints {
 }
 
 use lints::{
-    arvo_types_only::ArvoTypesOnly, lint_allow_requires_task_id::LintAllowRequiresTaskId,
+    arvo_types_only::ArvoTypesOnly,
+    commit_style::CommitStyle,
+    message_attribution::MessageAttribution, lint_allow_requires_task_id::LintAllowRequiresTaskId,
     no_alloc::NoAlloc, no_bare_numeric::NoBareNumeric, no_bare_option::NoBareOption,
     no_bare_result::NoBareResult, no_bare_static_str::NoBareStaticStr,
     no_bare_string::NoBareString, no_dyn_dispatch::NoDynDispatch,
@@ -77,5 +81,11 @@ mockspace_lint_rules::lint_pack! {
     ],
     workspace_lints: [
         WritingStyle,
+    ],
+    // Both carry configuration, so they are constructed rather than named as
+    // unit structs. The macro takes expressions for exactly this case.
+    message_lints: [
+        CommitStyle::default(),
+        MessageAttribution::default(),
     ],
 }
