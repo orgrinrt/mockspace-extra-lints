@@ -17,4 +17,4 @@ push = "error"
 
 [scope]
 paths = ["**/*.rs"]
-exempt_crates = ["mockspace-rs", "mockspace-hilavitkutin-stack-lints"]
+exempt_crates = ["mockspace-rs", "mockspace-extra-lints"]

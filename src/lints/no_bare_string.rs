@@ -9,7 +9,7 @@
 //! position is drift. Line-local `lint:allow(no-bare-string)` is the
 //! only escape hatch, for foreign-crate boundaries.
 
-use mockspace_lint_rules::{Lint, LintContext, LintError, Severity};
+use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 
 use crate::util::{categories, crate_introduces_category, err};
 use crate::util::line_lint_allowed;
@@ -18,9 +18,10 @@ pub struct NoBareString;
 
 impl Lint for NoBareString {
     fn name(&self) -> &'static str { "no-bare-string" }
-
     fn default_severity(&self) -> Severity { Severity::HARD_ERROR }
+}
 
+impl CrateLint for NoBareString {
     fn check(&self, ctx: &LintContext) -> Vec<LintError> {
         if ctx.should_skip_proc_macro_source_lint() { return Vec::new(); }
         let mut out = Vec::new();

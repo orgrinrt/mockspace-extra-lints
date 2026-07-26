@@ -6,7 +6,7 @@
 //!
 //! Escape hatch for a single line: `// lint:allow(no-alloc) reason: ...; tracked: #N`.
 
-use mockspace_lint_rules::{Lint, LintContext, LintError, Severity};
+use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 
 use crate::util::err;
 use crate::util::line_lint_allowed;
@@ -37,9 +37,10 @@ pub struct NoAlloc;
 
 impl Lint for NoAlloc {
     fn name(&self) -> &'static str { "no-alloc" }
-
     fn default_severity(&self) -> Severity { Severity::HARD_ERROR }
+}
 
+impl CrateLint for NoAlloc {
     fn check(&self, ctx: &LintContext) -> Vec<LintError> {
         // Proc-macro crates run in the compiler host context and use std
         // by construction. Their heap usage is not consumer-runtime heap.

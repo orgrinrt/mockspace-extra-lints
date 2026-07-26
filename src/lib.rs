@@ -4,7 +4,7 @@
 //!
 //! ```toml
 //! [lint-crates]
-//! mockspace-hilavitkutin-stack-lints = { path = "../mockspace-hilavitkutin-stack-lints" }
+//! mockspace-extra-lints = { path = "../mockspace-extra-lints" }
 //! ```
 //!
 //! Every lint is emitted from one place so severity policy stays in sync
@@ -14,7 +14,8 @@ mod util;
 
 pub mod lints {
     //! Individual lint rules. Each is a unit struct that implements
-    //! `mockspace_lint_rules::Lint` or `CrossCrateLint`.
+    //! `mockspace_lint_rules::CrateLint` or `WorkspaceLint`, over the shared
+    //! `Lint` supertrait.
 
     pub mod no_alloc;
     pub mod no_std;
@@ -67,7 +68,7 @@ mockspace_lint_rules::lint_pack! {
         ArvoTypesOnly,
         LintAllowRequiresTaskId,
     ],
-    cross_lints: [
+    workspace_lints: [
         WritingStyle,
     ],
 }

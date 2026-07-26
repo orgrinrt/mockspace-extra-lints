@@ -4,7 +4,7 @@
 //! Escape via `// lint:allow(no-std)`. Test crates may disable via
 //! `[lints.no-std] severity = "off"`.
 
-use mockspace_lint_rules::{Lint, LintContext, LintError, Severity};
+use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 
 use crate::util::err;
 use crate::util::line_lint_allowed;
@@ -13,9 +13,10 @@ pub struct NoStd;
 
 impl Lint for NoStd {
     fn name(&self) -> &'static str { "no-std" }
-
     fn default_severity(&self) -> Severity { Severity::HARD_ERROR }
+}
 
+impl CrateLint for NoStd {
     fn check(&self, ctx: &LintContext) -> Vec<LintError> {
         let mut out = Vec::new();
 
