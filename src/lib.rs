@@ -25,6 +25,7 @@ pub mod lints {
     //! `Lint` supertrait.
 
     pub mod commit_style;
+    pub mod forge_body;
     pub mod message_attribution;
     pub mod no_alloc;
     pub mod no_std;
@@ -49,6 +50,7 @@ pub mod lints {
 use lints::{
     arvo_types_only::ArvoTypesOnly,
     commit_style::CommitStyle,
+    forge_body::ForgeBody,
     message_attribution::MessageAttribution, lint_allow_requires_task_id::LintAllowRequiresTaskId,
     no_alloc::NoAlloc, no_bare_numeric::NoBareNumeric, no_bare_option::NoBareOption,
     no_bare_result::NoBareResult, no_bare_static_str::NoBareStaticStr,
@@ -86,6 +88,7 @@ mockspace_lint_rules::lint_pack! {
     // unit structs. The macro takes expressions for exactly this case.
     message_lints: [
         CommitStyle::default(),
+        ForgeBody::default(),
         MessageAttribution::default(),
     ],
 }
