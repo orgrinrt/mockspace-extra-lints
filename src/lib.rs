@@ -1,14 +1,21 @@
-//! Mockspace lint pack for the hilavitkutin / arvo / notko / vehje stack.
+//! An opt-in mockspace lint pack: shared lints and presets a project imports
+//! because it wants them, rather than anything mockspace ships by default.
 //!
-//! Consumed by each repo's `mockspace.toml` via:
+//! The stack lints (no-alloc, no-std, the bare-primitive family, the arvo and
+//! strategy-marker rules) came first and are why this existed, but nothing here
+//! is limited to that stack, and the commit-style and forge-body presets it also
+//! carries are general.
+//!
+//! Consumed by a repo's `mockspace.toml` via:
 //!
 //! ```toml
 //! [lint-crates]
 //! mockspace-extra-lints = { path = "../mockspace-extra-lints" }
 //! ```
 //!
-//! Every lint is emitted from one place so severity policy stays in sync
-//! across arvo, hilavitkutin, vehje, and notko.
+//! Emitting every lint from one place is the point: policy stays in sync across
+//! importers instead of drifting per repo, which is exactly what happened to the
+//! hand-copied commit-style rule before it moved here.
 
 mod util;
 
