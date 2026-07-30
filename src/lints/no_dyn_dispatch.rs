@@ -3,7 +3,7 @@
 //! uses monomorphisation; dispatch is a zero-cost abstraction only when
 //! static.
 
-use mockspace_lint_rules::{Lint, LintContext, LintError, Severity};
+use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 
 use crate::util::err;
 use crate::util::line_lint_allowed;
@@ -12,9 +12,10 @@ pub struct NoDynDispatch;
 
 impl Lint for NoDynDispatch {
     fn name(&self) -> &'static str { "no-dyn-dispatch" }
-
     fn default_severity(&self) -> Severity { Severity::HARD_ERROR }
+}
 
+impl CrateLint for NoDynDispatch {
     fn check(&self, ctx: &LintContext) -> Vec<LintError> {
         if ctx.should_skip_proc_macro_source_lint() { return Vec::new(); }
         let mut out = Vec::new();

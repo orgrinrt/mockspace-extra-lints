@@ -14,7 +14,7 @@
 
 use std::path::{Path, PathBuf};
 
-use mockspace_lint_rules::{CrossCrateLint, LintContext, LintError, Severity};
+use mockspace_lint_rules::{Lint, LintContext, LintError, Severity, WorkspaceLint};
 
 const HYPE_WORDS: &[&str] = &[
     "blazing", "seamless", "powerful", "amazing", "incredible",
@@ -44,13 +44,13 @@ const EM_DASH_PER_LINES: usize = 10;
 
 pub struct WritingStyle;
 
-impl CrossCrateLint for WritingStyle {
+impl Lint for WritingStyle {
     fn name(&self) -> &'static str { "writing-style" }
-
     fn source_only(&self) -> bool { false }
-
     fn default_severity(&self) -> Severity { Severity::PUSH_GATE }
+}
 
+impl WorkspaceLint for WritingStyle {
     fn check_all(&self, crates: &[(&str, &LintContext)]) -> Vec<LintError> {
         let workspace_root = match crates.first() {
             Some((_, ctx)) => ctx.workspace_root,

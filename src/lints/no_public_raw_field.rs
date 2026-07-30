@@ -10,7 +10,7 @@
 //! retained for config compatibility; the scope is no longer
 //! restricted to public fields.
 
-use mockspace_lint_rules::{Lint, LintContext, LintError, Severity};
+use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 use tree_sitter::{Node, Parser, Tree};
 
 use crate::util::{categories, crate_introduces_category, err, for_each_struct, txt};
@@ -45,9 +45,10 @@ pub struct NoPublicRawField;
 
 impl Lint for NoPublicRawField {
     fn name(&self) -> &'static str { "no-public-raw-field" }
-
     fn default_severity(&self) -> Severity { Severity::HARD_ERROR }
+}
 
+impl CrateLint for NoPublicRawField {
     fn check(&self, ctx: &LintContext) -> Vec<LintError> {
         if ctx.should_skip_proc_macro_source_lint() { return Vec::new(); }
         // Per-category skip happens inside `report_if_forbidden`: a

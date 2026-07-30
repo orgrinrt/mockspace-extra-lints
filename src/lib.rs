@@ -1,21 +1,32 @@
-//! Mockspace lint pack for the hilavitkutin / arvo / notko / vehje stack.
+//! An opt-in mockspace lint pack: shared lints and presets a project imports
+//! because it wants them, rather than anything mockspace ships by default.
 //!
-//! Consumed by each repo's `mockspace.toml` via:
+//! The stack lints (no-alloc, no-std, the bare-primitive family, the arvo and
+//! strategy-marker rules) came first and are why this existed, but nothing here
+//! is limited to that stack, and the commit-style and forge-body presets it also
+//! carries are general.
+//!
+//! Consumed by a repo's `mockspace.toml` via:
 //!
 //! ```toml
 //! [lint-crates]
-//! mockspace-hilavitkutin-stack-lints = { path = "../mockspace-hilavitkutin-stack-lints" }
+//! mockspace-extra-lints = { path = "../mockspace-extra-lints" }
 //! ```
 //!
-//! Every lint is emitted from one place so severity policy stays in sync
-//! across arvo, hilavitkutin, vehje, and notko.
+//! Emitting every lint from one place is the point: policy stays in sync across
+//! importers instead of drifting per repo, which is exactly what happened to the
+//! hand-copied commit-style rule before it moved here.
 
 mod util;
 
 pub mod lints {
     //! Individual lint rules. Each is a unit struct that implements
-    //! `mockspace_lint_rules::Lint` or `CrossCrateLint`.
+    //! `mockspace_lint_rules::CrateLint` or `WorkspaceLint`, over the shared
+    //! `Lint` supertrait.
 
+    pub mod commit_style;
+    pub mod forge_body;
+    pub mod message_attribution;
     pub mod no_alloc;
     pub mod no_std;
     pub mod no_bare_option;
@@ -37,7 +48,10 @@ pub mod lints {
 }
 
 use lints::{
-    arvo_types_only::ArvoTypesOnly, lint_allow_requires_task_id::LintAllowRequiresTaskId,
+    arvo_types_only::ArvoTypesOnly,
+    commit_style::CommitStyle,
+    forge_body::ForgeBody,
+    message_attribution::MessageAttribution, lint_allow_requires_task_id::LintAllowRequiresTaskId,
     no_alloc::NoAlloc, no_bare_numeric::NoBareNumeric, no_bare_option::NoBareOption,
     no_bare_result::NoBareResult, no_bare_static_str::NoBareStaticStr,
     no_bare_string::NoBareString, no_dyn_dispatch::NoDynDispatch,
@@ -67,7 +81,14 @@ mockspace_lint_rules::lint_pack! {
         ArvoTypesOnly,
         LintAllowRequiresTaskId,
     ],
-    cross_lints: [
+    workspace_lints: [
         WritingStyle,
+    ],
+    // Both carry configuration, so they are constructed rather than named as
+    // unit structs. The macro takes expressions for exactly this case.
+    message_lints: [
+        CommitStyle::default(),
+        ForgeBody::default(),
+        MessageAttribution::default(),
     ],
 }

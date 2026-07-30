@@ -10,7 +10,7 @@
 //! named it still apply; the two are semantically equivalent today.
 //! Prefer `arvo-types-only` in new configs.
 
-use mockspace_lint_rules::{Lint, LintContext, LintError, Severity};
+use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 
 use crate::util::{categories, crate_introduces_category, err};
 use crate::util::line_lint_allowed;
@@ -27,9 +27,10 @@ pub struct NoBareNumeric;
 
 impl Lint for NoBareNumeric {
     fn name(&self) -> &'static str { "no-bare-numeric" }
-
     fn default_severity(&self) -> Severity { Severity::HARD_ERROR }
+}
 
+impl CrateLint for NoBareNumeric {
     fn check(&self, ctx: &LintContext) -> Vec<LintError> {
         if ctx.should_skip_proc_macro_source_lint() { return Vec::new(); }
         if crate_introduces_category(ctx, categories::NUMERIC) { return Vec::new(); }

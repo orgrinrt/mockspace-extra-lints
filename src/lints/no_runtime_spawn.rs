@@ -2,7 +2,7 @@
 //! `rayon::spawn`, and similar thread/task launchers. Concurrency in the
 //! stack is scheduler-managed, not ad-hoc.
 
-use mockspace_lint_rules::{Lint, LintContext, LintError, Severity};
+use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 
 use crate::util::err;
 use crate::util::line_lint_allowed;
@@ -22,9 +22,10 @@ pub struct NoRuntimeSpawn;
 
 impl Lint for NoRuntimeSpawn {
     fn name(&self) -> &'static str { "no-runtime-spawn" }
-
     fn default_severity(&self) -> Severity { Severity::HARD_ERROR }
+}
 
+impl CrateLint for NoRuntimeSpawn {
     fn check(&self, ctx: &LintContext) -> Vec<LintError> {
         if ctx.should_skip_proc_macro_source_lint() { return Vec::new(); }
         let mut out = Vec::new();

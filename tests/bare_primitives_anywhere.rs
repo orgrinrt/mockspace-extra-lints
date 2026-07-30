@@ -10,12 +10,12 @@
 
 use std::collections::BTreeSet;
 
-use mockspace_hilavitkutin_stack_lints::lints::{
+use mockspace_extra_lints::lints::{
     arvo_types_only::ArvoTypesOnly, no_bare_numeric::NoBareNumeric,
     no_bare_option::NoBareOption, no_bare_result::NoBareResult,
     no_bare_string::NoBareString, no_public_raw_field::NoPublicRawField,
 };
-use mockspace_lint_rules::{CrateSourceFile, Lint, LintContext};
+use mockspace_lint_rules::{CrateLint, CrateSourceFile, Lint, LintContext};
 
 fn ctx_with(source: &'static str) -> LintContext<'static> {
     let mut parser = tree_sitter::Parser::new();

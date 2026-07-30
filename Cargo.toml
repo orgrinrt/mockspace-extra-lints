@@ -1,8 +1,8 @@
 [package]
-name = "mockspace-hilavitkutin-stack-lints"
+name = "mockspace-extra-lints"
 version = "0.1.0"
 edition = "2021"
-description = "Mockspace lint pack for the hilavitkutin / arvo / notko / vehje stack"
+description = "Opt-in mockspace lint pack: shared lints and presets, imported by a project that wants them rather than shipped in mockspace core"
 license = "MPL-2.0"
 publish = false
 

@@ -2,7 +2,7 @@
 //! signatures. Traits are contracts; callers provide a sink/iterator,
 //! implementers don't return an owned heap container.
 
-use mockspace_lint_rules::{Lint, LintContext, LintError, Severity};
+use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 use tree_sitter::Node;
 
 use crate::util::{err, for_each_trait, txt};
@@ -14,9 +14,10 @@ pub struct NoVecInTraitSig;
 
 impl Lint for NoVecInTraitSig {
     fn name(&self) -> &'static str { "no-vec-in-trait-sig" }
-
     fn default_severity(&self) -> Severity { Severity::HARD_ERROR }
+}
 
+impl CrateLint for NoVecInTraitSig {
     fn check(&self, ctx: &LintContext) -> Vec<LintError> {
         if ctx.should_skip_proc_macro_source_lint() { return Vec::new(); }
         let mut out = Vec::new();

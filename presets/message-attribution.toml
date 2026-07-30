@@ -1,0 +1,20 @@
+schema_version = "1.0"
+name = "message-attribution"
+primitive = "message-attribution"
+description = "no agent authorship byline unless the active mode permits one, and no tool-advertising trailers on any surface"
+
+# Applies to commit messages AND forge bodies. A pull-request body never passes
+# through git, so no git hook can inspect one; this is the only layer that can.
+#
+# Both globs are empty, which permits nothing. That is the right default on the
+# provenance axis (work done with a human in the loop is the human's) and on the
+# advert axis (nobody wants a tool advert in their durable record).
+[config]
+assistant = ""
+autonomous = ""
+adverts = ""
+
+[severity]
+commit = "error"
+build = "error"
+push = "error"

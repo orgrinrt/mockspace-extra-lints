@@ -11,7 +11,7 @@
 //! carry `lint:allow(no-bare-result)` since the textual form still
 //! mentions `Result`.
 
-use mockspace_lint_rules::{Lint, LintContext, LintError, Severity};
+use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 
 use crate::util::{categories, crate_introduces_category, err};
 use crate::util::line_lint_allowed;
@@ -20,9 +20,10 @@ pub struct NoBareResult;
 
 impl Lint for NoBareResult {
     fn name(&self) -> &'static str { "no-bare-result" }
-
     fn default_severity(&self) -> Severity { Severity::HARD_ERROR }
+}
 
+impl CrateLint for NoBareResult {
     fn check(&self, ctx: &LintContext) -> Vec<LintError> {
         if ctx.should_skip_proc_macro_source_lint() { return Vec::new(); }
         let mut out = Vec::new();

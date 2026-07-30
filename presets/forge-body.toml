@@ -1,0 +1,21 @@
+schema_version = "1.0"
+name = "forge-body"
+primitive = "forge-body"
+description = "a pull-request body carries the sections a project requires, and none of its forbidden content"
+
+# Nothing is required or forbidden by default. What counts as leakage is entirely
+# project-specific, and a forge body is not something an engine should have
+# opinions about, so every entry here is a project's own declaration.
+#
+# `forbidden` entries are `pattern` or `pattern=reason`. The reason is shown when
+# the pattern matches, because a bare refusal leaves the author guessing and they
+# will work around it rather than fix it.
+[config]
+required_sections = ""
+min_length = ""
+forbidden = ""
+
+[severity]
+commit = "error"
+build = "error"
+push = "error"

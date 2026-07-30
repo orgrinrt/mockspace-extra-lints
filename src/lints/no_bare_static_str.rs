@@ -28,7 +28,7 @@
 //! tracked: #N`: only when a foreign contract or macro-expansion path
 //! genuinely requires a bare literal at runtime.
 
-use mockspace_lint_rules::{Lint, LintContext, LintError, Severity};
+use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 use tree_sitter::{Node, Parser, Tree};
 
 use crate::util::{categories, crate_introduces_category, err, txt};
@@ -38,9 +38,10 @@ pub struct NoBareStaticStr;
 
 impl Lint for NoBareStaticStr {
     fn name(&self) -> &'static str { "no-bare-static-str" }
-
     fn default_severity(&self) -> Severity { Severity::HARD_ERROR }
+}
 
+impl CrateLint for NoBareStaticStr {
     fn check(&self, ctx: &LintContext) -> Vec<LintError> {
         if ctx.should_skip_proc_macro_source_lint() { return Vec::new(); }
         // hilavitkutin-str introduces this category; it is the interning
