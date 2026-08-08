@@ -57,7 +57,7 @@ fn check_trait(node: Node, ctx: &LintContext, out: &mut Vec<LintError>) {
         }
 
         for forbidden in FORBIDDEN_IN_TRAIT {
-            if sig.contains(forbidden) {
+            if contains_type_named(&sig, forbidden) {
                 out.push(err(
                     ctx,
                     line,
@@ -68,4 +68,45 @@ fn check_trait(node: Node, ctx: &LintContext, out: &mut Vec<LintError>) {
             }
         }
     }
+}
+
+/// Whether `sig` names the type `needle`, rather than merely containing its
+/// letters.
+///
+/// Every entry but one in the forbidden list ends in `<`, which anchors it. The
+/// exception is `String`, and unanchored it matches any type whose name merely
+/// begins with those letters: `StringInterner`, `StringBuilder`, `Stringly`.
+/// A wrapper around an interner is not a heap string, and reporting it as one
+/// trains readers to reach for a `lint:allow` on a lint that was right about
+/// everything else.
+///
+/// So a match counts only when the character following it cannot continue a
+/// Rust identifier.
+fn contains_type_named(sig: &str, needle: &str) -> bool {
+    // An entry ending in `<` is already anchored by that bracket, and what
+    // follows it is the generic argument, which of course continues an
+    // identifier. Applying the boundary rule there would reject every real
+    // match.
+    let anchored = !needle
+        .chars()
+        .next_back()
+        .is_some_and(|c| c.is_alphanumeric() || c == '_');
+    if anchored {
+        return sig.contains(needle);
+    }
+
+    let mut from = 0;
+    while let Some(at) = sig[from ..].find(needle) {
+        let start = from + at;
+        let end = start + needle.len();
+        let next_continues_ident = sig[end ..]
+            .chars()
+            .next()
+            .is_some_and(|c| c.is_alphanumeric() || c == '_');
+        if !next_continues_ident {
+            return true;
+        }
+        from = end;
+    }
+    false
 }
