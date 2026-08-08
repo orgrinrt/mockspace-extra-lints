@@ -13,7 +13,7 @@
 use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 use tree_sitter::{Node, Parser, Tree};
 
-use crate::util::{categories, crate_introduces_category, err, for_each_struct, txt};
+use crate::util::{categories, crate_introduces_category, err_in_file, for_each_struct, txt};
 use crate::util::line_lint_allowed;
 
 /// Forbidden field types paired with the substrate category each
@@ -44,6 +44,13 @@ const FORBIDDEN_FIELD_TYPES: &[(&str, &str)] = &[
 pub struct NoPublicRawField;
 
 impl Lint for NoPublicRawField {
+    /// Walks `all_sources` itself, so the dispatcher must hand it the crate
+    /// once rather than once per file. Left at the default it would report
+    /// every finding once per file in the crate.
+    fn per_file(&self) -> bool {
+        false
+    }
+
     fn name(&self) -> &'static str { "no-public-raw-field" }
     fn default_severity(&self) -> Severity { Severity::HARD_ERROR }
 }
@@ -185,8 +192,9 @@ fn report_if_forbidden(
             // its category; keep scanning so an unrelated-category
             // type later in the list still fires.
             if crate_introduces_category(ctx, category) { return; }
-            out.push(err(
+            out.push(err_in_file(
                 ctx,
+                &rel_path,
                 line,
                 "no-public-raw-field",
                 format!(

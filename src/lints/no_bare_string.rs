@@ -11,12 +11,19 @@
 
 use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 
-use crate::util::{categories, crate_introduces_category, err};
+use crate::util::{categories, crate_introduces_category, err_in_file};
 use crate::util::line_lint_allowed;
 
 pub struct NoBareString;
 
 impl Lint for NoBareString {
+    /// Walks `all_sources` itself, so the dispatcher must hand it the crate
+    /// once rather than once per file. Left at the default it would report
+    /// every finding once per file in the crate.
+    fn per_file(&self) -> bool {
+        false
+    }
+
     fn name(&self) -> &'static str { "no-bare-string" }
     fn default_severity(&self) -> Severity { Severity::HARD_ERROR }
 }
@@ -46,8 +53,9 @@ impl CrateLint for NoBareString {
                 let scan = strip_line_comment(&scan);
 
                 if contains_bare_string_type(&scan) {
-                    out.push(err(
+                    out.push(err_in_file(
                         ctx,
+                        &rel_path,
                         idx + 1,
                         "no-bare-string",
                         format!(
@@ -59,8 +67,9 @@ impl CrateLint for NoBareString {
                     continue;
                 }
                 if contains_non_static_str_ref(&scan) {
-                    out.push(err(
+                    out.push(err_in_file(
                         ctx,
+                        &rel_path,
                         idx + 1,
                         "no-bare-string",
                         format!(

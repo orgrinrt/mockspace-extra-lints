@@ -28,7 +28,7 @@
 
 use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 
-use crate::util::{categories, crate_introduces_category, err};
+use crate::util::{categories, crate_introduces_category, err_in_file};
 use crate::util::line_lint_allowed;
 
 const BARE_PRIMITIVES: &[&str] = &[
@@ -42,6 +42,13 @@ const BARE_PRIMITIVES: &[&str] = &[
 pub struct ArvoTypesOnly;
 
 impl Lint for ArvoTypesOnly {
+    /// Walks `all_sources` itself, so the dispatcher must hand it the crate
+    /// once rather than once per file. Left at the default it would report
+    /// every finding once per file in the crate.
+    fn per_file(&self) -> bool {
+        false
+    }
+
     fn name(&self) -> &'static str { "arvo-types-only" }
     fn default_severity(&self) -> Severity { Severity::HARD_ERROR }
 }
@@ -76,8 +83,9 @@ impl CrateLint for ArvoTypesOnly {
 
                 for prim in BARE_PRIMITIVES {
                     if contains_bare_word(&scan, prim) {
-                        out.push(err(
+                        out.push(err_in_file(
                             ctx,
+                            &rel_path,
                             idx + 1,
                             "arvo-types-only",
                             format!(
