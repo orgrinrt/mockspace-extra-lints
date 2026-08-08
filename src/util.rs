@@ -269,3 +269,44 @@ pub fn err_in_file(
     e.path = Some(rel_path.as_ref().to_string());
     e
 }
+
+/// Whether `hay` names the type `needle`, rather than merely containing its
+/// letters.
+///
+/// A match counts only where the characters on each side cannot continue a Rust
+/// identifier, and **each side is gated on the needle itself**: the leading
+/// check applies when the needle starts with an identifier character, the
+/// trailing check when it ends with one.
+///
+/// That gating is what makes the rule uniform. `String` gets both checks, so
+/// `MyString` and `StringInterner` stop matching. `Vec<` gets a leading check
+/// and no trailing one, because what follows its bracket is the generic
+/// argument, so `MyVec<u8>` stops matching while `Vec<u8>` still does. Nothing
+/// infers behaviour from a trailing character, so adding an entry to a
+/// forbidden-type list cannot surprise whoever adds it.
+pub fn names_type(hay: &str, needle: &str) -> bool {
+    fn is_ident(b: u8) -> bool {
+        b.is_ascii_alphanumeric() || b == b'_'
+    }
+
+    if needle.is_empty() {
+        return false;
+    }
+    let (h, n) = (hay.as_bytes(), needle.as_bytes());
+    let check_before = is_ident(n[0]);
+    let check_after = is_ident(n[n.len() - 1]);
+
+    let mut i = 0;
+    while i + n.len() <= h.len() {
+        if &h[i .. i + n.len()] == n {
+            let before_ok = !check_before || i == 0 || !is_ident(h[i - 1]);
+            let after = i + n.len();
+            let after_ok = !check_after || after >= h.len() || !is_ident(h[after]);
+            if before_ok && after_ok {
+                return true;
+            }
+        }
+        i += 1;
+    }
+    false
+}

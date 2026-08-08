@@ -5,7 +5,7 @@
 use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 use tree_sitter::Node;
 
-use crate::util::{err, for_each_trait, txt};
+use crate::util::{err, for_each_trait, names_type, txt};
 use crate::util::line_lint_allowed;
 
 const FORBIDDEN_IN_TRAIT: &[&str] = &["Vec<", "HashMap<", "BTreeMap<", "HashSet<", "BTreeSet<", "VecDeque<", "String"];
@@ -57,7 +57,7 @@ fn check_trait(node: Node, ctx: &LintContext, out: &mut Vec<LintError>) {
         }
 
         for forbidden in FORBIDDEN_IN_TRAIT {
-            if sig.contains(forbidden) {
+            if names_type(&sig, forbidden) {
                 out.push(err(
                     ctx,
                     line,
@@ -69,3 +69,4 @@ fn check_trait(node: Node, ctx: &LintContext, out: &mut Vec<LintError>) {
         }
     }
 }
+
