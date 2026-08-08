@@ -12,7 +12,7 @@
 use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 use tree_sitter::Node;
 
-use crate::util::{err, for_each_fn, is_public, txt};
+use crate::util::{err, for_each_fn, is_public, names_type, txt};
 use crate::util::line_lint_allowed;
 
 pub struct TraitFirstSignatures;
@@ -47,7 +47,7 @@ fn check_fn(node: Node, ctx: &LintContext, out: &mut Vec<LintError>) {
     if let Some(ret) = node.child_by_field_name("return_type") {
         let text = txt(ret, ctx.source);
         for ty in &["Vec<", "HashMap<", "BTreeMap<", "HashSet<", "VecDeque<"] {
-            if text.contains(ty) {
+            if names_type(text, ty) {
                 out.push(err(
                     ctx,
                     line,
@@ -64,7 +64,7 @@ fn check_fn(node: Node, ctx: &LintContext, out: &mut Vec<LintError>) {
         let text = txt(params, ctx.source);
         // Heuristic: `: Vec<` as a parameter type → suggest impl IntoIterator.
         for ty in &[": Vec<", ": HashMap<", ": BTreeMap<", ": HashSet<", ": VecDeque<"] {
-            if text.contains(ty) {
+            if names_type(text, ty) {
                 out.push(err(
                     ctx,
                     line,

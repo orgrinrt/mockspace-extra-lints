@@ -13,7 +13,9 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use mockspace_extra_lints::lints::no_vec_in_trait_sig::NoVecInTraitSig;
+use mockspace_extra_lints::lints::{
+    no_vec_in_trait_sig::NoVecInTraitSig, trait_first_signatures::TraitFirstSignatures,
+};
 use mockspace_lint_rules::{CrateLint, CrateSourceFile, LintContext};
 
 fn ctx_with(source: &'static str) -> LintContext<'static> {
@@ -101,4 +103,58 @@ fn the_anchored_entries_still_fire() {
     let src = "pub trait Bag {\n    fn items(&self) -> Vec<u8>;\n}\n";
     let hits = NoVecInTraitSig.check(&ctx_with(src));
     assert_eq!(hits.len(), 1, "Vec< is anchored and must still fire");
+}
+
+// ---- the leading edge, which the first fix left standing -----------------
+
+/// A wrapper whose name *ends* in the forbidden one. The first version of this
+/// fix checked only the character after the match, so this still reported.
+#[test]
+fn a_type_merely_ending_with_string_is_not_a_string() {
+    let src = "pub trait Name {\n    fn set(&mut self, name: MyString);\n}\n";
+    let hits = NoVecInTraitSig.check(&ctx_with(src));
+    assert!(
+        hits.is_empty(),
+        "MyString is not String; got: {:?}",
+        hits.iter().map(|h| &h.message).collect::<Vec<_>>()
+    );
+}
+
+/// The shape that produced this whole change: a compact-string wrapper.
+#[test]
+fn a_compact_string_wrapper_is_not_a_string() {
+    let src = "pub trait Name {\n    fn set(&mut self, name: CompactString);\n}\n";
+    let hits = NoVecInTraitSig.check(&ctx_with(src));
+    assert!(hits.is_empty(), "CompactString is not String");
+}
+
+/// An anchored needle gets a leading check and no trailing one, so a wrapper
+/// around a container stops matching while the container itself does not.
+#[test]
+fn a_type_merely_ending_with_vec_is_not_a_vec() {
+    let src = "pub trait Bag {\n    fn items(&self) -> MyVec<u8>;\n}\n";
+    let hits = NoVecInTraitSig.check(&ctx_with(src));
+    assert!(hits.is_empty(), "MyVec<u8> is not Vec<u8>");
+}
+
+// ---- the sibling lint with the same defect -------------------------------
+
+/// `trait-first-signatures` carried the identical substring match and was not
+/// covered by the first version of this change.
+#[test]
+fn the_sibling_lint_does_not_report_a_wrapper_container() {
+    let src = "pub fn items() -> MyVec<u8> { todo!() }\n";
+    let hits = TraitFirstSignatures.check(&ctx_with(src));
+    assert!(
+        hits.is_empty(),
+        "MyVec<u8> is not a concrete Vec; got: {:?}",
+        hits.iter().map(|h| &h.message).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn the_sibling_lint_still_reports_a_real_container() {
+    let src = "pub fn items() -> Vec<u8> { todo!() }\n";
+    let hits = TraitFirstSignatures.check(&ctx_with(src));
+    assert!(!hits.is_empty(), "a real Vec return must still be caught");
 }

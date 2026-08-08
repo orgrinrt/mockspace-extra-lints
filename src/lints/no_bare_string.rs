@@ -11,7 +11,7 @@
 
 use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 
-use crate::util::{categories, crate_introduces_category, err_in_file};
+use crate::util::{categories, crate_introduces_category, err_in_file, names_type};
 use crate::util::line_lint_allowed;
 
 pub struct NoBareString;
@@ -52,7 +52,7 @@ impl CrateLint for NoBareString {
                 let scan = strip_strings_and_chars(raw_line);
                 let scan = strip_line_comment(&scan);
 
-                if contains_bare_string_type(&scan) {
+                if names_type(&scan, "String") {
                     out.push(err_in_file(
                         ctx,
                         &rel_path,
@@ -86,23 +86,6 @@ impl CrateLint for NoBareString {
     }
 }
 
-fn contains_bare_string_type(hay: &str) -> bool {
-    let bytes = hay.as_bytes();
-    let needle = b"String";
-    let mut i = 0;
-    while i + needle.len() <= bytes.len() {
-        if &bytes[i..i + needle.len()] == needle {
-            let before_ok = i == 0 || !is_ident(bytes[i - 1]);
-            let after_pos = i + needle.len();
-            let after_ok = after_pos >= bytes.len() || !is_ident(bytes[after_pos]);
-            if before_ok && after_ok {
-                return true;
-            }
-        }
-        i += 1;
-    }
-    false
-}
 
 fn contains_non_static_str_ref(hay: &str) -> bool {
     let bytes = hay.as_bytes();
