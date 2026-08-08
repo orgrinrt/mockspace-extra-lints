@@ -22,10 +22,18 @@ impl CrateLint for NoStd {
 
         // Root-level #![no_std] must be present (allowing a lint:allow on the
         // first 20 lines to opt out for test / proc-macro crates).
+        // This half is a claim about the crate root. The dispatcher hands a
+        // per-file lint the same context with `source` swapped for each module
+        // file, so it must fire only when `source` IS the root; otherwise every
+        // module file is reported as a root missing its attribute.
+        let is_crate_root = ctx
+            .all_sources
+            .first()
+            .map_or(true, |f| f.text == ctx.source);
         let head: String = ctx.source.lines().take(30).collect::<Vec<_>>().join("\n");
         let has_no_std = head.contains("#![no_std]");
         let allowed_at_root = line_lint_allowed(&head, "no-std");
-        if !has_no_std && !allowed_at_root && !ctx.is_proc_macro_crate() {
+        if is_crate_root && !has_no_std && !allowed_at_root && !ctx.is_proc_macro_crate() {
             out.push(err(
                 ctx,
                 1,

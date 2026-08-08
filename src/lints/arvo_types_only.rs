@@ -42,6 +42,13 @@ const BARE_PRIMITIVES: &[&str] = &[
 pub struct ArvoTypesOnly;
 
 impl Lint for ArvoTypesOnly {
+    /// Walks `all_sources` itself, so the dispatcher must hand it the crate
+    /// once rather than once per file. Left at the default it would report
+    /// every finding once per file in the crate.
+    fn per_file(&self) -> bool {
+        false
+    }
+
     fn name(&self) -> &'static str { "arvo-types-only" }
     fn default_severity(&self) -> Severity { Severity::HARD_ERROR }
 }

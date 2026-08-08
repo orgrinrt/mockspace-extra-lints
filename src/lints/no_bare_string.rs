@@ -17,6 +17,13 @@ use crate::util::line_lint_allowed;
 pub struct NoBareString;
 
 impl Lint for NoBareString {
+    /// Walks `all_sources` itself, so the dispatcher must hand it the crate
+    /// once rather than once per file. Left at the default it would report
+    /// every finding once per file in the crate.
+    fn per_file(&self) -> bool {
+        false
+    }
+
     fn name(&self) -> &'static str { "no-bare-string" }
     fn default_severity(&self) -> Severity { Severity::HARD_ERROR }
 }

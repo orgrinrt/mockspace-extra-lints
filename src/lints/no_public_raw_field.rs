@@ -44,6 +44,13 @@ const FORBIDDEN_FIELD_TYPES: &[(&str, &str)] = &[
 pub struct NoPublicRawField;
 
 impl Lint for NoPublicRawField {
+    /// Walks `all_sources` itself, so the dispatcher must hand it the crate
+    /// once rather than once per file. Left at the default it would report
+    /// every finding once per file in the crate.
+    fn per_file(&self) -> bool {
+        false
+    }
+
     fn name(&self) -> &'static str { "no-public-raw-field" }
     fn default_severity(&self) -> Severity { Severity::HARD_ERROR }
 }
