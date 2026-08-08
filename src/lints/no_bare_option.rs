@@ -13,7 +13,7 @@
 
 use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 
-use crate::util::{categories, crate_introduces_category, err};
+use crate::util::{categories, crate_introduces_category, err_in_file};
 use crate::util::line_lint_allowed;
 
 pub struct NoBareOption;
@@ -55,8 +55,9 @@ impl CrateLint for NoBareOption {
                 let scan = strip_line_comment(&scan);
 
                 if contains_option_token(&scan) {
-                    out.push(err(
+                    out.push(err_in_file(
                         ctx,
+                        &rel_path,
                         idx + 1,
                         "no-bare-option",
                         format!(

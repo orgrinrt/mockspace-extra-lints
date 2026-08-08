@@ -12,7 +12,7 @@
 
 use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 
-use crate::util::{categories, crate_introduces_category, err};
+use crate::util::{categories, crate_introduces_category, err_in_file};
 use crate::util::line_lint_allowed;
 
 const BARE_NUMERICS: &[&str] = &[
@@ -63,8 +63,9 @@ impl CrateLint for NoBareNumeric {
 
                 for prim in BARE_NUMERICS {
                     if contains_bare_word(&scan, prim) {
-                        out.push(err(
+                        out.push(err_in_file(
                             ctx,
+                            &rel_path,
                             idx + 1,
                             "no-bare-numeric",
                             format!(

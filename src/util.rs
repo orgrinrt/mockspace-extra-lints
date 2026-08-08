@@ -251,3 +251,21 @@ pub fn is_public(node: Node, src: &str) -> bool {
     }
     false
 }
+
+/// The same as [`err`], for a lint that walks `all_sources` and therefore
+/// knows which file it is reporting about.
+///
+/// Sets `LintError::path`, which the renderer needs to print a real location.
+/// A lint that folds the path into its message instead leaves `path` empty, and
+/// the rendered `{crate}:{line}` then points at nothing.
+pub fn err_in_file(
+    ctx: &LintContext,
+    rel_path: impl AsRef<str>,
+    line: usize,
+    lint_name: &'static str,
+    message: String,
+) -> LintError {
+    let mut e = err(ctx, line, lint_name, message);
+    e.path = Some(rel_path.as_ref().to_string());
+    e
+}

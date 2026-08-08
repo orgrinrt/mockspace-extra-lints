@@ -31,7 +31,7 @@
 use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 use tree_sitter::{Node, Parser, Tree};
 
-use crate::util::{categories, crate_introduces_category, err, txt};
+use crate::util::{categories, crate_introduces_category, err_in_file, txt};
 use crate::util::line_lint_allowed;
 
 pub struct NoBareStaticStr;
@@ -123,8 +123,9 @@ fn walk(
                                 .map(|n| txt(n, source).to_string())
                                 .unwrap_or_else(|| "<anon>".to_string());
                             let keyword = if node.kind() == "const_item" { "const" } else { "static" };
-                            out.push(err(
+                            out.push(err_in_file(
                                 ctx,
+                                &rel_path,
                                 line,
                                 "no-bare-static-str",
                                 format!(

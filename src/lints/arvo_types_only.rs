@@ -28,7 +28,7 @@
 
 use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 
-use crate::util::{categories, crate_introduces_category, err};
+use crate::util::{categories, crate_introduces_category, err_in_file};
 use crate::util::line_lint_allowed;
 
 const BARE_PRIMITIVES: &[&str] = &[
@@ -83,8 +83,9 @@ impl CrateLint for ArvoTypesOnly {
 
                 for prim in BARE_PRIMITIVES {
                     if contains_bare_word(&scan, prim) {
-                        out.push(err(
+                        out.push(err_in_file(
                             ctx,
+                            &rel_path,
                             idx + 1,
                             "arvo-types-only",
                             format!(
