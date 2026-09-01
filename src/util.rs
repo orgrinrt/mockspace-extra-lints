@@ -268,7 +268,7 @@ pub fn err_in_file(
 /// letters.
 ///
 /// A match counts only where the characters on each side cannot continue a Rust
-/// identifier, and **each side is gated on the needle itself**: the leading
+/// identifier, and each side is gated on the needle itself: the leading
 /// check applies when the needle starts with an identifier character, the
 /// trailing check when it ends with one.
 ///

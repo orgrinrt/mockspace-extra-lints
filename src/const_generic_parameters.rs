@@ -24,8 +24,7 @@ use tree_sitter::{Node, Parser};
 ///
 /// Returns a copy the caller scans instead of the original.
 ///
-/// **A file that does not parse is not fully enforced, and the earlier wording
-/// here claimed it was.** tree-sitter recovers from an error rather than
+/// A file that does not parse is not fully enforced. tree-sitter recovers from an error rather than
 /// refusing the file, so a broken file still yields `const_parameter` nodes and
 /// their types are still blanked. `parse` returning `None` is the only path back
 /// to the original, and for Rust it is effectively unreachable. What holds is
@@ -44,8 +43,8 @@ pub fn without_const_generic_parameter_types(source: &str) -> String {
 /// The byte range of the type of every const generic parameter whose type is one
 /// of the primitive names the lints refuse.
 ///
-/// Empty when the file has none. **Not empty merely because the file is broken**,
-/// since the parser recovers; see the note above.
+/// Empty when the file has none, and not empty merely because the file is
+/// broken, since the parser recovers; see the note above.
 #[must_use]
 pub fn const_generic_parameter_type_spans(source: &str) -> Vec<Range<usize>> {
     let mut parser = Parser::new();
@@ -67,11 +66,11 @@ pub fn const_generic_parameter_type_spans(source: &str) -> Vec<Range<usize>> {
 /// The names a const generic parameter may carry and still be excepted.
 ///
 /// The same fifteen the two lints refuse, and the exception reaches no further
-/// than they do. **Blanking the whole type node was wider than the canon**: op
-/// excepted the const generic parameter, not a bare primitive nested inside a
-/// compound annotation sitting there, and `const N: Foo<u32>` blanked the `u32`
-/// with it. That needs `min_adt_const_params` to be written at all, so nothing
-/// in the tree reaches it today, and it is the overshoot this was said to avoid.
+/// than they do. Blanking the whole type node would reach further than that: the
+/// exception is for the const generic parameter itself, not for a bare primitive
+/// nested inside a compound annotation sitting in that position, so
+/// `const N: Foo<u32>` keeps its `u32` in scope for the lints. Writing that form
+/// needs `min_adt_const_params`, so nothing in the tree reaches it today.
 const EXCEPTED: &[&str] = &[
     "u8", "u16", "u32", "u64", "u128", "i8", "i16", "i32", "i64", "i128", "f32", "f64", "usize",
     "isize", "bool",

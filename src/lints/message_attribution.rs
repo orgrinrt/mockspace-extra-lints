@@ -6,12 +6,12 @@
 //!
 //! # Two axes, configured independently
 //!
-//! **Provenance** is an agent `Co-Authored-By`. It is judged against the glob the
+//! Provenance is an agent `Co-Authored-By`. It is judged against the glob the
 //! active mode permits, which is what lets a genuinely headless run carry the
 //! byline that work wants while a run with a human in the loop carries none. A
 //! co-author who is a real person is never touched.
 //!
-//! **Adverts** are `Generated with [...]`, a session link, a robot emoji. These
+//! Adverts are `Generated with [...]`, a session link, a robot emoji. These
 //! are not provenance: they are injected by a tool's defaults rather than chosen,
 //! they say nothing about who did the work, and they turn a durable public record
 //! into a billboard. Denied by default on every surface and in every mode, with
