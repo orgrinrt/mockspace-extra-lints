@@ -4,7 +4,16 @@
 //! source to match the "arvo is the exclusive numeric substrate" rule
 //! verbatim. Bare `u*`/`i*`/`f*`/`usize`/`isize`/`bool` do not exist
 //! in this stack, not in pub API, not in private fields, not in
-//! expressions, not in casts, not in literal suffixes.
+//! expressions and not in casts. A literal suffix is the one the line
+//! scan cannot reach, because it always carries a digit or an
+//! underscore in front of the name; the gap is catalogued in
+//! `tests/the_const_generic_parameter_is_excepted.rs`.
+//!
+//! One position is excepted, and only one: the type of a const generic
+//! parameter, where the bare form buys a smoother API and there is
+//! nothing else to write. The exception reaches the parameter
+//! declaration and nothing else, so an associated constant, an item
+//! constant, a field, a cast and a literal suffix all still report.
 //!
 //! This lint is retained alongside `arvo-types-only` so configs that
 //! named it still apply; the two are semantically equivalent today.
@@ -12,6 +21,7 @@
 
 use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 
+use crate::const_generic_parameters::without_const_generic_parameter_types;
 use crate::util::{categories, crate_introduces_category, err_in_file};
 use crate::util::line_lint_allowed;
 
@@ -53,12 +63,15 @@ impl CrateLint for NoBareNumeric {
         };
 
         for (rel_path, source) in sources {
-            for (idx, raw_line) in source.lines().enumerate() {
+            // The excepted position comes off the parse, blanked in place so the
+            // line numbering is still the file's own.
+            let excepted = without_const_generic_parameter_types(source);
+            for (idx, (raw_line, kept)) in source.lines().zip(excepted.lines()).enumerate() {
                 let trimmed = raw_line.trim_start();
                 if trimmed.starts_with("//") { continue; }
                 if line_lint_allowed(raw_line, "no-bare-numeric") { continue; }
 
-                let scan = strip_strings_and_chars(raw_line);
+                let scan = strip_strings_and_chars(kept);
                 let scan = strip_line_comment(&scan);
 
                 for prim in BARE_NUMERICS {
@@ -69,7 +82,7 @@ impl CrateLint for NoBareNumeric {
                             idx + 1,
                             "no-bare-numeric",
                             format!(
-                                "bare `{prim}` in {} line {}. arvo is the exclusive numeric substrate. Wrap in UFixed / IFixed / FastFloat / StrictFloat / USize / Cap / Bool or a domain alias; bare primitives do not exist in this stack",
+                                "bare `{prim}` in {} line {}. arvo is the exclusive numeric substrate. Wrap in an arvo type, or a domain alias grounded on one; bare primitives do not exist in this stack",
                                 rel_path,
                                 idx + 1,
                             ),
