@@ -3,8 +3,8 @@
 //! Pre-hilavitkutin-str crates (arvo, notko, mockspace-*) must gate
 //! every `const NAME: &str` / `static NAME: &str` behind a
 //! `#[cfg(debug_assertions)]` attribute. Post-hilavitkutin-str crates
-//! use `hilavitkutin_str::Str` interning. The `static-string`
-//! substrate introducer (hilavitkutin-str itself) is exempt.
+//! use `hilavitkutin_str::Str` interning. The introducer of the
+//! `static-string` category (hilavitkutin-str itself) is exempt.
 
 use std::collections::{BTreeMap, BTreeSet};
 

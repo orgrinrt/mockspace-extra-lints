@@ -1,6 +1,6 @@
 //! Lint: arvo-types-only. The headline.
 //!
-//! arvo is the exclusive numeric substrate. Bare Rust primitives
+//! arvo is where every numeric in this stack comes from. Bare core primitives
 //! (`u8..u128`, `i8..i128`, `f32`, `f64`, `usize`, `isize`, `bool`)
 //! do not exist in this stack: "as if they don't exist". Any
 //! appearance of such a token anywhere in source is drift, not just

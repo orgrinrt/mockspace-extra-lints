@@ -386,7 +386,7 @@ fn ctx_with_crate_and_introductions(
 
 #[test]
 fn arvo_types_only_skips_numeric_introducer() {
-    // arvo is tagged as introducing the numeric substrate; the lint
+    // arvo is tagged as introducing the numeric category; the lint
     // self-exempts for this crate regardless of internal impl.
     let ctx = ctx_with_crate_and_introductions(
         "arvo",
@@ -402,7 +402,7 @@ fn arvo_types_only_skips_numeric_introducer() {
 
 #[test]
 fn arvo_types_only_fires_on_non_introducer_crate() {
-    // hilavitkutin is NOT an introducer of the numeric substrate.
+    // hilavitkutin is NOT an introducer of the numeric category.
     // Even though arvo is configured, hilavitkutin's bare usize is drift.
     let ctx = ctx_with_crate_and_introductions(
         "hilavitkutin",
@@ -436,7 +436,7 @@ fn arvo_types_only_ignores_unknown_category() {
 
 #[test]
 fn no_bare_option_skips_fallibility_introducer() {
-    // notko is the fallibility substrate; bare Option in its source
+    // notko introduces the fallibility category; bare Option in its source
     // is acknowledged as part of defining Maybe.
     let ctx = ctx_with_crate_and_introductions(
         "notko",
@@ -469,7 +469,7 @@ fn no_bare_option_fires_on_non_fallibility_crate() {
 fn no_public_raw_field_numeric_introducer_still_flags_string_fields() {
     // Numeric introducer gets numeric field types exempted, but a
     // bare `String` field still fires; the crate doesn't introduce
-    // the string substrate.
+    // the string category.
     let ctx = ctx_with_crate_and_introductions(
         "arvo",
         vec![("arvo", vec!["numeric"])],
@@ -488,7 +488,7 @@ fn no_public_raw_field_numeric_introducer_still_flags_string_fields() {
 
 #[test]
 fn no_public_raw_field_skips_numeric_introducer() {
-    // arvo-bits introduces the numeric substrate at L1 (opaque-bit
+    // arvo-bits introduces the numeric category at L1 (opaque-bit
     // containers). Its u64 field in Bits<N>(u64) is legitimate.
     let ctx = ctx_with_crate_and_introductions(
         "arvo-bits",

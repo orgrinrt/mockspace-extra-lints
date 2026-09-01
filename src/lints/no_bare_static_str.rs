@@ -13,8 +13,8 @@
 //!   vehje) use `hilavitkutin_str::Str` interning via `str_const!()` at
 //!   the call site instead of a bare literal.
 //!
-//! `hilavitkutin-str` itself introduces the `static-string` substrate
-//! category and is exempt from the lint; it is the source-of-truth for
+//! `hilavitkutin-str` itself introduces the `static-string` category
+//! and is exempt from the lint; it is the source-of-truth for
 //! compile-time string handles.
 //!
 //! Implementation: tree-sitter walk of `const_item` and `static_item`

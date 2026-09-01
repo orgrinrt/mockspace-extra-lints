@@ -3,23 +3,22 @@
 use mockspace_lint_rules::{LintContext, LintError, Severity};
 use tree_sitter::Node;
 
-/// Primitive-substrate categories that the ecosystem's types group
-/// into. Each lint in this pack declares which category (or
-/// categories) of substrate it protects via the `Lint::categories`
-/// helper; the `[primitive-introductions]` section in a consumer's
-/// mockspace.toml lists the categories that each crate introduces.
-/// When the two intersect, the lint self-exempts for that crate.
-/// The crate is the one bringing the substrate to the table, so
-/// whatever it does internally to define it is legitimate.
+/// The categories the ecosystem's primitives group into. Each lint in
+/// this pack declares which category (or categories) it protects via
+/// the `Lint::categories` helper; the `[primitive-introductions]`
+/// section in a consumer's mockspace.toml lists the categories that
+/// each crate introduces. When the two intersect, the lint self-exempts
+/// for that crate. The crate is the one bringing those primitives to
+/// the table, so whatever it does internally to define them is
+/// legitimate.
 ///
 /// Categories (not specific arvo type names) keep the map stable as
 /// the stack evolves. Adding a new arvo type (e.g. a new strategy
 /// marker, a new arithmetic kind, a new opaque-bit container) just
 /// means tagging its introducing crate with the right category. No
 /// lint pack change, no recompile. Categories change only when a
-/// genuinely new substrate DOMAIN appears (rare; e.g. if a "temporal
-/// substrate" layer ever joined, a new lint would carry its own
-/// domain).
+/// genuinely new domain appears (rare; e.g. if a temporal layer ever
+/// joined, a new lint would carry its own domain).
 ///
 /// The current stable categories:
 ///
@@ -45,7 +44,7 @@ pub mod categories {
 }
 
 /// Whether the current crate is declared (via
-/// `[primitive-introductions]`) to introduce the substrate `category`.
+/// `[primitive-introductions]`) to introduce the `category`.
 /// Bare-primitive lints call this once at the top of `check`: if the
 /// crate introduces the category the lint enforces, the lint returns
 /// an empty violation set for that crate, unconditionally.
@@ -54,7 +53,7 @@ pub mod categories {
 /// an unknown category to a crate's list has no effect; no lint
 /// watches that category. Adding `"numeric"` or `"fallibility"` to a
 /// crate's list is an auditable architectural claim (the crate must
-/// actually define the substrate types) rather than a list of
+/// actually define those types) rather than a list of
 /// forbidden tokens to bypass.
 #[must_use]
 pub fn crate_introduces_category(ctx: &LintContext, category: &str) -> bool {
