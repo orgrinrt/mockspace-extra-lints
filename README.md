@@ -67,6 +67,12 @@ cargo test
 
 Requires the pinned nightly in `rust-toolchain.toml`.
 
+The `mockspace-lint-rules` dependency comes from the mockspace repo over git.
+Iterating on both at once, redirect it with a `[patch]` section in
+`.cargo/config.toml` rather than editing the manifest, so nothing local reaches
+a commit. A path dependency works the same way where the two sit beside each
+other in one workspace.
+
 ## A note on coding agents
 
 We do not recommend using coding agents with this codebase.
