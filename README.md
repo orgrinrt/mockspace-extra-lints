@@ -56,8 +56,10 @@ deliberate departures rather than a full listing.
 `arvo-types-only`, `no-bare-numeric`, `no-bare-option`, `no-bare-result`,
 `no-bare-string`, `no-bare-static-str`, `no-public-raw-field`,
 `no-vec-in-trait-sig`. These enforce that a codebase built on a typed numeric
-layer does not leak the primitives that layer exists to replace. They read every
-file in a crate rather than its root alone.
+layer does not leak the primitives that layer exists to replace: `u8` through
+`u128`, `i8` through `i128`, `f32`, `f64`, `String`, a non-`'static` `&str`, and
+`Option` and `Result` in an API position. They read every file in a crate rather
+than its root alone.
 
 The type of a const generic parameter is excepted, and it is the only excepted
 position. `<const BITS: u32>` is permitted, while `const BITS: u32 = 32;`, an
