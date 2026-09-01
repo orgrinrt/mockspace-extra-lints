@@ -3,16 +3,16 @@
 > An opt-in lint pack for mockspace. Imported by a project that wants these
 > rules, rather than shipped in mockspace core.
 
-Mockspace ships the lints every project needs: changelist discipline, document
+Mockspace ships the lints every project needs, changelist discipline, document
 and source agreement, file size, dead crates. This pack holds the ones that only
-make sense once a project has committed to a particular substrate, where the
-right answer for one codebase is noise for another.
+make sense once a project has committed to a particular set of foundations,
+where the right answer for one codebase is noise for another.
 
 A project opts in from its `mockspace.toml`:
 
 ```toml
 [lint-crates]
-mockspace-extra-lints = { git = "ssh://git@github.com/orgrinrt/mockspace-hilavitkutin-stack-lints.git", branch = "dev" }
+mockspace-extra-lints = { git = "ssh://git@github.com/orgrinrt/mockspace-extra-lints.git", branch = "dev" }
 ```
 
 Every lint is then configured, or silenced, per project in the same file. The
@@ -20,22 +20,38 @@ pack registers names; it does not decide severities.
 
 ## What is in it
 
-**Primitive discipline.** `arvo-types-only`, `no-bare-numeric`,
-`no-bare-option`, `no-bare-result`, `no-bare-string`, `no-bare-static-str`,
-`no-public-raw-field`, `no-vec-in-trait-sig`. These enforce that a codebase
-built on a typed numeric substrate does not leak the primitives that substrate
-exists to replace. They read every file in a crate rather than its root alone.
+### Primitive discipline
 
-**Environment discipline.** `no-std`, `no-alloc`, `no-runtime-spawn`,
-`no-runtime-registration`. What a `no_std`, allocation-free engine may reach
-for, and what it may not.
+`arvo-types-only`, `no-bare-numeric`, `no-bare-option`, `no-bare-result`,
+`no-bare-string`, `no-bare-static-str`, `no-public-raw-field`,
+`no-vec-in-trait-sig`. These enforce that a codebase built on a typed numeric
+layer does not leak the primitives that layer exists to replace. They read every
+file in a crate rather than its root alone.
 
-**Shape discipline.** `no-dyn-dispatch`, `strategy-marker-required`,
-`trait-first-signatures`, `semantic-alias-nudge`. Advisory in tone, and mostly
-about whether a signature says what it means.
+The type of a const generic parameter is excepted, and it is the only excepted
+position. `<const BITS: u32>` is permitted, while `const BITS: u32 = 32;`, an
+associated constant, a field, a cast and a literal suffix are all still
+reported, even though a line scan cannot tell any of them apart. The exception
+comes out of the parse rather than the line, in
+`src/const_generic_parameters.rs`, which blanks the type of every const
+generic parameter before the scan runs and keeps the byte length so the line
+numbers stay the file's own.
 
-**Prose and process.** `writing-style`, `commit-style`, `forge-body`,
-`message-attribution`, `lint-allow-requires-task-id`.
+### Environment discipline
+
+`no-std`, `no-alloc`, `no-runtime-spawn`, `no-runtime-registration`. What a
+`no_std`, allocation-free engine may reach for, and what it may not.
+
+### Shape discipline
+
+`no-dyn-dispatch`, `strategy-marker-required`, `trait-first-signatures`,
+`semantic-alias-nudge`. Advisory in tone, and mostly about whether a signature
+says what it means.
+
+### Prose and process
+
+`writing-style`, `commit-style`, `forge-body`, `message-attribution`,
+`lint-allow-requires-task-id`.
 
 ## Per-file and per-crate dispatch
 

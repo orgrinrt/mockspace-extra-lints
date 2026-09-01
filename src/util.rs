@@ -64,11 +64,6 @@ pub fn crate_introduces_category(ctx: &LintContext, category: &str) -> bool {
         .unwrap_or(false)
 }
 
-/// Whether the current crate introduces ANY of `categories`.
-pub fn crate_introduces_any_category(ctx: &LintContext, categories: &[&str]) -> bool {
-    categories.iter().any(|c| crate_introduces_category(ctx, c))
-}
-
 /// Slice of source for a node.
 pub fn txt<'a>(node: Node<'a>, src: &'a str) -> &'a str {
     &src[node.byte_range()]
