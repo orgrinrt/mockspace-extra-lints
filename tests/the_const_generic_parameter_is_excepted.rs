@@ -372,3 +372,25 @@ fn the_whole_surface_was_refused_before_the_exception_reached_it() {
         .collect();
     assert_eq!(changed, vec![1, 2, 3, 4, 5], "only the parameter declarations moved");
 }
+
+// ---- a lifetime tick opens what looks like a char literal -----------------
+
+#[test]
+#[ignore = "catalogue: two lifetime ticks on one line pair as a char literal and \
+            everything between them is stripped before the scan, so a field, a \
+            parameter or a cast sitting there is never seen. Raised by a reviewer \
+            against this change and confirmed: it predates the carve-out and \
+            nothing on the line below is an excepted position. The stripper wants \
+            the parse, same as the literal suffix, and that is a separate change"]
+fn a_bare_primitive_between_two_lifetime_ticks_still_reports() {
+    let source = "pub struct S<'a> { pub n: u32, pub r: &'a str }\n";
+    assert_eq!(lines(source), vec![1], "the `u32` field sits between two ticks");
+}
+
+#[test]
+fn one_lifetime_tick_alone_does_not_hide_anything() {
+    // The control on the catalogued arm above, and what bounds it: a single tick
+    // finds no partner, so the line is scanned whole and the field reports. Two
+    // is what it takes.
+    assert_eq!(lines("pub struct S<'a>(&'a u32);\n"), vec![1]);
+}
