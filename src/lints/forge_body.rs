@@ -6,12 +6,12 @@
 //!
 //! Two jobs, both entirely configured:
 //!
-//! **Shape.** Required sections, a minimum length, and whether process narrative
-//! is permitted. A body that reads "final state after multiple review iterations"
+//! The first is shape: required sections, a minimum length, and whether process
+//! narrative is permitted. A body that reads "final state after review iterations"
 //! tells a reader nothing about what changed, and the reader six months from now
 //! is the one the body exists for.
 //!
-//! **Forbidden patterns.** An arbitrary list a project supplies, each with an
+//! The second is forbidden patterns: an arbitrary list a project supplies, each with an
 //! optional reason shown when it matches, and each scoped to the surfaces it
 //! applies to. This is the general facility: internal hostnames, ticket URLs
 //! that mean nothing publicly, vocabulary a project has retired. Nothing is
