@@ -11,17 +11,26 @@
 //! carry `lint:allow(no-bare-result)` since the textual form still
 //! mentions `Result`.
 
-use mockspace_lint_rules::{Lint, LintContext, LintError, Severity};
+use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 
-use crate::util::{categories, crate_introduces_category, err};
+use crate::util::{categories, crate_introduces_category, err_in_file};
+use crate::util::line_lint_allowed;
 
 pub struct NoBareResult;
 
 impl Lint for NoBareResult {
+    /// Walks `all_sources` itself, so the dispatcher must hand it the crate
+    /// once rather than once per file. Left at the default it would report
+    /// every finding once per file in the crate.
+    fn per_file(&self) -> bool {
+        false
+    }
+
     fn name(&self) -> &'static str { "no-bare-result" }
-
     fn default_severity(&self) -> Severity { Severity::HARD_ERROR }
+}
 
+impl CrateLint for NoBareResult {
     fn check(&self, ctx: &LintContext) -> Vec<LintError> {
         if ctx.should_skip_proc_macro_source_lint() { return Vec::new(); }
         let mut out = Vec::new();
@@ -40,18 +49,19 @@ impl Lint for NoBareResult {
             for (idx, raw_line) in source.lines().enumerate() {
                 let trimmed = raw_line.trim_start();
                 if trimmed.starts_with("//") { continue; }
-                if raw_line.contains("lint:allow(no-bare-result)") { continue; }
+                if line_lint_allowed(raw_line, "no-bare-result") { continue; }
 
                 let scan = strip_strings_and_chars(raw_line);
                 let scan = strip_line_comment(&scan);
 
                 if contains_bare_result(&scan) {
-                    out.push(err(
+                    out.push(err_in_file(
                         ctx,
+                        &rel_path,
                         idx + 1,
                         "no-bare-result",
                         format!(
-                            "bare `Result` in {} line {} — use notko::Outcome<T, E> (cold) or notko::Just<T> (hot). Result does not exist in this stack",
+                            "bare `Result` in {} line {}. Use notko::Outcome<T, E> (cold) or notko::Just<T> (hot). Result does not exist in this stack",
                             rel_path,
                             idx + 1,
                         ),

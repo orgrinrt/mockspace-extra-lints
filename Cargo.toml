@@ -1,15 +1,16 @@
 [package]
-name = "mockspace-hilavitkutin-stack-lints"
+name = "mockspace-extra-lints"
 version = "0.1.0"
 edition = "2021"
-description = "Mockspace lint pack for the hilavitkutin / arvo / notko / clause stack"
+description = "Opt-in mockspace lint pack: the rules that only make sense once a project has picked its foundations"
 license = "MPL-2.0"
+repository = "https://github.com/orgrinrt/mockspace-extra-lints"
 publish = false
 
 [dependencies]
 # Committed state points at the canonical mockspace repo. For local
 # iteration, use `[patch]` in `.cargo/config.toml` to redirect.
-mockspace-lint-rules = { git = "ssh://git@github.com/hiisi-digital/mockspace.git", branch = "main" }
+mockspace-lint-rules = { git = "ssh://git@github.com/hiisi-digital/mockspace.git", branch = "dev" }
 tree-sitter = "0.24"
 tree-sitter-rust = "0.23"
 

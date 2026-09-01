@@ -5,10 +5,10 @@
 //! // lint:allow(<rule>) reason: <why>; tracked: #<task-id>
 //! ```
 //!
-//! Loose forms — no reason, no tracked id — get rejected. This ensures
+//! Loose forms (no reason, no tracked id) get rejected. This ensures
 //! every escape becomes an auditable piece of debt.
 
-use mockspace_lint_rules::{Lint, LintContext, LintError, Severity};
+use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 
 use crate::util::err;
 
@@ -16,9 +16,10 @@ pub struct LintAllowRequiresTaskId;
 
 impl Lint for LintAllowRequiresTaskId {
     fn name(&self) -> &'static str { "lint-allow-requires-task-id" }
-
     fn default_severity(&self) -> Severity { Severity::HARD_ERROR }
+}
 
+impl CrateLint for LintAllowRequiresTaskId {
     fn check(&self, ctx: &LintContext) -> Vec<LintError> {
         let mut out = Vec::new();
         for (idx, line) in ctx.source.lines().enumerate() {

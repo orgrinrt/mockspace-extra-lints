@@ -1,21 +1,23 @@
 //! Lint: every public `UFixed<I, F>` / `IFixed<I, F>` numeric type
-//! position must carry an explicit `S: Strategy` marker — `Hot`, `Warm`,
-//! `Cold`, `Precise`, or a bound. A bare `UFixed<I32, F0>` without `S`
+//! position must carry an explicit `S: Strategy` marker (`Hot`, `Warm`,
+//! `Cold`, `Precise`, or a bound). A bare `UFixed<I32, F0>` without `S`
 //! signals a sloppy signature where the caller can't choose container
 //! speed.
 
-use mockspace_lint_rules::{Lint, LintContext, LintError, Severity};
+use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 use tree_sitter::Node;
 
 use crate::util::{err, for_each_fn, is_public, txt};
+use crate::util::line_lint_allowed;
 
 pub struct StrategyMarkerRequired;
 
 impl Lint for StrategyMarkerRequired {
     fn name(&self) -> &'static str { "strategy-marker-required" }
-
     fn default_severity(&self) -> Severity { Severity::HARD_ERROR }
+}
 
+impl CrateLint for StrategyMarkerRequired {
     fn check(&self, ctx: &LintContext) -> Vec<LintError> {
         if ctx.should_skip_proc_macro_source_lint() { return Vec::new(); }
         let mut out = Vec::new();
@@ -30,7 +32,7 @@ impl Lint for StrategyMarkerRequired {
 fn check_fn(node: Node, ctx: &LintContext, out: &mut Vec<LintError>) {
     let line = node.start_position().row + 1;
     let src_line = ctx.source.lines().nth(node.start_position().row).unwrap_or("");
-    if src_line.contains("lint:allow(strategy-marker-required)") { return; }
+    if line_lint_allowed(src_line, "strategy-marker-required") { return; }
 
     let mut sig = String::new();
     if let Some(params) = node.child_by_field_name("parameters") {

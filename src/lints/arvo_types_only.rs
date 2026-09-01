@@ -1,8 +1,8 @@
 //! Lint: arvo-types-only. The headline.
 //!
-//! arvo is the exclusive numeric substrate. Bare Rust primitives
+//! arvo is where every numeric in this stack comes from. Bare core primitives
 //! (`u8..u128`, `i8..i128`, `f32`, `f64`, `usize`, `isize`, `bool`)
-//! do not exist in this stack — "as if they don't exist". Any
+//! do not exist in this stack: "as if they don't exist". Any
 //! appearance of such a token anywhere in source is drift, not just
 //! in public API.
 //!
@@ -18,17 +18,39 @@
 //! - array element types (`[u32; N]`)
 //! - cast expressions (`x as u32`)
 //! - associated paths (`u32::MAX`, `bool::from_str`)
-//! - literal suffixes (`0u32`, `1_usize`, `0.0_f32`)
 //! - tuple-field declarations (`pub struct Str(u32)`)
 //!
+//! A literal suffix is not among them, and the list said it was. The
+//! scan wants a non-identifier byte on each side of the name, and a
+//! suffix always has a digit or an underscore in front of it, so
+//! `0u32`, `1_usize` and `0.0_f32` go unreported. Reaching them wants
+//! the parse rather than the line. The catalogued arm is
+//! `a_literal_suffix_still_reports` in
+//! `tests/the_const_generic_parameter_is_excepted.rs`.
+//!
+//! One position is excepted, and only one: the type of a const generic
+//! parameter. `pub struct Signed<const BITS: u32>;` passes, because a
+//! const generic is where the bare form buys a smoother API and there
+//! is nothing else to write there. The exception reaches the parameter
+//! declaration and nothing else: an associated constant, an item
+//! constant, a field and a cast all still report, including on the
+//! same line as a parameter that passed. A literal suffix does not,
+//! for the reason given above, and the exception has nothing to do
+//! with it. The other
+//! half of the rule, that the bare form is used there only where the
+//! alternative is genuinely painful, is not something a scan can
+//! judge, so it stays with whoever reviews the code.
+//!
 //! Escape hatch (single line): `// lint:allow(arvo-types-only) reason: ...; tracked: #N`
-//! — only appropriate for foreign-crate boundary where the crate
+//! is only appropriate for foreign-crate boundary where the crate
 //! demands a specific primitive and no arvo impl of its contract is
 //! possible. Prefer dropping the crate over a long-lived allowance.
 
-use mockspace_lint_rules::{Lint, LintContext, LintError, Severity};
+use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 
-use crate::util::{categories, crate_introduces_category, err};
+use crate::const_generic_parameters::without_const_generic_parameter_types;
+use crate::util::{categories, crate_introduces_category, err_in_file};
+use crate::util::line_lint_allowed;
 
 const BARE_PRIMITIVES: &[&str] = &[
     "u8", "u16", "u32", "u64", "u128",
@@ -41,16 +63,24 @@ const BARE_PRIMITIVES: &[&str] = &[
 pub struct ArvoTypesOnly;
 
 impl Lint for ArvoTypesOnly {
+    /// Walks `all_sources` itself, so the dispatcher must hand it the crate
+    /// once rather than once per file. Left at the default it would report
+    /// every finding once per file in the crate.
+    fn per_file(&self) -> bool {
+        false
+    }
+
     fn name(&self) -> &'static str { "arvo-types-only" }
-
     fn default_severity(&self) -> Severity { Severity::HARD_ERROR }
+}
 
+impl CrateLint for ArvoTypesOnly {
     fn check(&self, ctx: &LintContext) -> Vec<LintError> {
         if ctx.should_skip_proc_macro_source_lint() { return Vec::new(); }
         if crate_introduces_category(ctx, categories::NUMERIC) { return Vec::new(); }
         let mut out = Vec::new();
 
-        // Scan every .rs file under src/ — module files (bits.rs,
+        // Scan every .rs file under src/. Module files (bits.rs,
         // prim.rs, ufixed_impl.rs, ...) are where drift usually
         // lives. Fall back to ctx.source only if the context carried
         // no all_sources (older mockspace version).
@@ -64,22 +94,26 @@ impl Lint for ArvoTypesOnly {
         };
 
         for (rel_path, source) in sources {
-            for (idx, raw_line) in source.lines().enumerate() {
+            // The excepted position comes off the parse, blanked in place so the
+            // line numbering is still the file's own.
+            let excepted = without_const_generic_parameter_types(source);
+            for (idx, (raw_line, kept)) in source.lines().zip(excepted.lines()).enumerate() {
                 let trimmed_start = raw_line.trim_start();
                 if trimmed_start.starts_with("//") { continue; }
-                if raw_line.contains("lint:allow(arvo-types-only)") { continue; }
+                if line_lint_allowed(raw_line, "arvo-types-only") { continue; }
 
-                let scan = strip_string_and_char_literals(raw_line);
+                let scan = strip_string_and_char_literals(kept);
                 let scan = strip_line_comment(&scan);
 
                 for prim in BARE_PRIMITIVES {
                     if contains_bare_word(&scan, prim) {
-                        out.push(err(
+                        out.push(err_in_file(
                             ctx,
+                            &rel_path,
                             idx + 1,
                             "arvo-types-only",
                             format!(
-                                "bare `{prim}` in {} line {} — the stack has no bare numeric/bool primitives. Use an arvo type (UFixed / IFixed / FastFloat / StrictFloat / USize / Cap / Bool) or a domain alias grounded on one",
+                                "bare `{prim}` in {} line {}. The stack has no bare numeric/bool primitives. Use an arvo type, or a domain alias grounded on one",
                                 rel_path,
                                 idx + 1,
                             ),
@@ -145,7 +179,7 @@ fn strip_string_and_char_literals(line: &str) -> String {
     out
 }
 
-/// Drop content after a `//` line-comment marker (outside strings —
+/// Drop content after a `//` line-comment marker (outside strings;
 /// this runs AFTER `strip_string_and_char_literals`).
 fn strip_line_comment(line: &str) -> String {
     if let Some(idx) = line.find("//") {

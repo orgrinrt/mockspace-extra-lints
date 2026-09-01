@@ -3,13 +3,13 @@
 //! Pre-hilavitkutin-str crates (arvo, notko, mockspace-*) must gate
 //! every `const NAME: &str` / `static NAME: &str` behind a
 //! `#[cfg(debug_assertions)]` attribute. Post-hilavitkutin-str crates
-//! use `hilavitkutin_str::Str` interning. The `static-string`
-//! substrate introducer (hilavitkutin-str itself) is exempt.
+//! use `hilavitkutin_str::Str` interning. The introducer of the
+//! `static-string` category (hilavitkutin-str itself) is exempt.
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use mockspace_hilavitkutin_stack_lints::lints::no_bare_static_str::NoBareStaticStr;
-use mockspace_lint_rules::{CrateSourceFile, Lint, LintContext};
+use mockspace_extra_lints::lints::no_bare_static_str::NoBareStaticStr;
+use mockspace_lint_rules::{CrateLint, CrateSourceFile, Lint, LintContext};
 
 fn ctx(crate_name: &'static str, introductions: Vec<(&'static str, Vec<&'static str>)>, source: &'static str) -> LintContext<'static> {
     let mut parser = tree_sitter::Parser::new();

@@ -1,13 +1,14 @@
 //! Lint: advisory warn on raw arvo primitives at public API boundaries.
 //! Encourages flipping `QWord` → `RecordIndex`, `UFixed<I32, F0, Hot>` →
-//! `SlotId`, etc. — a semantic alias reads better than the primitive.
+//! `SlotId`, etc. A semantic alias reads better than the primitive.
 //!
 //! Default severity: ADVISORY (warn everywhere, blocks nothing).
 
-use mockspace_lint_rules::{Lint, LintContext, LintError, Severity};
+use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 use tree_sitter::Node;
 
 use crate::util::{for_each_fn, is_public, txt};
+use crate::util::line_lint_allowed;
 
 const RAW_ARVO_PRIMITIVES: &[&str] = &[
     "UFixed", "IFixed", "FastFloat", "StrictFloat",
@@ -19,9 +20,10 @@ pub struct SemanticAliasNudge;
 
 impl Lint for SemanticAliasNudge {
     fn name(&self) -> &'static str { "semantic-alias-nudge" }
-
     fn default_severity(&self) -> Severity { Severity::ADVISORY }
+}
 
+impl CrateLint for SemanticAliasNudge {
     fn check(&self, ctx: &LintContext) -> Vec<LintError> {
         if ctx.should_skip_proc_macro_source_lint() { return Vec::new(); }
         let mut out = Vec::new();
@@ -36,7 +38,7 @@ impl Lint for SemanticAliasNudge {
 fn check_fn(node: Node, ctx: &LintContext, out: &mut Vec<LintError>) {
     let line = node.start_position().row + 1;
     let src_line = ctx.source.lines().nth(node.start_position().row).unwrap_or("");
-    if src_line.contains("lint:allow(semantic-alias-nudge)") { return; }
+    if line_lint_allowed(src_line, "semantic-alias-nudge") { return; }
 
     let mut sig = String::new();
     if let Some(params) = node.child_by_field_name("parameters") {
@@ -56,7 +58,7 @@ fn check_fn(node: Node, ctx: &LintContext, out: &mut Vec<LintError>) {
                 ctx.crate_name.to_string(),
                 line,
                 "semantic-alias-nudge",
-                format!("`{name}` exposes raw `{prim}` in its signature — consider a domain alias (NodeId / SlotId / RecordIndex / etc.) for readability"),
+                format!("`{name}` exposes raw `{prim}` in its signature. Consider a domain alias (NodeId / SlotId / RecordIndex / etc.) for readability"),
             ));
             return;
         }

@@ -1,18 +1,31 @@
 //! Lint: no bare numeric primitive anywhere in source.
 //!
-//! Historically scoped to public fn signatures; now scans the entire
-//! source to match the "arvo is the exclusive numeric substrate" rule
-//! verbatim — bare `u*`/`i*`/`f*`/`usize`/`isize`/`bool` do not exist
+//! Scans the whole source rather than public signatures alone, because
+//! the rule it enforces is that arvo is where every numeric comes from.
+//! Bare `u*`/`i*`/`f*`/`usize`/`isize`/`bool` do not exist
 //! in this stack, not in pub API, not in private fields, not in
-//! expressions, not in casts, not in literal suffixes.
+//! expressions and not in casts. A literal suffix is the one the line
+//! scan cannot reach, because it always carries a digit or an
+//! underscore in front of the name; the gap is catalogued in
+//! `tests/the_const_generic_parameter_is_excepted.rs`.
+//!
+//! One position is excepted, and only one: the type of a const generic
+//! parameter, where the bare form buys a smoother API and there is
+//! nothing else to write. The exception reaches the parameter
+//! declaration and nothing else, so an associated constant, an item
+//! constant, a field and a cast all still report. A literal suffix
+//! does not, for the reason given above, which is a property of the
+//! scan rather than of the exception.
 //!
 //! This lint is retained alongside `arvo-types-only` so configs that
 //! named it still apply; the two are semantically equivalent today.
 //! Prefer `arvo-types-only` in new configs.
 
-use mockspace_lint_rules::{Lint, LintContext, LintError, Severity};
+use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 
-use crate::util::{categories, crate_introduces_category, err};
+use crate::const_generic_parameters::without_const_generic_parameter_types;
+use crate::util::{categories, crate_introduces_category, err_in_file};
+use crate::util::line_lint_allowed;
 
 const BARE_NUMERICS: &[&str] = &[
     "u8", "u16", "u32", "u64", "u128",
@@ -25,10 +38,18 @@ const BARE_NUMERICS: &[&str] = &[
 pub struct NoBareNumeric;
 
 impl Lint for NoBareNumeric {
+    /// Walks `all_sources` itself, so the dispatcher must hand it the crate
+    /// once rather than once per file. Left at the default it would report
+    /// every finding once per file in the crate.
+    fn per_file(&self) -> bool {
+        false
+    }
+
     fn name(&self) -> &'static str { "no-bare-numeric" }
-
     fn default_severity(&self) -> Severity { Severity::HARD_ERROR }
+}
 
+impl CrateLint for NoBareNumeric {
     fn check(&self, ctx: &LintContext) -> Vec<LintError> {
         if ctx.should_skip_proc_macro_source_lint() { return Vec::new(); }
         if crate_introduces_category(ctx, categories::NUMERIC) { return Vec::new(); }
@@ -44,22 +65,26 @@ impl Lint for NoBareNumeric {
         };
 
         for (rel_path, source) in sources {
-            for (idx, raw_line) in source.lines().enumerate() {
+            // The excepted position comes off the parse, blanked in place so the
+            // line numbering is still the file's own.
+            let excepted = without_const_generic_parameter_types(source);
+            for (idx, (raw_line, kept)) in source.lines().zip(excepted.lines()).enumerate() {
                 let trimmed = raw_line.trim_start();
                 if trimmed.starts_with("//") { continue; }
-                if raw_line.contains("lint:allow(no-bare-numeric)") { continue; }
+                if line_lint_allowed(raw_line, "no-bare-numeric") { continue; }
 
-                let scan = strip_strings_and_chars(raw_line);
+                let scan = strip_strings_and_chars(kept);
                 let scan = strip_line_comment(&scan);
 
                 for prim in BARE_NUMERICS {
                     if contains_bare_word(&scan, prim) {
-                        out.push(err(
+                        out.push(err_in_file(
                             ctx,
+                            &rel_path,
                             idx + 1,
                             "no-bare-numeric",
                             format!(
-                                "bare `{prim}` in {} line {} — arvo is the exclusive numeric substrate. Wrap in UFixed / IFixed / FastFloat / StrictFloat / USize / Cap / Bool or a domain alias; bare primitives do not exist in this stack",
+                                "bare `{prim}` in {} line {}. arvo is where every numeric here comes from. Wrap in an arvo type, or a domain alias grounded on one; bare primitives do not exist in this stack",
                                 rel_path,
                                 idx + 1,
                             ),

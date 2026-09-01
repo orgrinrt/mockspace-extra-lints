@@ -9,18 +9,20 @@
 //!
 //! Richer detection will grow with signal. First pass catches the big three.
 
-use mockspace_lint_rules::{Lint, LintContext, LintError, Severity};
+use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 use tree_sitter::Node;
 
-use crate::util::{err, for_each_fn, is_public, txt};
+use crate::util::{err, for_each_fn, is_public, names_type, txt};
+use crate::util::line_lint_allowed;
 
 pub struct TraitFirstSignatures;
 
 impl Lint for TraitFirstSignatures {
     fn name(&self) -> &'static str { "trait-first-signatures" }
-
     fn default_severity(&self) -> Severity { Severity::HARD_ERROR }
+}
 
+impl CrateLint for TraitFirstSignatures {
     fn check(&self, ctx: &LintContext) -> Vec<LintError> {
         if ctx.should_skip_proc_macro_source_lint() { return Vec::new(); }
         let mut out = Vec::new();
@@ -35,7 +37,7 @@ impl Lint for TraitFirstSignatures {
 fn check_fn(node: Node, ctx: &LintContext, out: &mut Vec<LintError>) {
     let line = node.start_position().row + 1;
     let src_line = ctx.source.lines().nth(node.start_position().row).unwrap_or("");
-    if src_line.contains("lint:allow(trait-first-signatures)") { return; }
+    if line_lint_allowed(src_line, "trait-first-signatures") { return; }
 
     let name = node.child_by_field_name("name")
         .map(|n| txt(n, ctx.source))
@@ -45,12 +47,12 @@ fn check_fn(node: Node, ctx: &LintContext, out: &mut Vec<LintError>) {
     if let Some(ret) = node.child_by_field_name("return_type") {
         let text = txt(ret, ctx.source);
         for ty in &["Vec<", "HashMap<", "BTreeMap<", "HashSet<", "VecDeque<"] {
-            if text.contains(ty) {
+            if names_type(text, ty) {
                 out.push(err(
                     ctx,
                     line,
                     "trait-first-signatures",
-                    format!("`{name}` returns a concrete `{ty}...>` — take a sink or return `impl Iterator`"),
+                    format!("`{name}` returns a concrete `{ty}...>`. Take a sink or return `impl Iterator`"),
                 ));
                 return;
             }
@@ -62,7 +64,7 @@ fn check_fn(node: Node, ctx: &LintContext, out: &mut Vec<LintError>) {
         let text = txt(params, ctx.source);
         // Heuristic: `: Vec<` as a parameter type → suggest impl IntoIterator.
         for ty in &[": Vec<", ": HashMap<", ": BTreeMap<", ": HashSet<", ": VecDeque<"] {
-            if text.contains(ty) {
+            if names_type(text, ty) {
                 out.push(err(
                     ctx,
                     line,

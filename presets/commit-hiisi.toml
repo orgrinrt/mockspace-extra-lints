@@ -1,0 +1,24 @@
+schema_version = "1.0"
+name = "commit-style"
+primitive = "commit-message"
+description = "a stricter take on conventional commits: no parenthesised scope, lowercase imperative subject, no trailing period, under 72"
+
+# Not a default anywhere. A commit convention fits neither everyone nor most
+# people, so a project imports this preset deliberately or declares its own.
+[config]
+types = "feat,fix,refactor,docs,test,chore"
+separator = ": "
+breaking_marker = "!"
+require_type = "true"
+max_subject = "72"
+subject_case = "lower"
+# The one real divergence from conventional commits: `type(scope):` is out. A
+# scope duplicates what the diff already says and pushes the subject over budget.
+allow_scope = "false"
+forbid_trailing_period = "true"
+require_blank_line = "true"
+
+[severity]
+commit = "error"
+build = "error"
+push = "error"

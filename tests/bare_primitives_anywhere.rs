@@ -1,5 +1,5 @@
 //! Coverage test: the tightened `no-bare-*` and `arvo-types-only`
-//! lints fire on drift ANYWHERE in source — not just public fn
+//! lints fire on drift ANYWHERE in source, not just public fn
 //! signatures.
 //!
 //! Every case here captures a real leak in the pre-tightening lints:
@@ -10,12 +10,12 @@
 
 use std::collections::BTreeSet;
 
-use mockspace_hilavitkutin_stack_lints::lints::{
+use mockspace_extra_lints::lints::{
     arvo_types_only::ArvoTypesOnly, no_bare_numeric::NoBareNumeric,
     no_bare_option::NoBareOption, no_bare_result::NoBareResult,
     no_bare_string::NoBareString, no_public_raw_field::NoPublicRawField,
 };
-use mockspace_lint_rules::{CrateSourceFile, Lint, LintContext};
+use mockspace_lint_rules::{CrateLint, CrateSourceFile, Lint, LintContext};
 
 fn ctx_with(source: &'static str) -> LintContext<'static> {
     let mut parser = tree_sitter::Parser::new();
@@ -79,10 +79,20 @@ fn arvo_types_only_fires_on_cast_expression() {
 }
 
 #[test]
-fn arvo_types_only_fires_on_literal_suffix() {
+fn arvo_types_only_fires_on_a_const_binding_beside_a_literal_suffix() {
+    // Named for what it establishes. It used to be named for the literal suffix
+    // and passed on the `usize` binding on the same line; the suffix itself goes
+    // unreported, and the arm that says so is catalogued red in
+    // `the_const_generic_parameter_is_excepted.rs`.
     let src = "const X: usize = 0u32 as usize;\n";
     let hits = ArvoTypesOnly.check(&ctx_with(src));
-    assert!(!hits.is_empty(), "literal suffix `0u32` must be flagged");
+    assert!(!hits.is_empty(), "the bare `usize` binding must be flagged");
+
+    let suffix_alone = "fn f() { let _ = 0u32; }\n";
+    assert!(
+        ArvoTypesOnly.check(&ctx_with(suffix_alone)).is_empty(),
+        "pinning the gap rather than hiding it: a suffix on its own is missed",
+    );
 }
 
 #[test]
@@ -376,7 +386,7 @@ fn ctx_with_crate_and_introductions(
 
 #[test]
 fn arvo_types_only_skips_numeric_introducer() {
-    // arvo is tagged as introducing the numeric substrate; the lint
+    // arvo is tagged as introducing the numeric category; the lint
     // self-exempts for this crate regardless of internal impl.
     let ctx = ctx_with_crate_and_introductions(
         "arvo",
@@ -392,7 +402,7 @@ fn arvo_types_only_skips_numeric_introducer() {
 
 #[test]
 fn arvo_types_only_fires_on_non_introducer_crate() {
-    // hilavitkutin is NOT an introducer of the numeric substrate.
+    // hilavitkutin is NOT an introducer of the numeric category.
     // Even though arvo is configured, hilavitkutin's bare usize is drift.
     let ctx = ctx_with_crate_and_introductions(
         "hilavitkutin",
@@ -409,7 +419,7 @@ fn arvo_types_only_fires_on_non_introducer_crate() {
 #[test]
 fn arvo_types_only_ignores_unknown_category() {
     // Adding a string that isn't a known category (e.g. a raw std
-    // primitive name) has no effect — the lint only matches known
+    // primitive name) has no effect; the lint only matches known
     // categories. This is the anti-bypass property: you can't just
     // add "u32" to your list to silence the lint.
     let ctx = ctx_with_crate_and_introductions(
@@ -426,7 +436,7 @@ fn arvo_types_only_ignores_unknown_category() {
 
 #[test]
 fn no_bare_option_skips_fallibility_introducer() {
-    // notko is the fallibility substrate; bare Option in its source
+    // notko introduces the fallibility category; bare Option in its source
     // is acknowledged as part of defining Maybe.
     let ctx = ctx_with_crate_and_introductions(
         "notko",
@@ -458,8 +468,8 @@ fn no_bare_option_fires_on_non_fallibility_crate() {
 #[test]
 fn no_public_raw_field_numeric_introducer_still_flags_string_fields() {
     // Numeric introducer gets numeric field types exempted, but a
-    // bare `String` field still fires — the crate doesn't introduce
-    // the string substrate.
+    // bare `String` field still fires; the crate doesn't introduce
+    // the string category.
     let ctx = ctx_with_crate_and_introductions(
         "arvo",
         vec![("arvo", vec!["numeric"])],
@@ -478,7 +488,7 @@ fn no_public_raw_field_numeric_introducer_still_flags_string_fields() {
 
 #[test]
 fn no_public_raw_field_skips_numeric_introducer() {
-    // arvo-bits introduces the numeric substrate at L1 (opaque-bit
+    // arvo-bits introduces the numeric category at L1 (opaque-bit
     // containers). Its u64 field in Bits<N>(u64) is legitimate.
     let ctx = ctx_with_crate_and_introductions(
         "arvo-bits",

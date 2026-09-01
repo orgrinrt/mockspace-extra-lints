@@ -1,21 +1,38 @@
-//! Mockspace lint pack for the hilavitkutin / arvo / notko / clause stack.
+//! An opt-in mockspace lint pack, shared lints and presets a project imports
+//! because it wants them rather than anything mockspace ships by default.
 //!
-//! Consumed by each repo's `mockspace.toml` via:
+//! Some of it is narrow, the bare-primitive family and the arvo and
+//! strategy-marker rules only mean something to a codebase built on that layer,
+//! and some of it is general, the commit-style and forge-body ones fit any
+//! project that has an opinion about its own git text.
+//!
+//! Consumed by a repo's `mockspace.toml`:
 //!
 //! ```toml
 //! [lint-crates]
-//! mockspace-hilavitkutin-stack-lints = { path = "../mockspace-hilavitkutin-stack-lints" }
+//! mockspace-extra-lints = { git = "ssh://git@github.com/orgrinrt/mockspace-extra-lints.git", branch = "dev" }
 //! ```
 //!
-//! Every lint is emitted from one place so severity policy stays in sync
-//! across arvo, hilavitkutin, clause, and notko.
+//! A path dependency works the same way where the two sit beside each other in
+//! one workspace.
+//!
+//! Emitting every lint from one place is the point, since a policy several repos
+//! share stays in step that way, where a copy per repo drifts and nothing says
+//! which of the copies is the one that is right.
 
+mod const_generic_parameters;
 mod util;
 
 pub mod lints {
-    //! Individual lint rules. Each is a unit struct that implements
-    //! `mockspace_lint_rules::Lint` or `CrossCrateLint`.
+    //! Individual lint rules. Each is a unit struct over the shared
+    //! `mockspace_lint_rules::Lint` supertrait, and then one of `CrateLint`,
+    //! `WorkspaceLint` or `MessageLint` depending on what it is handed: a crate
+    //! with its sources, the workspace as a whole, or one commit message or
+    //! forge body.
 
+    pub mod commit_style;
+    pub mod forge_body;
+    pub mod message_attribution;
     pub mod no_alloc;
     pub mod no_std;
     pub mod no_bare_option;
@@ -37,7 +54,10 @@ pub mod lints {
 }
 
 use lints::{
-    arvo_types_only::ArvoTypesOnly, lint_allow_requires_task_id::LintAllowRequiresTaskId,
+    arvo_types_only::ArvoTypesOnly,
+    commit_style::CommitStyle,
+    forge_body::ForgeBody,
+    message_attribution::MessageAttribution, lint_allow_requires_task_id::LintAllowRequiresTaskId,
     no_alloc::NoAlloc, no_bare_numeric::NoBareNumeric, no_bare_option::NoBareOption,
     no_bare_result::NoBareResult, no_bare_static_str::NoBareStaticStr,
     no_bare_string::NoBareString, no_dyn_dispatch::NoDynDispatch,
@@ -67,7 +87,14 @@ mockspace_lint_rules::lint_pack! {
         ArvoTypesOnly,
         LintAllowRequiresTaskId,
     ],
-    cross_lints: [
+    workspace_lints: [
         WritingStyle,
+    ],
+    // Both carry configuration, so they are constructed rather than named as
+    // unit structs. The macro takes expressions for exactly this case.
+    message_lints: [
+        CommitStyle::default(),
+        ForgeBody::default(),
+        MessageAttribution::default(),
     ],
 }

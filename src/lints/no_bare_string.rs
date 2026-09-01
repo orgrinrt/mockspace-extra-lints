@@ -9,17 +9,26 @@
 //! position is drift. Line-local `lint:allow(no-bare-string)` is the
 //! only escape hatch, for foreign-crate boundaries.
 
-use mockspace_lint_rules::{Lint, LintContext, LintError, Severity};
+use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 
-use crate::util::{categories, crate_introduces_category, err};
+use crate::util::{categories, crate_introduces_category, err_in_file, names_type};
+use crate::util::line_lint_allowed;
 
 pub struct NoBareString;
 
 impl Lint for NoBareString {
+    /// Walks `all_sources` itself, so the dispatcher must hand it the crate
+    /// once rather than once per file. Left at the default it would report
+    /// every finding once per file in the crate.
+    fn per_file(&self) -> bool {
+        false
+    }
+
     fn name(&self) -> &'static str { "no-bare-string" }
-
     fn default_severity(&self) -> Severity { Severity::HARD_ERROR }
+}
 
+impl CrateLint for NoBareString {
     fn check(&self, ctx: &LintContext) -> Vec<LintError> {
         if ctx.should_skip_proc_macro_source_lint() { return Vec::new(); }
         let mut out = Vec::new();
@@ -34,37 +43,37 @@ impl Lint for NoBareString {
         };
 
         if crate_introduces_category(ctx, categories::STRING) { return Vec::new(); }
-        let check_string = true;
-        let check_str = true;
         for (rel_path, source) in sources {
             for (idx, raw_line) in source.lines().enumerate() {
                 let trimmed = raw_line.trim_start();
                 if trimmed.starts_with("//") { continue; }
-                if raw_line.contains("lint:allow(no-bare-string)") { continue; }
+                if line_lint_allowed(raw_line, "no-bare-string") { continue; }
 
                 let scan = strip_strings_and_chars(raw_line);
                 let scan = strip_line_comment(&scan);
 
-                if check_string && contains_bare_string_type(&scan) {
-                    out.push(err(
+                if names_type(&scan, "String") {
+                    out.push(err_in_file(
                         ctx,
+                        &rel_path,
                         idx + 1,
                         "no-bare-string",
                         format!(
-                            "bare `String` in {} line {} — use hilavitkutin_str::Str. String is heap-allocated and does not exist in this stack",
+                            "bare `String` in {} line {}. Use hilavitkutin_str::Str. String is heap-allocated and does not exist in this stack",
                             rel_path,
                             idx + 1,
                         ),
                     ));
                     continue;
                 }
-                if check_str && contains_non_static_str_ref(&scan) {
-                    out.push(err(
+                if contains_non_static_str_ref(&scan) {
+                    out.push(err_in_file(
                         ctx,
+                        &rel_path,
                         idx + 1,
                         "no-bare-string",
                         format!(
-                            "non-static `&str` in {} line {} — use `&'static str` or hilavitkutin_str::Str. Unowned borrowed strings do not cross API boundaries",
+                            "non-static `&str` in {} line {}. Use `&'static str` or hilavitkutin_str::Str. Unowned borrowed strings do not cross API boundaries",
                             rel_path,
                             idx + 1,
                         ),
@@ -77,23 +86,6 @@ impl Lint for NoBareString {
     }
 }
 
-fn contains_bare_string_type(hay: &str) -> bool {
-    let bytes = hay.as_bytes();
-    let needle = b"String";
-    let mut i = 0;
-    while i + needle.len() <= bytes.len() {
-        if &bytes[i..i + needle.len()] == needle {
-            let before_ok = i == 0 || !is_ident(bytes[i - 1]);
-            let after_pos = i + needle.len();
-            let after_ok = after_pos >= bytes.len() || !is_ident(bytes[after_pos]);
-            if before_ok && after_ok {
-                return true;
-            }
-        }
-        i += 1;
-    }
-    false
-}
 
 fn contains_non_static_str_ref(hay: &str) -> bool {
     let bytes = hay.as_bytes();
@@ -150,7 +142,7 @@ fn strip_strings_and_chars(line: &str) -> String {
                 i += 1;
             }
         } else if b == b'\'' {
-            // Don't consume the tick here — char literals are recognised
+            // Don't consume the tick here. Char literals are recognised
             // above, lifetimes start with a tick that's NOT a char-literal
             // opener (no closing tick on the line). Treat identical to
             // the numeric lint.

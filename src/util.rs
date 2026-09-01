@@ -3,23 +3,22 @@
 use mockspace_lint_rules::{LintContext, LintError, Severity};
 use tree_sitter::Node;
 
-/// Primitive-substrate categories that the ecosystem's types group
-/// into. Each lint in this pack declares which category (or
-/// categories) of substrate it protects via the `Lint::categories`
-/// helper; the `[primitive-introductions]` section in a consumer's
-/// mockspace.toml lists the categories that each crate introduces.
-/// When the two intersect, the lint self-exempts for that crate —
-/// the crate is the one bringing the substrate to the table, so
-/// whatever it does internally to define it is legitimate.
+/// The categories the ecosystem's primitives group into. Each lint in
+/// this pack declares which category (or categories) it protects via
+/// the `Lint::categories` helper; the `[primitive-introductions]`
+/// section in a consumer's mockspace.toml lists the categories that
+/// each crate introduces. When the two intersect, the lint self-exempts
+/// for that crate. The crate is the one bringing those primitives to
+/// the table, so whatever it does internally to define them is
+/// legitimate.
 ///
 /// Categories (not specific arvo type names) keep the map stable as
 /// the stack evolves. Adding a new arvo type (e.g. a new strategy
 /// marker, a new arithmetic kind, a new opaque-bit container) just
-/// means tagging its introducing crate with the right category — no
+/// means tagging its introducing crate with the right category. No
 /// lint pack change, no recompile. Categories change only when a
-/// genuinely new substrate DOMAIN appears (rare; e.g. if a "temporal
-/// substrate" layer ever joined, a new lint would carry its own
-/// domain).
+/// genuinely new domain appears (rare; e.g. if a temporal layer ever
+/// joined, a new lint would carry its own domain).
 ///
 /// The current stable categories:
 ///
@@ -45,17 +44,18 @@ pub mod categories {
 }
 
 /// Whether the current crate is declared (via
-/// `[primitive-introductions]`) to introduce the substrate `category`.
+/// `[primitive-introductions]`) to introduce the `category`.
 /// Bare-primitive lints call this once at the top of `check`: if the
 /// crate introduces the category the lint enforces, the lint returns
 /// an empty violation set for that crate, unconditionally.
 ///
 /// Matching is exact string compare against the crate's list. Adding
-/// an unknown category to a crate's list has no effect — no lint
+/// an unknown category to a crate's list has no effect; no lint
 /// watches that category. Adding `"numeric"` or `"fallibility"` to a
 /// crate's list is an auditable architectural claim (the crate must
-/// actually define the substrate types) rather than a list of
+/// actually define those types) rather than a list of
 /// forbidden tokens to bypass.
+#[must_use]
 pub fn crate_introduces_category(ctx: &LintContext, category: &str) -> bool {
     ctx.primitive_introductions
         .get(ctx.crate_name)
@@ -63,23 +63,118 @@ pub fn crate_introduces_category(ctx: &LintContext, category: &str) -> bool {
         .unwrap_or(false)
 }
 
-/// Whether the current crate introduces ANY of `categories`.
-pub fn crate_introduces_any_category(ctx: &LintContext, categories: &[&str]) -> bool {
-    categories.iter().any(|c| crate_introduces_category(ctx, c))
-}
-
 /// Slice of source for a node.
 pub fn txt<'a>(node: Node<'a>, src: &'a str) -> &'a str {
     &src[node.byte_range()]
 }
 
-/// Whether the line a node starts on contains `lint:allow(<name>)`.
+/// Whether a source line carries `lint:allow(<rule_name>)`, including
+/// the case where one marker silences multiple lints at once via the
+/// comma-separated form `lint:allow(rule_a, rule_b, rule_c)`. Whitespace
+/// inside the parens is tolerated. Multiple `lint:allow(...)` markers on
+/// the same line each get scanned.
+///
+/// The historical naive substring check (`line.contains("lint:allow(<rule>)")`)
+/// did not handle comma-separated lists. Multi-lint allow comments became
+/// useless because the substring never matched. This helper is the canonical
+/// allow-detection for every lint in this pack.
+pub fn line_lint_allowed(line: &str, rule_name: &str) -> bool {
+    let mut search = line;
+    let needle = "lint:allow(";
+    while let Some(start) = search.find(needle) {
+        let after_open = &search[start + needle.len()..];
+        if let Some(close) = after_open.find(')') {
+            let names = &after_open[..close];
+            for name in names.split(',') {
+                if name.trim() == rule_name {
+                    return true;
+                }
+            }
+            search = &after_open[close..];
+        } else {
+            break;
+        }
+    }
+    false
+}
+
+/// Whether the line a node starts on contains a `lint:allow(<name>)`
+/// (including comma-list form). Use [`line_lint_allowed`] for non-node
+/// callers.
 #[allow(dead_code)]
 pub fn is_lint_allowed(node: Node, ctx: &LintContext, rule_name: &str) -> bool {
     let row = node.start_position().row;
     let line = ctx.source.lines().nth(row).unwrap_or("");
-    let token = format!("lint:allow({rule_name})");
-    line.contains(&token)
+    line_lint_allowed(line, rule_name)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::line_lint_allowed;
+
+    #[test]
+    fn single_name_matches() {
+        assert!(line_lint_allowed("use std::env; // lint:allow(no-std)", "no-std"));
+    }
+
+    #[test]
+    fn comma_list_matches_first() {
+        assert!(line_lint_allowed(
+            "use std::env; // lint:allow(no-std, forbidden-imports)",
+            "no-std",
+        ));
+    }
+
+    #[test]
+    fn comma_list_matches_second() {
+        assert!(line_lint_allowed(
+            "use std::env; // lint:allow(forbidden-imports, no-std)",
+            "no-std",
+        ));
+    }
+
+    #[test]
+    fn comma_list_matches_third() {
+        assert!(line_lint_allowed("x // lint:allow(a, b, c)", "c"));
+    }
+
+    #[test]
+    fn whitespace_tolerated() {
+        assert!(line_lint_allowed("x // lint:allow(  a  ,  b  )", "a"));
+        assert!(line_lint_allowed("x // lint:allow(  a  ,  b  )", "b"));
+    }
+
+    #[test]
+    fn non_match_returns_false() {
+        assert!(!line_lint_allowed("x // lint:allow(other)", "no-std"));
+        assert!(!line_lint_allowed("x // lint:allow(a, b)", "c"));
+        assert!(!line_lint_allowed("no lint marker here", "no-std"));
+    }
+
+    #[test]
+    fn malformed_unclosed_returns_false() {
+        assert!(!line_lint_allowed("x // lint:allow(no-std", "no-std"));
+    }
+
+    #[test]
+    fn similar_name_does_not_match_partial() {
+        assert!(!line_lint_allowed("x // lint:allow(no-std-extra)", "no-std"));
+        assert!(!line_lint_allowed("x // lint:allow(extra-no-std)", "no-std"));
+    }
+
+    #[test]
+    fn multiple_markers_on_line() {
+        let line = "x // lint:allow(a) further text lint:allow(b, c)";
+        assert!(line_lint_allowed(line, "a"));
+        assert!(line_lint_allowed(line, "b"));
+        assert!(line_lint_allowed(line, "c"));
+        assert!(!line_lint_allowed(line, "d"));
+    }
+
+    #[test]
+    fn empty_parens_matches_nothing() {
+        assert!(!line_lint_allowed("x // lint:allow()", "anything"));
+    }
 }
 
 /// Build a blocking error with the standard (crate, line, lint, message) shape.
@@ -147,6 +242,65 @@ pub fn is_public(node: Node, src: &str) -> bool {
             let text = txt(child, src);
             return text.starts_with("pub");
         }
+    }
+    false
+}
+
+/// The same as [`err`], for a lint that walks `all_sources` and therefore
+/// knows which file it is reporting about.
+///
+/// Sets `LintError::path`, which the renderer needs to print a real location.
+/// A lint that folds the path into its message instead leaves `path` empty, and
+/// the rendered `{crate}:{line}` then points at nothing.
+pub fn err_in_file(
+    ctx: &LintContext,
+    rel_path: impl AsRef<str>,
+    line: usize,
+    lint_name: &'static str,
+    message: String,
+) -> LintError {
+    let mut e = err(ctx, line, lint_name, message);
+    e.path = Some(rel_path.as_ref().to_string());
+    e
+}
+
+/// Whether `hay` names the type `needle`, rather than merely containing its
+/// letters.
+///
+/// A match counts only where the characters on each side cannot continue a Rust
+/// identifier, and each side is gated on the needle itself: the leading
+/// check applies when the needle starts with an identifier character, the
+/// trailing check when it ends with one.
+///
+/// That gating is what makes the rule uniform. `String` gets both checks, so
+/// `MyString` and `StringInterner` stop matching. `Vec<` gets a leading check
+/// and no trailing one, because what follows its bracket is the generic
+/// argument, so `MyVec<u8>` stops matching while `Vec<u8>` still does. Nothing
+/// infers behaviour from a trailing character, so adding an entry to a
+/// forbidden-type list cannot surprise whoever adds it.
+pub fn names_type(hay: &str, needle: &str) -> bool {
+    fn is_ident(b: u8) -> bool {
+        b.is_ascii_alphanumeric() || b == b'_'
+    }
+
+    if needle.is_empty() {
+        return false;
+    }
+    let (h, n) = (hay.as_bytes(), needle.as_bytes());
+    let check_before = is_ident(n[0]);
+    let check_after = is_ident(n[n.len() - 1]);
+
+    let mut i = 0;
+    while i + n.len() <= h.len() {
+        if &h[i .. i + n.len()] == n {
+            let before_ok = !check_before || i == 0 || !is_ident(h[i - 1]);
+            let after = i + n.len();
+            let after_ok = !check_after || after >= h.len() || !is_ident(h[after]);
+            if before_ok && after_ok {
+                return true;
+            }
+        }
+        i += 1;
     }
     false
 }

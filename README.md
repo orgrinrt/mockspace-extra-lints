@@ -1,86 +1,160 @@
-# mockspace-hilavitkutin-stack-lints
+# `mockspace-extra-lints`
 
-The mockspace lint pack for the `notko` / `arvo` / `hilavitkutin` / `vehje` stack. It exists so the
-rules those four repos share are written once and enforced identically, rather than drifting into
-four slightly different opinions about the same thing.
+<div align="center" style="text-align: center;">
 
-The rules it carries are not general Rust style. They are the stack's own discipline: no heap, no
-bare standard primitives at an API boundary, no runtime dispatch or registration where a compile-time
-shape would do, and every escape hatch tied to a tracked task. Those are choices the stack made
-deliberately, and a lint is what keeps them from eroding one convenient exception at a time.
+[![GitHub Stars](https://img.shields.io/github/stars/orgrinrt/mockspace-extra-lints.svg)](https://github.com/orgrinrt/mockspace-extra-lints/stargazers)
+[![GitHub Issues](https://img.shields.io/github/issues/orgrinrt/mockspace-extra-lints.svg)](https://github.com/orgrinrt/mockspace-extra-lints/issues)
+![License](https://img.shields.io/github/license/orgrinrt/mockspace-extra-lints?color=%23009689)
 
-This crate is `publish = false`. It is consumed from git by the repos that use it, and there is no
-version of it that makes sense outside them.
+> An opt-in lint pack for mockspace, for the rules that only make sense once a
+> project has picked its foundations.
 
-## Using it
+</div>
 
-Each consuming repo names the pack in its `mockspace.toml`:
+Mockspace ships the lints every project needs, changelist discipline, document
+and source agreement, file size, dead crates. This pack holds the ones that only
+make sense once a project has committed to a particular set of foundations,
+where the right answer for one codebase is noise for another.
+
+## Installation
+
+Not on crates.io, and it is not meant to be: a lint pack is reached through
+mockspace rather than through a dependency graph, so a project opts in from its
+`mockspace.toml`.
 
 ```toml
 [lint-crates]
-mockspace-hilavitkutin-stack-lints = { path = "../mockspace-hilavitkutin-stack-lints" }
+mockspace-extra-lints = { git = "ssh://git@github.com/orgrinrt/mockspace-extra-lints.git", branch = "dev" }
 ```
 
-A path dependency is the normal shape here because the consumers sit beside this repo in the same
-workspace. Point it at the git remote instead when they do not.
+## Usage
 
-Severity is set per repo in the same file. The pack decides what a lint means; the consuming repo
-decides how loudly it says so.
+Every lint is then configured, or silenced, per project in the same file. The
+pack registers names; it does not decide severities, which is what lets one
+codebase run `no-alloc` at `error` on every gate while another never turns it on.
 
-## The lints
+```toml
+[lints.no-alloc]
+commit = "error"
+build = "error"
+push = "error"
 
-Seventeen source lints, plus one that runs across crates.
+[lints.semantic-alias-nudge]
+commit = "warn"
 
-| Lint | What it refuses |
-|---|---|
-| `no-alloc` | `alloc::*`, `Vec`, `String`, `Box`. The stack does not allocate. |
-| `no-std` | `std::*` where `core` would do |
-| `no-bare-option` | `Option<T>` in favour of `notko::Maybe<T>` |
-| `no-bare-result` | `Result<T, E>` in favour of `notko::Outcome<T, E>` |
-| `no-bare-numeric` | `u8`..`u128`, `i8`..`i128`, `f32`, `f64` in favour of arvo's exact-width types |
-| `no-bare-string` | `String` in an API position |
-| `no-bare-static-str` | non-`'static` `&str`, including as a const or static |
-| `no-dyn-dispatch` | `dyn Trait` where a generic parameter carries the same contract |
-| `no-runtime-spawn` | spawning work the scheduler should have planned |
-| `no-runtime-registration` | registering at runtime what the type system could have declared |
-| `no-public-raw-field` | a raw-typed field, public or not, since a field is part of the perimeter |
-| `no-vec-in-trait-sig` | `Vec<T>` in a trait signature, where an iterator or a collector belongs |
-| `strategy-marker-required` | a numeric type without its strategy marker |
-| `semantic-alias-nudge` | advisory: raw arvo primitives at a public boundary |
-| `trait-first-signatures` | a concrete type where a trait bound would let the call site choose |
-| `arvo-types-only` | the headline: no bare numerics anywhere, at all |
-| `lint-allow-requires-task-id` | a `// lint:allow(...)` with no tracked task behind it |
+[lints.no-bare-string]
+commit = "off"
+```
 
-The cross-crate lint is `writing-style`, which applies the workspace's prose rules to public-facing
-documentation.
+A lint nobody names does whatever its own default says, so the file is a set of
+deliberate departures rather than a full listing.
 
-`semantic-alias-nudge` is the only advisory one. The rest refuse.
+## What is in it
 
-## Building it
+### Primitive discipline
 
-```bash
+`arvo-types-only`, `no-bare-numeric`, `no-bare-option`, `no-bare-result`,
+`no-bare-string`, `no-bare-static-str`, `no-public-raw-field`,
+`no-vec-in-trait-sig`. These enforce that a codebase built on a typed numeric
+layer does not leak the primitives that layer exists to replace: `u8` through
+`u128`, `i8` through `i128`, `f32`, `f64`, `String`, a non-`'static` `&str`, and
+`Option` and `Result` in an API position. They read every file in a crate rather
+than its root alone.
+
+The type of a const generic parameter is excepted, and it is the only excepted
+position. `<const BITS: u32>` is permitted, while `const BITS: u32 = 32;`, an
+associated constant, a field and a cast are all still reported, even though a
+line scan cannot tell any of them apart. The exception comes out of the parse
+rather than the line, in `src/const_generic_parameters.rs`, which blanks the
+type of every const generic parameter before the scan runs and keeps the byte
+length so the line numbers stay the file's own.
+
+A literal suffix is reported by neither lint, and the scan is why: it wants a
+non-identifier byte on each side of the name, and a suffix always carries a
+digit or an underscore in front of it, so `0u32`, `1_usize` and `0.0_f32` go
+past. Reaching them wants the parse as well, which is a change nobody has made
+yet, and the gap is catalogued as a test rather than left to be rediscovered.
+
+### Environment discipline
+
+`no-std`, `no-alloc`, `no-runtime-spawn`, `no-runtime-registration`. What a
+`no_std`, allocation-free engine may reach for, and what it may not.
+
+### Shape discipline
+
+`no-dyn-dispatch`, `strategy-marker-required`, `trait-first-signatures`,
+`semantic-alias-nudge`. Advisory in tone, and mostly about whether a signature
+says what it means.
+
+### Prose and process
+
+`writing-style`, `commit-style`, `forge-body`, `message-attribution`,
+`lint-allow-requires-task-id`.
+
+## Per-file and per-crate dispatch
+
+Worth knowing before adding a lint here, because getting it wrong is invisible
+in the lint's own output.
+
+Mockspace hands a lint one crate at a time and, by default, calls it once per
+file with the file swapped into `source`. That default is what lets a line scan
+see module files rather than only the crate root.
+
+A lint that walks `ctx.all_sources` itself must therefore declare
+`per_file(false)`, or it reports its whole crate once per file. A lint making a
+claim about the crate root must check that `source` is the root before making
+it. Both defects report a plausible-looking number and neither fails a test that
+only calls the lint once, so `tests/per_file_dispatch.rs` asserts the dispatch
+axis directly.
+
+## Presets
+
+`presets/` holds shareable severity sets a consumer can extend rather than
+restate. See `presets/README.md`.
+
+## Building
+
+```
+cargo build --release
 cargo test
 ```
 
-Fifty-two tests over the lint bodies and the pack's entry points. The `mockspace-lint-rules`
-dependency is taken from the mockspace repo over git; redirect it with a `[patch]` section in
-`.cargo/config.toml` when iterating on both at once.
+Requires the pinned nightly in `rust-toolchain.toml`.
+
+The `mockspace-lint-rules` dependency comes from the mockspace repo over git.
+Iterating on both at once, redirect it with a `[patch]` section in
+`.cargo/config.toml` rather than editing the manifest, so nothing local reaches
+a commit. A path dependency works the same way where the two sit beside each
+other in one workspace.
 
 ## A note on coding agents
 
 We do not recommend using coding agents with this codebase.
 
-If you still choose to use one:
+If you still choose to use a coding agent:
 
-- Be aware of the environmental and social impact of large-scale model inference. Minimise agent use
-  where it is not needed. Be responsible.
-- Only use an agent if you yourself understand the architecture. Do not use an agent because you do
-  not understand; you will waste time and energy, both yours and the planet's.
-- A lint pack is a poor thing to hand to an agent in particular, because a lint that is subtly wrong
-  is worse than no lint: it teaches everyone downstream to write around it.
+- Be aware of the environmental and social impact of large-scale model
+  inference. Minimise agent use where it is not needed. Be responsible.
+- Only use an agent if you yourself understand the architecture. Do not use an
+  agent because you do not understand; you will waste time and energy, both
+  yours and the planet's.
+- A lint is a rule about a codebase that a reader will trust without rereading
+  it. Getting one subtly wrong is worse than not having it, because the gate
+  then reports clean over the thing it was added to catch.
 
-The recommendation stands: do this work yourself unless you know what you are doing and why.
+The recommendation stands: do this work yourself unless you know what you are
+doing and why.
+
+## Support
+
+Whether you use this project, have learned something from it, or just like it, please consider supporting it by buying me a coffee, so I can dedicate more time on open-source projects like this :)
+
+<a href="https://buymeacoffee.com/orgrinrt" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy Me A Coffee" style="height: auto !important;width: auto !important;" ></a>
 
 ## License
 
-MPL-2.0. See [LICENSE](LICENSE).
+> The project is licensed under the **Mozilla Public License 2.0**.
+
+`SPDX-License-Identifier: MPL-2.0`
+
+> You can check out the full license [here](https://github.com/orgrinrt/mockspace-extra-lints/blob/dev/LICENSE)

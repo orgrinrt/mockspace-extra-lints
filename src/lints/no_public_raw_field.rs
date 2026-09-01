@@ -5,20 +5,21 @@
 //! `u32`, `bool`, `String`, `Vec<T>`, `Option<T>`, etc. signals
 //! the "primitives don't exist in this stack" rule being broken.
 //!
-//! Scope is universal — both pub and private fields, both pub and
+//! Scope is universal: both pub and private fields, both pub and
 //! private structs. The historical name `no-public-raw-field` is
 //! retained for config compatibility; the scope is no longer
 //! restricted to public fields.
 
-use mockspace_lint_rules::{Lint, LintContext, LintError, Severity};
+use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 use tree_sitter::{Node, Parser, Tree};
 
-use crate::util::{categories, crate_introduces_category, err, for_each_struct, txt};
+use crate::util::{categories, crate_introduces_category, err_in_file, for_each_struct, txt};
+use crate::util::line_lint_allowed;
 
-/// Forbidden field types paired with the substrate category each
+/// Forbidden field types paired with the category each
 /// falls under. When a crate is tagged as introducing a category,
 /// the check skips forbidden types in that category but continues
-/// scanning types in other categories — a `["numeric"]`-tagged
+/// scanning types in other categories. A `["numeric"]`-tagged
 /// crate still gets its `String` fields flagged.
 const FORBIDDEN_FIELD_TYPES: &[(&str, &str)] = &[
     ("u8",    categories::NUMERIC),
@@ -43,10 +44,18 @@ const FORBIDDEN_FIELD_TYPES: &[(&str, &str)] = &[
 pub struct NoPublicRawField;
 
 impl Lint for NoPublicRawField {
+    /// Walks `all_sources` itself, so the dispatcher must hand it the crate
+    /// once rather than once per file. Left at the default it would report
+    /// every finding once per file in the crate.
+    fn per_file(&self) -> bool {
+        false
+    }
+
     fn name(&self) -> &'static str { "no-public-raw-field" }
-
     fn default_severity(&self) -> Severity { Severity::HARD_ERROR }
+}
 
+impl CrateLint for NoPublicRawField {
     fn check(&self, ctx: &LintContext) -> Vec<LintError> {
         if ctx.should_skip_proc_macro_source_lint() { return Vec::new(); }
         // Per-category skip happens inside `report_if_forbidden`: a
@@ -122,7 +131,7 @@ fn scan_named_body(
             .lines()
             .nth(field.start_position().row)
             .unwrap_or("");
-        if src_line.contains("lint:allow(no-public-raw-field)") { continue; }
+        if line_lint_allowed(src_line, "no-public-raw-field") { continue; }
 
         let type_text = match field.child_by_field_name("type") {
             Some(t) => txt(t, source).trim().to_string(),
@@ -161,7 +170,7 @@ fn scan_tuple_body(
             .lines()
             .nth(field.start_position().row)
             .unwrap_or("");
-        if src_line.contains("lint:allow(no-public-raw-field)") { continue; }
+        if line_lint_allowed(src_line, "no-public-raw-field") { continue; }
 
         let type_text = txt(field, source).trim().to_string();
         if type_text.is_empty() { continue; }
@@ -183,12 +192,13 @@ fn report_if_forbidden(
             // its category; keep scanning so an unrelated-category
             // type later in the list still fires.
             if crate_introduces_category(ctx, category) { return; }
-            out.push(err(
+            out.push(err_in_file(
                 ctx,
+                &rel_path,
                 line,
                 "no-public-raw-field",
                 format!(
-                    "field `{field_name}: {type_text}` in {rel_path} uses raw `{forbidden}` — wrap in a domain newtype or arvo primitive. Bare primitives do not exist in this stack (pub or private field, no exception)"
+                    "field `{field_name}: {type_text}` in {rel_path} uses raw `{forbidden}`. Wrap in a domain newtype or arvo primitive. Bare primitives do not exist in this stack (pub or private field, no exception)"
                 ),
             ));
             return;
