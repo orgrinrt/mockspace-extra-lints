@@ -31,14 +31,14 @@ exempt_paths = ["**/build.rs", "**/benches/**"]
 `name` names the lint it lands on. The file name is the overlay's own identity
 and is deliberately allowed to differ from `name`, which is what lets one lint
 carry several policies: `commit-conventional.toml` and `commit-hiisi.toml` both
-target `commit-style` and disagree about parenthesised scopes, and
-`attribution-claude.toml` and `attribution-copilot.toml` both target
-`message-attribution` for different tools. A project picks one of each pair.
+target `commit-style` and disagree about parenthesised scopes, and three files
+target `message-attribution`, one per tool plus the general one. A project picks
+one from each such group.
 
 ## What is here
 
 `ls` the directory. Writing the count into this file means one of the two goes
-stale the next time somebody adds an overlay, and it has already happened once.
+stale the next time somebody adds an overlay.
 
 Not every lint in the pack has one. A preset configures a mockspace primitive,
 so a lint that carries its own detection has nothing for an overlay to set, and

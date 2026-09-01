@@ -33,8 +33,10 @@
 //! const generic is where the bare form buys a smoother API and there
 //! is nothing else to write there. The exception reaches the parameter
 //! declaration and nothing else: an associated constant, an item
-//! constant, a field, a cast and a literal suffix all still report,
-//! including on the same line as a parameter that passed. The other
+//! constant, a field and a cast all still report, including on the
+//! same line as a parameter that passed. A literal suffix does not,
+//! for the reason given above, and the exception has nothing to do
+//! with it. The other
 //! half of the rule, that the bare form is used there only where the
 //! alternative is genuinely painful, is not something a scan can
 //! judge, so it stays with whoever reviews the code.

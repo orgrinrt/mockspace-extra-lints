@@ -13,7 +13,9 @@
 //! parameter, where the bare form buys a smoother API and there is
 //! nothing else to write. The exception reaches the parameter
 //! declaration and nothing else, so an associated constant, an item
-//! constant, a field, a cast and a literal suffix all still report.
+//! constant, a field and a cast all still report. A literal suffix
+//! does not, for the reason given above, which is a property of the
+//! scan rather than of the exception.
 //!
 //! This lint is retained alongside `arvo-types-only` so configs that
 //! named it still apply; the two are semantically equivalent today.

@@ -1,22 +1,53 @@
-# mockspace-extra-lints
+# `mockspace-extra-lints`
 
-> An opt-in lint pack for mockspace. Imported by a project that wants these
-> rules, rather than shipped in mockspace core.
+<div align="center" style="text-align: center;">
+
+[![GitHub Stars](https://img.shields.io/github/stars/orgrinrt/mockspace-extra-lints.svg)](https://github.com/orgrinrt/mockspace-extra-lints/stargazers)
+[![GitHub Issues](https://img.shields.io/github/issues/orgrinrt/mockspace-extra-lints.svg)](https://github.com/orgrinrt/mockspace-extra-lints/issues)
+![License](https://img.shields.io/github/license/orgrinrt/mockspace-extra-lints?color=%23009689)
+
+> An opt-in lint pack for mockspace, for the rules that only make sense once a
+> project has picked its foundations.
+
+</div>
 
 Mockspace ships the lints every project needs, changelist discipline, document
 and source agreement, file size, dead crates. This pack holds the ones that only
 make sense once a project has committed to a particular set of foundations,
 where the right answer for one codebase is noise for another.
 
-A project opts in from its `mockspace.toml`:
+## Installation
+
+Not on crates.io, and it is not meant to be: a lint pack is reached through
+mockspace rather than through a dependency graph, so a project opts in from its
+`mockspace.toml`.
 
 ```toml
 [lint-crates]
 mockspace-extra-lints = { git = "ssh://git@github.com/orgrinrt/mockspace-extra-lints.git", branch = "dev" }
 ```
 
+## Usage
+
 Every lint is then configured, or silenced, per project in the same file. The
-pack registers names; it does not decide severities.
+pack registers names; it does not decide severities, which is what lets one
+codebase run `no-alloc` at `error` on every gate while another never turns it on.
+
+```toml
+[lints.no-alloc]
+commit = "error"
+build = "error"
+push = "error"
+
+[lints.semantic-alias-nudge]
+commit = "warn"
+
+[lints.no-bare-string]
+commit = "off"
+```
+
+A lint nobody names does whatever its own default says, so the file is a set of
+deliberate departures rather than a full listing.
 
 ## What is in it
 
@@ -30,12 +61,17 @@ file in a crate rather than its root alone.
 
 The type of a const generic parameter is excepted, and it is the only excepted
 position. `<const BITS: u32>` is permitted, while `const BITS: u32 = 32;`, an
-associated constant, a field, a cast and a literal suffix are all still
-reported, even though a line scan cannot tell any of them apart. The exception
-comes out of the parse rather than the line, in
-`src/const_generic_parameters.rs`, which blanks the type of every const
-generic parameter before the scan runs and keeps the byte length so the line
-numbers stay the file's own.
+associated constant, a field and a cast are all still reported, even though a
+line scan cannot tell any of them apart. The exception comes out of the parse
+rather than the line, in `src/const_generic_parameters.rs`, which blanks the
+type of every const generic parameter before the scan runs and keeps the byte
+length so the line numbers stay the file's own.
+
+A literal suffix is reported by neither lint, and the scan is why: it wants a
+non-identifier byte on each side of the name, and a suffix always carries a
+digit or an underscore in front of it, so `0u32`, `1_usize` and `0.0_f32` go
+past. Reaching them wants the parse as well, which is a change nobody has made
+yet, and the gap is catalogued as a test rather than left to be rediscovered.
 
 ### Environment discipline
 
@@ -107,6 +143,16 @@ If you still choose to use a coding agent:
 The recommendation stands: do this work yourself unless you know what you are
 doing and why.
 
+## Support
+
+Whether you use this project, have learned something from it, or just like it, please consider supporting it by buying me a coffee, so I can dedicate more time on open-source projects like this :)
+
+<a href="https://buymeacoffee.com/orgrinrt" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy Me A Coffee" style="height: auto !important;width: auto !important;" ></a>
+
 ## License
 
-MPL-2.0. See `LICENSE`.
+> The project is licensed under the **Mozilla Public License 2.0**.
+
+`SPDX-License-Identifier: MPL-2.0`
+
+> You can check out the full license [here](https://github.com/orgrinrt/mockspace-extra-lints/blob/dev/LICENSE)
