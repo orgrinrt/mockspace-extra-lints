@@ -75,10 +75,20 @@ fn arvo_types_only_fires_on_cast_expression() {
 }
 
 #[test]
-fn arvo_types_only_fires_on_literal_suffix() {
+fn arvo_types_only_fires_on_a_const_binding_beside_a_literal_suffix() {
+    // Named for what it establishes. It used to be named for the literal suffix
+    // and passed on the `usize` binding on the same line; the suffix itself goes
+    // unreported, and the arm that says so is catalogued red in
+    // `the_const_generic_parameter_is_excepted.rs`.
     let src = "const X: usize = 0u32 as usize;\n";
     let hits = ArvoTypesOnly.check(&ctx_with(src));
-    assert!(!hits.is_empty(), "literal suffix `0u32` must be flagged");
+    assert!(!hits.is_empty(), "the bare `usize` binding must be flagged");
+
+    let suffix_alone = "fn f() { let _ = 0u32; }\n";
+    assert!(
+        ArvoTypesOnly.check(&ctx_with(suffix_alone)).is_empty(),
+        "pinning the gap rather than hiding it: a suffix on its own is missed",
+    );
 }
 
 #[test]

@@ -18,8 +18,26 @@
 //! - array element types (`[u32; N]`)
 //! - cast expressions (`x as u32`)
 //! - associated paths (`u32::MAX`, `bool::from_str`)
-//! - literal suffixes (`0u32`, `1_usize`, `0.0_f32`)
 //! - tuple-field declarations (`pub struct Str(u32)`)
+//!
+//! A literal suffix is not among them, and the list said it was. The
+//! scan wants a non-identifier byte on each side of the name, and a
+//! suffix always has a digit or an underscore in front of it, so
+//! `0u32`, `1_usize` and `0.0_f32` go unreported. Reaching them wants
+//! the parse rather than the line. The catalogued arm is
+//! `a_literal_suffix_still_reports` in
+//! `tests/the_const_generic_parameter_is_excepted.rs`.
+//!
+//! One position is excepted, and only one: the type of a const generic
+//! parameter. `pub struct Signed<const BITS: u32>;` passes, because a
+//! const generic is where the bare form buys a smoother API and there
+//! is nothing else to write there. The exception reaches the parameter
+//! declaration and nothing else: an associated constant, an item
+//! constant, a field, a cast and a literal suffix all still report,
+//! including on the same line as a parameter that passed. The other
+//! half of the rule, that the bare form is used there only where the
+//! alternative is genuinely painful, is not something a scan can
+//! judge, so it stays with whoever reviews the code.
 //!
 //! Escape hatch (single line): `// lint:allow(arvo-types-only) reason: ...; tracked: #N`
 //! is only appropriate for foreign-crate boundary where the crate
@@ -28,6 +46,7 @@
 
 use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 
+use crate::const_generic_parameters::without_const_generic_parameter_types;
 use crate::util::{categories, crate_introduces_category, err_in_file};
 use crate::util::line_lint_allowed;
 
@@ -73,12 +92,15 @@ impl CrateLint for ArvoTypesOnly {
         };
 
         for (rel_path, source) in sources {
-            for (idx, raw_line) in source.lines().enumerate() {
+            // The excepted position comes off the parse, blanked in place so the
+            // line numbering is still the file's own.
+            let excepted = without_const_generic_parameter_types(source);
+            for (idx, (raw_line, kept)) in source.lines().zip(excepted.lines()).enumerate() {
                 let trimmed_start = raw_line.trim_start();
                 if trimmed_start.starts_with("//") { continue; }
                 if line_lint_allowed(raw_line, "arvo-types-only") { continue; }
 
-                let scan = strip_string_and_char_literals(raw_line);
+                let scan = strip_string_and_char_literals(kept);
                 let scan = strip_line_comment(&scan);
 
                 for prim in BARE_PRIMITIVES {

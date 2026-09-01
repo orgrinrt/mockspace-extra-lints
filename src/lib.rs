@@ -17,6 +17,7 @@
 //! importers instead of drifting per repo, which is exactly what happened to the
 //! hand-copied commit-style rule before it moved here.
 
+mod const_generic_parameters;
 mod util;
 
 pub mod lints {
