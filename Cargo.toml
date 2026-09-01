@@ -2,8 +2,9 @@
 name = "mockspace-extra-lints"
 version = "0.1.0"
 edition = "2021"
-description = "Opt-in mockspace lint pack: shared lints and presets, imported by a project that wants them rather than shipped in mockspace core"
+description = "Opt-in mockspace lint pack: the rules that only make sense once a project has picked its foundations"
 license = "MPL-2.0"
+repository = "https://github.com/orgrinrt/mockspace-extra-lints"
 publish = false
 
 [dependencies]
