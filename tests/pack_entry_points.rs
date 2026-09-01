@@ -126,8 +126,9 @@ fn every_preset_names_a_lint_the_pack_contributes() {
 /// The assertion states the intended behaviour rather than the present one, so it
 /// flips to green when that lands.
 #[test]
-#[ignore = "catalogue: 14 of 15 presets set keys their lint ignores; the primitive \
-            layer the presets presume is not implemented and presets/ is never loaded"]
+#[ignore = "catalogue: nearly every preset sets keys its lint ignores, and the run \
+            names which; the primitive layer the presets presume is not implemented \
+            and presets/ is never loaded"]
 fn every_preset_config_key_is_declared_by_its_lint() {
     let p = collected();
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("presets");

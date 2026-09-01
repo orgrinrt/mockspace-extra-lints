@@ -2,7 +2,7 @@
 //! generic parameter.
 //!
 //! The bare-primitive lints scan lines rather than syntax, which is why they
-//! reach a literal suffix and a cast that a signature walk would miss. The cost
+//! reach a cast and a let binding that a signature walk would miss. The cost
 //! is that a line has no idea where in the grammar its tokens sit, so
 //! `<const BITS: u32>` and `const BITS: u32 = 32;` read the same to it. Only one
 //! of the two is permitted, so the position has to come from the parse.

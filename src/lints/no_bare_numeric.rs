@@ -1,8 +1,8 @@
 //! Lint: no bare numeric primitive anywhere in source.
 //!
-//! Historically scoped to public fn signatures; now scans the entire
-//! source to match the "arvo is the exclusive numeric substrate" rule
-//! verbatim. Bare `u*`/`i*`/`f*`/`usize`/`isize`/`bool` do not exist
+//! Scans the whole source rather than public signatures alone, because
+//! the rule it enforces is that arvo is where every numeric comes from.
+//! Bare `u*`/`i*`/`f*`/`usize`/`isize`/`bool` do not exist
 //! in this stack, not in pub API, not in private fields, not in
 //! expressions and not in casts. A literal suffix is the one the line
 //! scan cannot reach, because it always carries a digit or an
@@ -13,7 +13,9 @@
 //! parameter, where the bare form buys a smoother API and there is
 //! nothing else to write. The exception reaches the parameter
 //! declaration and nothing else, so an associated constant, an item
-//! constant, a field, a cast and a literal suffix all still report.
+//! constant, a field and a cast all still report. A literal suffix
+//! does not, for the reason given above, which is a property of the
+//! scan rather than of the exception.
 //!
 //! This lint is retained alongside `arvo-types-only` so configs that
 //! named it still apply; the two are semantically equivalent today.
@@ -82,7 +84,7 @@ impl CrateLint for NoBareNumeric {
                             idx + 1,
                             "no-bare-numeric",
                             format!(
-                                "bare `{prim}` in {} line {}. arvo is the exclusive numeric substrate. Wrap in an arvo type, or a domain alias grounded on one; bare primitives do not exist in this stack",
+                                "bare `{prim}` in {} line {}. arvo is where every numeric here comes from. Wrap in an arvo type, or a domain alias grounded on one; bare primitives do not exist in this stack",
                                 rel_path,
                                 idx + 1,
                             ),

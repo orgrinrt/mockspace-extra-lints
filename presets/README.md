@@ -1,91 +1,61 @@
-# Stack-lints preset pack
+# Presets
 
-TOML preset overlays consumed via the mockspace v2 preset infrastructure
-(see `mock/research/202605220500_lint-preset-infrastructure.md` and
-`mock/research/202605221700_directive-vocabulary-reconciled.md` in the
-mockspace repo for the design).
+TOML overlays a consumer extends instead of restating a lint's whole
+configuration in its own `mockspace.toml`. Each one carries the tokens, the
+severities and the path scopes for one policy, so a project that wants that
+policy names it rather than copying twenty lines that then drift.
 
-## What this is
-
-Once mockspace v2 Phase 4 lands (external preset host loading via the
-`mock://ext/<pkg>/export/lint-preset/<name>` URI scheme and
-SHA-pinned lockfile), consumers extend a preset from this pack by
-adding to their `mockspace.toml`:
+## What a preset file holds
 
 ```toml
-[lints.no-heap]
-extends = "stack-lints::no-alloc"
+schema_version = "1.0"
+name = "no-alloc"
+primitive = "token-scan"
+description = "no heap allocation in stack code"
+
+[config]
+tokens = ["Vec<", "Box<", "Rc<", "Arc<", "String", "vec!", "HashMap<", "BTreeMap<"]
+word_boundary = false
+
+[severity]
+commit = "error"
+build = "error"
+push = "error"
+
+[scope]
+paths = ["**/*.rs"]
+exempt_paths = ["**/build.rs", "**/benches/**"]
 ```
 
-The `extends` shorthand resolves to
-`mock://ext/stack-lints/export/lint-preset/no-alloc`, the loader
-fetches the TOML, and the cascade applies it between catalog defaults
-and the consumer's workspace defaults.
+`primitive` names the mockspace catalogue primitive the overlay configures, and
+`name` names the lint it lands on. The file name is the overlay's own identity
+and is deliberately allowed to differ from `name`, which is what lets one lint
+carry several policies: `commit-conventional.toml` and `commit-hiisi.toml` both
+target `commit-style` and disagree about parenthesised scopes, and three files
+target `message-attribution`, one per tool plus the general one. A project picks
+one from each such group.
 
-Until Phase 4 ships, these files are inert: they exist as the future
-content the loader will fetch. Consumers who want the same overlay
-behaviour today use the first-party form `extends = "mockspace::no-alloc"`
-which resolves to embedded content in the mockspace binary (shipped in
-mockspace PR #69).
+## What is here
 
-## What ships here
+`ls` the directory. Writing the count into this file means one of the two goes
+stale the next time somebody adds an overlay.
 
-15 preset overlays mirroring the corresponding policy bundles in
-mockspace-rs's first-party preset table:
+Not every lint in the pack has one. A preset configures a mockspace primitive,
+so a lint that carries its own detection has nothing for an overlay to set, and
+`arvo-types-only`, `no-bare-static-str` and `semantic-alias-nudge` are the three
+in that shape today. Moving them would mean shipping their detection as
+catalogue primitives first.
 
-- `no-alloc.toml`, `no-std.toml`, `no-dyn-dispatch.toml`,
-  `no-runtime-spawn.toml`, `no-runtime-registration.toml`
-- `no-bare-numeric.toml`, `no-bare-string.toml`, `no-bare-option.toml`,
-  `no-bare-result.toml`, `no-public-raw-field.toml`,
-  `no-vec-in-trait-sig.toml`, `strategy-marker-required.toml`,
-  `trait-first-signatures.toml`
-- `writing-style.toml`
-- `lint-allow-requires-task-id.toml`
+## Reaching them from a consumer
 
-Each preset's content is byte-equivalent to the corresponding
-mockspace::* preset at this snapshot. They duplicate intentionally:
+The host shorthand a consumer would write resolves to a `mock://ext/` URI that
+the loader fetches and pins by hash. That loader is not shipped, so nothing in a
+consumer's `mockspace.toml` reaches these files yet, and the equivalents
+embedded in the mockspace binary are what a project extends today. These
+overlays are the content the loader will fetch once it lands, and they are kept
+in step meanwhile.
 
-- Consumers using `mockspace::<name>` get the first-party (embedded)
-  shape today.
-- Consumers using `stack-lints::<name>` will get the external
-  (lockfile-pinned) shape once Phase 4 lands.
-
-Future divergence is expected: stack-lints presets will tighten as
-the stack matures, adding stricter forbidden tokens, narrower
-scopes, and harder severities than the mockspace::* baseline. The
-identical-content snapshot today is the starting point.
-
-## What stays as Rust code
-
-Three of the 18 lints in `src/lints/` do not have a corresponding
-mockspace-rs primitive that a preset could configure; they ship
-detection logic, not just policy:
-
-- `arvo_types_only` (arvo-specific newtype-at-boundaries enforcement)
-- `no_bare_static_str` (const/static string interning gate)
-- `semantic_alias_nudge` (soft warn on raw arvo primitives at API
-  boundary; carries the populated arvo-primitive-to-alias table)
-
-These stay as Rust impls in the crate. Migrating them to presets
-would require shipping the underlying detection logic as new
-catalog primitives in mockspace-rs first; that work has not been
-scoped.
-
-## Conventions
-
-- File name (minus `.toml`) is the preset name. It must match the
-  `name` field; the mockspace v2 schema validator hard-fails on
-  mismatch.
-- The `primitive` field names the mockspace-rs catalog primitive the
-  preset configures.
-- The `extends` field chains to another preset via the
-  `<host>::<name>` shorthand. The stack-lints presets currently
-  carry no `extends` (they are full overlays); future severity
-  profiles will chain off the mockspace::* base.
-
-## Cross-references
-
-- Reconciled directive vocabulary memo: `mockspace/mock/research/202605221700_directive-vocabulary-reconciled.md`.
-- Preset infrastructure memo: `mockspace/mock/research/202605220500_lint-preset-infrastructure.md`.
-- Migration guide (consumer-facing): `mockspace/docs/MIGRATION-v1-to-v2-lints.md`.
-- mockspace-rs's parallel first-party preset table: `mockspace/mock/crates/mockspace-rs/presets/`.
+Do note that they are expected to diverge from the embedded ones rather than
+stay identical, with tighter token lists, narrower scopes and harder severities,
+because the whole reason for a separate pack is that the right answer for one
+codebase is noise for another.

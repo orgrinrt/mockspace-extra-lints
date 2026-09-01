@@ -1,29 +1,34 @@
-//! An opt-in mockspace lint pack: shared lints and presets a project imports
-//! because it wants them, rather than anything mockspace ships by default.
+//! An opt-in mockspace lint pack, shared lints and presets a project imports
+//! because it wants them rather than anything mockspace ships by default.
 //!
-//! The stack lints (no-alloc, no-std, the bare-primitive family, the arvo and
-//! strategy-marker rules) came first and are why this existed, but nothing here
-//! is limited to that stack, and the commit-style and forge-body presets it also
-//! carries are general.
+//! Some of it is narrow, the bare-primitive family and the arvo and
+//! strategy-marker rules only mean something to a codebase built on that layer,
+//! and some of it is general, the commit-style and forge-body ones fit any
+//! project that has an opinion about its own git text.
 //!
-//! Consumed by a repo's `mockspace.toml` via:
+//! Consumed by a repo's `mockspace.toml`:
 //!
 //! ```toml
 //! [lint-crates]
-//! mockspace-extra-lints = { path = "../mockspace-extra-lints" }
+//! mockspace-extra-lints = { git = "ssh://git@github.com/orgrinrt/mockspace-extra-lints.git", branch = "dev" }
 //! ```
 //!
-//! Emitting every lint from one place is the point: policy stays in sync across
-//! importers instead of drifting per repo, which is exactly what happened to the
-//! hand-copied commit-style rule before it moved here.
+//! A path dependency works the same way where the two sit beside each other in
+//! one workspace.
+//!
+//! Emitting every lint from one place is the point, since a policy several repos
+//! share stays in step that way, where a copy per repo drifts and nothing says
+//! which of the copies is the one that is right.
 
 mod const_generic_parameters;
 mod util;
 
 pub mod lints {
-    //! Individual lint rules. Each is a unit struct that implements
-    //! `mockspace_lint_rules::CrateLint` or `WorkspaceLint`, over the shared
-    //! `Lint` supertrait.
+    //! Individual lint rules. Each is a unit struct over the shared
+    //! `mockspace_lint_rules::Lint` supertrait, and then one of `CrateLint`,
+    //! `WorkspaceLint` or `MessageLint` depending on what it is handed: a crate
+    //! with its sources, the workspace as a whole, or one commit message or
+    //! forge body.
 
     pub mod commit_style;
     pub mod forge_body;

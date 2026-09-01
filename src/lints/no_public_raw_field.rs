@@ -16,7 +16,7 @@ use tree_sitter::{Node, Parser, Tree};
 use crate::util::{categories, crate_introduces_category, err_in_file, for_each_struct, txt};
 use crate::util::line_lint_allowed;
 
-/// Forbidden field types paired with the substrate category each
+/// Forbidden field types paired with the category each
 /// falls under. When a crate is tagged as introducing a category,
 /// the check skips forbidden types in that category but continues
 /// scanning types in other categories. A `["numeric"]`-tagged
