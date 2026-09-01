@@ -111,7 +111,7 @@ impl CrateLint for ArvoTypesOnly {
                             idx + 1,
                             "arvo-types-only",
                             format!(
-                                "bare `{prim}` in {} line {}. The stack has no bare numeric/bool primitives. Use an arvo type (UFixed / IFixed / FastFloat / StrictFloat / USize / Cap / Bool) or a domain alias grounded on one",
+                                "bare `{prim}` in {} line {}. The stack has no bare numeric/bool primitives. Use an arvo type, or a domain alias grounded on one",
                                 rel_path,
                                 idx + 1,
                             ),

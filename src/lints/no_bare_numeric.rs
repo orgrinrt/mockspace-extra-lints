@@ -82,7 +82,7 @@ impl CrateLint for NoBareNumeric {
                             idx + 1,
                             "no-bare-numeric",
                             format!(
-                                "bare `{prim}` in {} line {}. arvo is the exclusive numeric substrate. Wrap in UFixed / IFixed / FastFloat / StrictFloat / USize / Cap / Bool or a domain alias; bare primitives do not exist in this stack",
+                                "bare `{prim}` in {} line {}. arvo is the exclusive numeric substrate. Wrap in an arvo type, or a domain alias grounded on one; bare primitives do not exist in this stack",
                                 rel_path,
                                 idx + 1,
                             ),
