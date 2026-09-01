@@ -45,6 +45,10 @@ fn ctx_with(source: &'static str) -> LintContext<'static> {
         shame_doc: None,
         workspace_root: std::path::Path::new("/tmp"),
         proc_macro_crates: &[],
+        // Upstream's default: source lints skip proc-macro crates, because a
+        // proc macro's own heap-using parser never ships in a consumer binary.
+        // These fixtures are ordinary crates, so the default is the honest
+        // setting and turning it on would test a different thing.
         lint_proc_macro_source: false,
         crate_prefix: "test",
         primitive_introductions: Box::leak(Box::new(std::collections::BTreeMap::new())),
@@ -288,6 +292,10 @@ fn ctx_with_files(files: Vec<(&'static str, &'static str)>) -> LintContext<'stat
         shame_doc: None,
         workspace_root: std::path::Path::new("/tmp"),
         proc_macro_crates: &[],
+        // Upstream's default: source lints skip proc-macro crates, because a
+        // proc macro's own heap-using parser never ships in a consumer binary.
+        // These fixtures are ordinary crates, so the default is the honest
+        // setting and turning it on would test a different thing.
         lint_proc_macro_source: false,
         crate_prefix: "test",
         primitive_introductions: Box::leak(Box::new(std::collections::BTreeMap::new())),
@@ -366,6 +374,10 @@ fn ctx_with_crate_and_introductions(
         shame_doc: None,
         workspace_root: std::path::Path::new("/tmp"),
         proc_macro_crates: &[],
+        // Upstream's default: source lints skip proc-macro crates, because a
+        // proc macro's own heap-using parser never ships in a consumer binary.
+        // These fixtures are ordinary crates, so the default is the honest
+        // setting and turning it on would test a different thing.
         lint_proc_macro_source: false,
         crate_prefix: "test",
         primitive_introductions: introductions_leaked,
