@@ -85,8 +85,8 @@ impl Tool for RulingsWithNoVerbatim {
     }
 
     fn help(&self) -> &'static str {
-        "With no argument: every `ruling` row that sets `says` and carries no \
-         `quote`, so what stands behind it is somebody's restatement rather \
+        "With no argument: every `ruling` row that carries no `quote`, so what \
+         stands behind it is somebody's restatement rather \
          than the words themselves. A row here is not a defect. Sometimes the \
          corpus genuinely holds no verbatim and the row is the best available \
          record of a real call, and the reason for that sits in `note` where a \

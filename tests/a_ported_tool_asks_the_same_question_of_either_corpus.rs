@@ -18,7 +18,7 @@
 use std::collections::BTreeMap;
 
 use mockspace_extra_lints::tools::rulings_with_no_verbatim::RulingsWithNoVerbatim;
-use mockspace_lint_rules::tool::{Outcome, Tool, ToolContext};
+use mockspace_lint_rules::tool::{NotALint, Outcome, Tool, ToolContext};
 use mockspace_lint_rules::RegistryView;
 
 fn row(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
@@ -56,6 +56,44 @@ fn examined(outcome: &Outcome) -> usize {
         Outcome::Clean { examined } => *examined,
         _ => panic!("expected a clean report, got {outcome:?}"),
     }
+}
+
+/// What the tool declares about itself, which the port dropped.
+///
+/// **Both of these were catalogued in the corpus this came from and neither
+/// survived.** `not_a_lint` decides how the contract reads the result, and
+/// `name` is the subcommand a person types, the string that collided with the
+/// local copy, and the reason a repository had to delete one. Give either any
+/// other value and, without this, everything still passes: a declaration
+/// nothing constrains is a comment with a type.
+#[test]
+fn the_tool_declares_the_kind_and_the_name_the_contract_reads() {
+    assert!(
+        matches!(RulingsWithNoVerbatim.not_a_lint(), NotALint::NoFailingCase),
+        "an inventory with no pass line, which is what makes it a tool rather than a lint"
+    );
+    assert_eq!(
+        RulingsWithNoVerbatim.name(),
+        "rulings-with-no-verbatim",
+        "the subcommand, and the name that has to be unique across every pack a repo loads"
+    );
+}
+
+/// A quote holding only whitespace is no quote.
+///
+/// The third case the port dropped. `has_no_verbatim` trims before asking, so
+/// this is the arm that says the trim is load-bearing rather than incidental.
+#[test]
+fn a_quote_that_is_only_whitespace_is_no_verbatim() {
+    let v = view(&[(
+        "ruling::blank",
+        row(&[("says", "restated"), ("quote", "   \n  ")]),
+    )]);
+    let (_, out) = run(&v, &[]);
+    assert!(
+        out.contains("blank"),
+        "a field present and holding nothing tells a reader exactly what a missing one does: {out}"
+    );
 }
 
 /// The control. Without it every arm below is satisfied by a tool that reports

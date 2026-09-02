@@ -42,6 +42,23 @@ fn the_pack_contributes_a_workspace_lint() {
     );
 }
 
+/// The pack contributes its tool, which is the whole claim of shipping one.
+///
+/// **Nothing asserted this.** Every other arm constructs the tool directly, so
+/// removing it from the `lint_pack!` left the suite green while the one thing a
+/// consumer gets by depending on this pack silently went away. That claim is
+/// also what licensed deleting the local copy in the repository this was ported
+/// out of, so it is the load-bearing one.
+#[test]
+fn the_pack_contributes_its_tool_under_the_name_the_subcommand_uses() {
+    let p = collected();
+    assert!(
+        p.tools.iter().any(|t| t.name() == "rulings-with-no-verbatim"),
+        "a consumer gets this tool by depending on the pack, and the name is the subcommand: {:?}",
+        p.tools.iter().map(|t| t.name()).collect::<Vec<_>>()
+    );
+}
+
 #[test]
 fn every_lint_has_a_kebab_case_name() {
     let p = collected();
