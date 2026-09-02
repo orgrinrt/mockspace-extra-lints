@@ -31,6 +31,7 @@ pub mod lints {
     //! forge body.
 
     pub mod commit_style;
+    pub mod file_size;
     pub mod forge_body;
     pub mod message_attribution;
     pub mod no_alloc;
@@ -56,6 +57,7 @@ pub mod lints {
 use lints::{
     arvo_types_only::ArvoTypesOnly,
     commit_style::CommitStyle,
+    file_size::FileSize,
     forge_body::ForgeBody,
     message_attribution::MessageAttribution, lint_allow_requires_task_id::LintAllowRequiresTaskId,
     no_alloc::NoAlloc, no_bare_numeric::NoBareNumeric, no_bare_option::NoBareOption,
@@ -86,6 +88,9 @@ mockspace_lint_rules::lint_pack! {
         TraitFirstSignatures,
         ArvoTypesOnly,
         LintAllowRequiresTaskId,
+        // Carries a budget and a counting mode, so it is constructed rather
+        // than named as a unit struct.
+        FileSize::default(),
     ],
     workspace_lints: [
         WritingStyle,
