@@ -78,8 +78,8 @@ impl Tool for RulingsWithNoVerbatim {
 
     fn args(&self) -> &'static [ArgSpec] {
         &[ArgSpec {
-            name:        "slug",
-            required:    false,
+            name: "slug",
+            required: false,
             description: "report one ruling in full, by its slug, before quoting it",
         }]
     }
@@ -117,19 +117,39 @@ impl Tool for RulingsWithNoVerbatim {
     }
 }
 
-/// Whether a row rests on somebody's restatement rather than on the words.
+/// Whether the row carries the words themselves.
 ///
-/// The `ratified_by` check is a lookup rather than an assumption: a corpus not
-/// declaring the field returns `None` here and excludes nothing, which is what
-/// makes this the same question on a corpus that never had the concept.
+/// One question, about one field, and nothing else folded into it. The
+/// exclusion below is a separate question with a separate answer, and a reader
+/// who wants to know whether there is a quote is asking this one.
 #[must_use]
-pub fn has_no_verbatim(ctx: &ToolContext<'_>, q: &str) -> bool {
-    if ctx.registry.field(q, RATIFIED_BY) == Some(NOT_THEIRS) {
-        return false;
-    }
+pub fn carries_verbatim(ctx: &ToolContext<'_>, q: &str) -> bool {
     ctx.registry
         .field(q, "quote")
-        .is_none_or(|v| v.trim().is_empty())
+        .is_some_and(|v| !v.trim().is_empty())
+}
+
+/// Whether the row is outside what this tool asks about at all.
+///
+/// A ruling stamped by converging experts was never resting on somebody's
+/// restatement of op, because it does not rest on op. So it is not a hole, and
+/// it is also not a row that carries his words: those are two different things
+/// and this answers only the first.
+///
+/// The lookup is a lookup rather than an assumption: a corpus not declaring the
+/// field returns `None` and excludes nothing, which is what makes this the same
+/// question on a corpus that never had the concept.
+#[must_use]
+pub fn outside_the_question(ctx: &ToolContext<'_>, q: &str) -> bool {
+    ctx.registry.field(q, RATIFIED_BY) == Some(NOT_THEIRS)
+}
+
+/// Whether a row rests on somebody's restatement rather than on the words.
+///
+/// The report's population: in scope, and carrying no quote.
+#[must_use]
+pub fn has_no_verbatim(ctx: &ToolContext<'_>, q: &str) -> bool {
+    !outside_the_question(ctx, q) && !carries_verbatim(ctx, q)
 }
 
 fn all(ctx: &ToolContext<'_>, rows: &[String]) -> ToolReport {
@@ -165,10 +185,8 @@ fn all(ctx: &ToolContext<'_>, rows: &[String]) -> ToolReport {
          carrying a note are the ones somebody has looked at.\n",
     );
     ToolReport {
-        outcome: Outcome::Clean {
-            examined: total,
-        },
-        output:  s,
+        outcome: Outcome::Clean { examined: total },
+        output: s,
     }
 }
 
@@ -184,10 +202,25 @@ fn one(ctx: &ToolContext<'_>, rows: &[String], key: &str) -> ToolReport {
         ));
     };
     let mut s = format!("{}\n", q.rsplit("::").next().unwrap_or(q));
+    // Two lines, because they are two facts and one of them used to stand in
+    // for both: a row stamped by experts was printed as carrying the words
+    // whether or not it had a quote, and the empty `quote` field was visible
+    // two lines below saying otherwise. This view is for reading a row before
+    // quoting it, which is exactly when a wrong yes costs something.
     s.push_str(&format!(
-        "\n  rests on the words behind it: {}\n",
-        if has_no_verbatim(ctx, q) { "no" } else { "yes" }
+        "\n  carries the words themselves: {}\n",
+        if carries_verbatim(ctx, q) {
+            "yes"
+        } else {
+            "no"
+        }
     ));
+    if outside_the_question(ctx, q) {
+        s.push_str(
+            "  and it is not asked to: `ratified_by` is `experts`, so the row rests on their\n  \
+             converging rather than on op, and it is left out of the report.\n",
+        );
+    }
     // Written as a filter rather than a let-chain: this pack is edition 2021
     // and the corpus it was ported from is 2024.
     for field in ["rung", RATIFIED_BY, "says", "quote", "note", "provenance"] {
@@ -201,9 +234,7 @@ fn one(ctx: &ToolContext<'_>, rows: &[String], key: &str) -> ToolReport {
         }
     }
     ToolReport {
-        outcome: Outcome::Clean {
-            examined: 1,
-        },
-        output:  s,
+        outcome: Outcome::Clean { examined: 1 },
+        output: s,
     }
 }

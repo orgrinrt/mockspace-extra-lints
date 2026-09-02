@@ -18,8 +18,8 @@
 use std::collections::BTreeMap;
 
 use mockspace_extra_lints::tools::rulings_with_no_verbatim::RulingsWithNoVerbatim;
-use mockspace_lint_rules::RegistryView;
 use mockspace_lint_rules::tool::{Outcome, Tool, ToolContext};
+use mockspace_lint_rules::RegistryView;
 
 fn row(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
     pairs
@@ -53,9 +53,7 @@ fn run(registry: &RegistryView, args: &[&str]) -> (Outcome, String) {
 
 fn examined(outcome: &Outcome) -> usize {
     match outcome {
-        Outcome::Clean {
-            examined,
-        } => *examined,
+        Outcome::Clean { examined } => *examined,
         _ => panic!("expected a clean report, got {outcome:?}"),
     }
 }
@@ -115,7 +113,10 @@ fn a_corpus_declaring_no_ratified_by_excludes_nothing() {
     let v = view(&[
         (
             "ruling::one",
-            row(&[("says", "restated"), ("note", "the corpus holds no verbatim")]),
+            row(&[
+                ("says", "restated"),
+                ("note", "the corpus holds no verbatim"),
+            ]),
         ),
         ("ruling::two", row(&[("says", "restated")])),
     ]);
@@ -135,7 +136,10 @@ fn the_listing_distinguishes_a_hole_somebody_has_looked_at() {
     let v = view(&[
         (
             "ruling::looked_at",
-            row(&[("says", "s"), ("note", "no verbatim exists, the call was made in a meeting")]),
+            row(&[
+                ("says", "s"),
+                ("note", "no verbatim exists, the call was made in a meeting"),
+            ]),
         ),
         ("ruling::untouched", row(&[("says", "s")])),
     ]);
@@ -181,5 +185,68 @@ fn the_single_row_form_takes_a_bare_slug_and_prints_the_fields_that_carry_anythi
     assert!(
         !out.contains("note:"),
         "an empty field carries nothing and must not be printed as though it did: {out}"
+    );
+}
+
+/// The single row states what it carries, not whether it is in the report.
+///
+/// **The case that used to print the opposite of the truth.** Being out of the
+/// report and carrying the words are two different facts, and one answer was
+/// serving both: a row stamped by experts with no `quote` was printed as having
+/// the words behind it, with the absent `quote` visible in the same output.
+/// This view is for reading a row before quoting it, so a wrong yes here is the
+/// one place the tool can actively mislead.
+#[test]
+fn a_row_out_of_scope_and_carrying_no_quote_does_not_claim_to_carry_one() {
+    let v = view(&[(
+        "ruling::stamped",
+        row(&[
+            ("says", "an agent's restatement"),
+            ("ratified_by", "experts"),
+        ]),
+    )]);
+    let (_, out) = run(&v, &["stamped"]);
+    assert!(
+        out.contains("carries the words themselves: no"),
+        "there is no `quote` on this row, so the only honest answer is no: {out}"
+    );
+    assert!(
+        out.contains("`ratified_by` is `experts`"),
+        "and the reason it is not in the report has to be said, or the no reads as a defect: \
+         {out}"
+    );
+    assert!(
+        !out.contains("the words behind it: yes"),
+        "the exact sentence the old shape printed here: {out}"
+    );
+}
+
+/// The other half, so neither answer is wired to a constant.
+#[test]
+fn a_row_out_of_scope_that_does_carry_its_quote_says_so() {
+    let v = view(&[(
+        "ruling::stamped_and_quoted",
+        row(&[("ratified_by", "experts"), ("quote", "his actual words")]),
+    )]);
+    let (_, out) = run(&v, &["stamped_and_quoted"]);
+    assert!(
+        out.contains("carries the words themselves: yes"),
+        "a quote is a quote whoever ratified the row: {out}"
+    );
+    assert!(
+        out.contains("`ratified_by` is `experts`"),
+        "still out of the report, and still says why: {out}"
+    );
+}
+
+/// And an in-scope row says nothing about an exclusion that did not happen.
+#[test]
+fn a_row_inside_the_question_carries_no_exclusion_line() {
+    let v = view(&[("ruling::plain", row(&[("says", "restated")]))]);
+    let (_, out) = run(&v, &["plain"]);
+    assert!(out.contains("carries the words themselves: no"), "{out}");
+    assert!(
+        !out.contains("ratified_by"),
+        "a corpus that never had the field must not have it narrated at it: {out}"
     );
 }
