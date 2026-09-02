@@ -91,6 +91,41 @@ says what it means.
 `writing-style`, `commit-style`, `forge-body`, `message-attribution`,
 `lint-allow-requires-task-id`.
 
+### Tools
+
+A tool rides the same cdylib a lint does, so depending on this pack gives you
+its tools too and your repo needs no `mock/tools/` of its own. `mock tools`
+lists them beside the builtins and your own, and does not distinguish where one
+came from, because at the point of running one it does not matter.
+
+`rulings-with-no-verbatim` reports every `ruling` row that sets `says` and
+carries no `quote`, so what stands behind it is somebody's restatement rather
+than the words themselves. Nothing gates on it: a row it names is sometimes the
+best available record of a real call, and the list is for knowing where the
+holes are. Where a corpus records a `ratified_by` of `experts` those rows are
+out of scope, and a corpus declaring no such field makes no such distinction, so
+all of its rulings are in scope.
+
+What belongs here rather than in one repository is the same question a lint
+answers. A check only one repo will ever want stays in that repo. A check
+several want is one implementation here instead of one per consumer, drifting
+apart. Two corpora had independently grown tools for the provenance of a ruling
+and for coverage of a namespace, under different names, neither citing the
+other, and a fix to either was a fix to one.
+
+Still living in their own repositories, and each is a candidate to come here on
+the same argument. From arvo: `obligation-coverage`, `awaiting-a-ruling`,
+`unasked-questions`, `a-panel-catalogue-is-readable`, `the-positions`. From
+kamu: `slot-coverage`, `claim-inventory`, `already-said`, `provenance-sweep`,
+`parallel-statements`, `intent-or-mechanism`, `tackle`, `corpus`, `corpus-talk`,
+`unearth`. Three of those pairs are the same check twice:
+`obligation-coverage` against `slot-coverage` is coverage of a namespace by what
+reaches it, differing only in which namespace; `awaiting-a-ruling` against
+`claim-inventory`; and `unasked-questions` against `already-said`. Each wants
+consolidating into one tool taking the namespace as an argument rather than
+naming it in a constant. `rounding-vocabulary` is genuinely arvo's own and
+should stay there.
+
 ## Per-file and per-crate dispatch
 
 Worth knowing before adding a lint here, because getting it wrong is invisible

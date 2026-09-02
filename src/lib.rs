@@ -21,6 +21,7 @@
 //! which of the copies is the one that is right.
 
 mod const_generic_parameters;
+pub mod tools;
 mod util;
 
 pub mod lints {
@@ -66,6 +67,7 @@ use lints::{
     semantic_alias_nudge::SemanticAliasNudge, strategy_marker_required::StrategyMarkerRequired,
     trait_first_signatures::TraitFirstSignatures, writing_style::WritingStyle,
 };
+use crate::tools::rulings_with_no_verbatim::RulingsWithNoVerbatim;
 
 mockspace_lint_rules::lint_pack! {
     lints: [
@@ -96,5 +98,12 @@ mockspace_lint_rules::lint_pack! {
         CommitStyle::default(),
         ForgeBody::default(),
         MessageAttribution::default(),
+    ],
+    // Tools ride the same cdylib as the lints and `mock tools` enumerates them
+    // identically, so a consumer gets these by depending on the pack and needs
+    // no `<mock>/tools/` directory of its own. See `tools` for which checks
+    // belong here rather than in one repository.
+    tools: [
+        RulingsWithNoVerbatim,
     ],
 }
