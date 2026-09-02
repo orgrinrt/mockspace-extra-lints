@@ -36,7 +36,7 @@ impl CrateLint for NoStd {
             .all_sources
             .first()
             .map_or(true, |f| f.text == ctx.source);
-        let head: String = ctx.source.lines().take(30).collect::<Vec<_>>().join("\n");
+        let head = crate_prelude(ctx.source);
         let has_no_std = head.contains("#![no_std]");
         let allowed_at_root = line_lint_allowed(&head, "no-std");
         if is_crate_root && !has_no_std && !allowed_at_root && !ctx.is_proc_macro_crate() {
@@ -70,5 +70,92 @@ impl CrateLint for NoStd {
         }
 
         out
+    }
+}
+
+/// The part of a crate root that may carry an inner attribute.
+///
+/// Everything up to and including the last line before the first item, which is
+/// where the language allows `#![...]` and nowhere else. A module doc runs as
+/// long as it runs, so a fixed line count is a guess about how much prose a
+/// crate is allowed to open with, and this reads the shape instead.
+///
+/// The window used to be thirty lines. A crate whose module doc ran to
+/// thirty-one reported its root as missing an attribute that was on line
+/// thirty-two, which is the whole reason this function exists.
+///
+/// Conservative at the boundary: an unrecognised line ends the prelude, so
+/// anything this cannot classify falls back to reporting rather than to
+/// silence.
+fn crate_prelude(source: &str) -> String {
+    let mut kept = Vec::new();
+    for line in source.lines() {
+        let text = line.trim_start();
+        // `#!` and not `#[`: an outer attribute opens an item, and an item is
+        // exactly what ends the prelude.
+        let is_prelude = text.is_empty()
+            || text.starts_with("//")
+            || text.starts_with("#!")
+            || text.starts_with("/*")
+            || text.starts_with('*');
+        if !is_prelude {
+            break;
+        }
+        kept.push(line);
+    }
+    kept.join("\n")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::crate_prelude;
+
+    #[test]
+    fn an_attribute_past_a_long_module_doc_is_still_found() {
+        let doc = "//! prose\n".repeat(80);
+        let source = format!("{doc}\n#![no_std]\n\npub mod thing;\n");
+        assert!(
+            crate_prelude(&source).contains("#![no_std]"),
+            "a module doc of any length may precede the attribute"
+        );
+    }
+
+    #[test]
+    fn an_attribute_on_the_very_first_line_is_found() {
+        assert!(crate_prelude("#![no_std]\npub mod thing;\n").contains("#![no_std]"));
+    }
+
+    #[test]
+    fn the_prelude_stops_at_the_first_item_so_a_later_line_cannot_pass_for_one() {
+        // The string appears, in a position the language would not accept an
+        // inner attribute in. Reading the whole file would find it; reading the
+        // prelude does not, which is the difference this function is for.
+        let source = "//! prose\npub mod thing;\nconst NOTE: &str = \"#![no_std]\";\n";
+        assert!(!crate_prelude(source).contains("#![no_std]"));
+    }
+
+    #[test]
+    fn a_crate_with_no_attribute_reports_none() {
+        let source = "//! prose\n//! more\n\npub mod thing;\n";
+        assert!(!crate_prelude(source).contains("#![no_std]"));
+    }
+
+    #[test]
+    fn a_block_comment_header_does_not_end_the_prelude() {
+        let source = "/* a banner\n * over several lines\n */\n#![no_std]\npub mod thing;\n";
+        assert!(crate_prelude(source).contains("#![no_std]"));
+    }
+
+    #[test]
+    fn an_outer_attribute_on_the_first_item_ends_the_prelude() {
+        // `#[derive(...)]` opens an item rather than the crate, so anything
+        // after it is not a place an inner attribute may sit.
+        let source = "//! prose\n#[derive(Debug)]\npub struct Thing;\n#![no_std]\n";
+        assert!(!crate_prelude(source).contains("#![no_std]"));
+    }
+
+    #[test]
+    fn an_empty_source_is_a_prelude_with_no_attribute_in_it() {
+        assert!(!crate_prelude("").contains("#![no_std]"));
     }
 }
