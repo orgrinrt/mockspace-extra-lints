@@ -141,6 +141,28 @@ fn check_text(content: &str, crate_name: &str, out: &mut Vec<LintError>) {
         ));
     }
 
+    // 1b. Inline emphasis, which is banned outright rather than rationed.
+    //
+    // A sentence carrying its weight in the words needs no typeface to say
+    // which half matters, and emphasis turns into decoration the moment there
+    // is more than a little of it, at which point a reader stops seeing any of
+    // it. No threshold for that reason: one is a violation.
+    //
+    // Agent instructions under `.claude/` are exempt and never reach here,
+    // because this lint's file set is the published surface plus rust comments.
+    for (number, marker) in emphasis_runs(&prose) {
+        out.push(LintError::with_severity(
+            crate_name.to_string(),
+            number,
+            "writing-style",
+            format!(
+                "inline emphasis `{marker}`. No bold, italic or underline in prose a human reads; \
+                 say it in the words. Backticks on an identifier or a path stay"
+            ),
+            Severity::PUSH_GATE,
+        ));
+    }
+
     // 2. Hype words, corporate jargon, filler phrases, greeting openers.
     let lower = prose.to_lowercase();
     for (word, category) in HYPE_WORDS.iter().map(|w| (*w, "hype"))
@@ -206,6 +228,77 @@ fn check_text(content: &str, crate_name: &str, out: &mut Vec<LintError>) {
             Severity::PUSH_GATE,
         ));
     }
+}
+
+/// Every inline-emphasis run in a body, as a line number and the marker used.
+///
+/// One entry per line rather than per run, because a line carrying three bold
+/// spans is one sentence to rewrite and three findings would say so three times.
+///
+/// What counts: a `**` or `__` pair for bold, and a `*` or `_` pair for italic.
+/// The single-character forms are the awkward ones, so both are required to sit
+/// against a word: `*this*` is emphasis, and `a * b`, `snake_case`, `_unused`
+/// and a bare `---` rule are not. A markdown list's leading `*` never pairs and
+/// so never fires.
+///
+/// Runs over prose that has already had code fences and inline code spans
+/// stripped, so a doubled star inside backticks does not reach here.
+fn emphasis_runs(prose: &str) -> Vec<(usize, &'static str)> {
+    let mut out = Vec::new();
+    for (index, line) in prose.lines().enumerate() {
+        let marker = if paired(line, "**") {
+            Some("**")
+        } else if paired(line, "__") {
+            Some("__")
+        } else if single_paired(line, '*') {
+            Some("*")
+        } else if single_paired(line, '_') {
+            Some("_")
+        } else {
+            None
+        };
+        if let Some(marker) = marker {
+            out.push((index + 1, marker));
+        }
+    }
+    out
+}
+
+/// Whether a line carries at least one opening and closing run of `marker`.
+fn paired(line: &str, marker: &str) -> bool {
+    line.matches(marker).count() >= 2
+}
+
+/// Whether a line carries a single-character emphasis pair.
+///
+/// Both ends have to touch a word for it to be emphasis rather than arithmetic,
+/// an identifier or a horizontal rule. The doubled form is excluded first, so a
+/// `**bold**` line is reported once as bold rather than twice.
+fn single_paired(line: &str, marker: char) -> bool {
+    let doubled: String = [marker, marker].iter().collect();
+    if line.contains(&doubled) {
+        return false;
+    }
+    let bytes: Vec<char> = line.chars().collect();
+    let mut opened = false;
+    for (i, c) in bytes.iter().enumerate() {
+        if *c != marker {
+            continue;
+        }
+        let before = i.checked_sub(1).and_then(|p| bytes.get(p)).copied();
+        let after = bytes.get(i + 1).copied();
+        let opens = after.is_some_and(|c| c.is_alphanumeric())
+            && before.is_none_or(|c| !c.is_alphanumeric());
+        let closes = before.is_some_and(|c| c.is_alphanumeric())
+            && after.is_none_or(|c| !c.is_alphanumeric());
+        if opened && closes {
+            return true;
+        }
+        if opens {
+            opened = true;
+        }
+    }
+    false
 }
 
 fn line_of_first_match(lines: &[&str], needle: &str) -> usize {
@@ -349,3 +442,122 @@ fn check_rust_doc_comments(source: &str, crate_name: &str, out: &mut Vec<LintErr
 
 #[allow(dead_code)]
 fn _keep_path_alive(_p: PathBuf) {}
+
+#[cfg(test)]
+mod emphasis_tests {
+    use super::{emphasis_runs, strip_code_spans};
+
+    fn markers(prose: &str) -> Vec<&'static str> {
+        emphasis_runs(prose).into_iter().map(|(_, m)| m).collect()
+    }
+
+    #[test]
+    fn bold_is_caught_in_both_spellings() {
+        assert_eq!(markers("a **loud** claim"), vec!["**"]);
+        assert_eq!(markers("a __loud__ claim"), vec!["__"]);
+    }
+
+    #[test]
+    fn italic_is_caught_in_both_spellings() {
+        assert_eq!(markers("a *quiet* claim"), vec!["*"]);
+        assert_eq!(markers("a _quiet_ claim"), vec!["_"]);
+    }
+
+    #[test]
+    fn a_line_with_several_runs_reports_once() {
+        assert_eq!(markers("**one** and **two** and **three**"), vec!["**"]);
+    }
+
+    #[test]
+    fn the_line_number_is_the_line_it_sits_on() {
+        let prose = "clean\nclean\na **loud** claim\nclean";
+        assert_eq!(emphasis_runs(prose), vec![(3, "**")]);
+    }
+
+    #[test]
+    fn every_line_carrying_emphasis_is_reported() {
+        let prose = "**one**\nclean\n*two*";
+        assert_eq!(emphasis_runs(prose), vec![(1, "**"), (3, "*")]);
+    }
+
+    #[test]
+    fn bold_is_reported_as_bold_rather_than_twice_as_italic() {
+        // The doubled form contains the single one, so a naive check would
+        // report `**bold**` under both markers.
+        assert_eq!(markers("**bold**"), vec!["**"]);
+    }
+
+    // The negatives. Each of these is a construction the ban does not reach, and
+    // each would fire under a plainer `contains('*')` check.
+
+    #[test]
+    fn plain_prose_is_left_alone() {
+        assert!(markers("a claim carrying its weight in the words").is_empty());
+    }
+
+    #[test]
+    fn multiplication_is_not_emphasis() {
+        assert!(markers("the area is a * b, in whole pixels").is_empty());
+        assert!(markers("width * height * 4").is_empty());
+    }
+
+    #[test]
+    fn a_snake_case_identifier_is_not_emphasis() {
+        assert!(markers("takes a from_raw and a to_raw").is_empty());
+        assert!(markers("one_two_three_four").is_empty());
+    }
+
+    #[test]
+    fn a_leading_underscore_is_not_emphasis() {
+        assert!(markers("_unused and _opaque are both fine").is_empty());
+    }
+
+    #[test]
+    fn a_markdown_list_bullet_is_not_emphasis() {
+        assert!(markers("* one item").is_empty());
+        assert!(markers("* one\n* two\n* three").is_empty());
+    }
+
+    #[test]
+    fn a_horizontal_rule_is_not_emphasis() {
+        assert!(markers("---").is_empty());
+        assert!(markers("***").is_empty());
+    }
+
+    #[test]
+    fn a_pointer_type_is_not_emphasis() {
+        assert!(markers("takes a *mut Proxy and returns a *const Interface").is_empty());
+    }
+
+    #[test]
+    fn a_doc_comment_prefix_does_not_confuse_it() {
+        assert_eq!(markers("/// A **loud** claim."), vec!["**"]);
+        assert!(markers("/// A plain claim.").is_empty());
+    }
+
+    #[test]
+    fn emphasis_inside_a_code_span_does_not_reach_the_check() {
+        // The pipeline strips code spans before this runs, so the guarantee is
+        // about the pair rather than about `emphasis_runs` alone.
+        let stripped = strip_code_spans("the literal `**` is not emphasis");
+        assert!(markers(&stripped).is_empty());
+    }
+
+    #[test]
+    fn emphasis_inside_a_fenced_block_does_not_reach_the_check() {
+        let stripped = strip_code_spans("prose\n```\nlet x = **y;\n```\nmore prose");
+        assert!(markers(&stripped).is_empty());
+    }
+
+    #[test]
+    fn an_unclosed_marker_is_not_emphasis() {
+        assert!(markers("a *start with no end").is_empty());
+        assert!(markers("a **start with no end").is_empty());
+    }
+
+    #[test]
+    fn an_empty_line_is_not_emphasis() {
+        assert!(markers("").is_empty());
+        assert!(markers("\n\n\n").is_empty());
+    }
+}
