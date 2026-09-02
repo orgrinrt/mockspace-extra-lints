@@ -162,8 +162,12 @@ axis directly.
 
 ## Presets
 
-`presets/` holds shareable severity sets a consumer can extend rather than
-restate. See `presets/README.md`.
+`presets/` holds severity sets written to be extended rather than restated, and
+nothing reads the directory yet. The lints here are hand-written Rust carrying
+their knobs inside them, where a preset describes a primitive-driven shape that
+was never built, so a preset key mostly names a knob its lint declares nothing
+for. `tests/pack_entry_points.rs` holds the assertion that closes it, red and
+catalogued until those primitives land. See `presets/README.md`.
 
 ## Building
 
