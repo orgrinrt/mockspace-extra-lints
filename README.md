@@ -91,6 +91,40 @@ says what it means.
 `writing-style`, `commit-style`, `forge-body`, `message-attribution`,
 `lint-allow-requires-task-id`.
 
+### Tools
+
+A tool rides the same cdylib a lint does, so depending on this pack gives you
+its tools too and your repo needs no `mock/tools/` of its own. `mock tools`
+lists them beside the builtins and your own, and does not distinguish where one
+came from, because at the point of running one it does not matter.
+
+`rulings-with-no-verbatim` reports every `ruling` row that sets `says` and
+carries no `quote`, so what stands behind it is somebody's restatement rather
+than the words themselves. Nothing gates on it: a row it names is sometimes the
+best available record of a real call, and the list is for knowing where the
+holes are. Where a corpus records a `ratified_by` of `experts` those rows are
+out of scope, and a corpus declaring no such field makes no such distinction, so
+all of its rulings are in scope.
+
+What belongs here rather than in one repository is the same question a lint
+answers. A check only one repo will ever want stays in that repo. A check
+several want is one implementation here instead of one per consumer, drifting
+apart. Two corpora had independently grown tools for the provenance of a ruling
+and for coverage of a namespace, under different names, neither citing the
+other, and a fix to either was a fix to one.
+
+Two things make a pair worth folding into one tool, and a resemblance in the
+name is neither of them. The check has to ask the same question, and the thing
+it differs on has to be expressible as an argument. Coverage of a namespace by
+what reaches it is one question wherever it is asked, so the namespace is an
+argument and one implementation serves. A check that takes no argument and reads
+one namespace from a constant is not the same shape as one that takes a required
+term and sweeps every namespace declared, however alike the two read, and
+merging them would change what one of them does.
+
+So the test is the contract rather than the noun. Where a check is genuinely one
+repository's, it stays there.
+
 ## Per-file and per-crate dispatch
 
 Worth knowing before adding a lint here, because getting it wrong is invisible
@@ -109,8 +143,12 @@ axis directly.
 
 ## Presets
 
-`presets/` holds shareable severity sets a consumer can extend rather than
-restate. See `presets/README.md`.
+`presets/` holds severity sets written to be extended rather than restated, and
+nothing reads the directory yet. The lints here are hand-written Rust carrying
+their knobs inside them, where a preset describes a primitive-driven shape that
+was never built, so a preset key mostly names a knob its lint declares nothing
+for. `tests/pack_entry_points.rs` holds the assertion that closes it, red and
+catalogued until those primitives land. See `presets/README.md`.
 
 ## Building
 
