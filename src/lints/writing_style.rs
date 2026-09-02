@@ -12,7 +12,7 @@
 //!
 //! Out of scope (discipline, not gated): `mock/design_rounds/**`.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use mockspace_lint_rules::{Lint, LintContext, LintError, Severity, WorkspaceLint};
 
@@ -119,7 +119,7 @@ fn check_file(
         Err(_) => return,
     };
     let mut found = Vec::new();
-    check_text(&content, crate_name, &mut found);
+    check_text(&content, crate_name, Body::Document, &mut found);
     for mut e in found {
         e.path = rel_label.map(str::to_string);
         out.push(e);
@@ -161,9 +161,34 @@ fn walk_md_tmpl(dir: &Path, workspace_root: &Path, out: &mut Vec<LintError>) {
     }
 }
 
-fn check_text(content: &str, crate_name: &str, out: &mut Vec<LintError>) {
+/// What kind of body `check_text` was handed.
+///
+/// The two differ in more than register. A document has sections, a first
+/// screen and a table of contents, so the structural checks below have
+/// something to be about. A file's comments have none of that: they are a
+/// corpus assembled out of lines that were never adjacent, interleaved with
+/// code that happens to be commented out, and the structural checks read that
+/// as prose and are wrong every time.
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+enum Body {
+    /// A markdown file, checked whole.
+    Document,
+    /// The comments of one source file, with `lines` the length of the source
+    /// rather than of the corpus, so a density is measured against the file a
+    /// reader opens.
+    Comments {
+        lines: usize,
+    },
+}
+
+fn check_text(content: &str, crate_name: &str, body: Body, out: &mut Vec<LintError>) {
     let lines: Vec<&str> = content.lines().collect();
-    let total_lines = lines.len().max(1);
+    let total_lines = match body {
+        Body::Document => lines.len().max(1),
+        Body::Comments {
+            lines,
+        } => lines.max(1),
+    };
 
     // Strip code fences and inline code spans for prose-level checks.
     // Raw content is retained for structural checks (leading lists, tables).
@@ -235,6 +260,16 @@ fn check_text(content: &str, crate_name: &str, out: &mut Vec<LintError>) {
         }
     }
 
+    // The three below are about a document's shape, so they run on a document
+    // and on nothing else. Each was measured firing on ordinary rust: two
+    // commented-out macro calls read as exclamations in prose, a module doc
+    // opening on bullets reads as a readme opening on a feature dump, and a
+    // rustdoc argument list reads as a glossary that should have been a table.
+    // None of those is what the rule is about.
+    if body != Body::Document {
+        return;
+    }
+
     // 3. Exclamation marks in prose (not in inline code or fenced blocks).
     let excl_count = count_exclamations_in_prose(content);
     if excl_count > 1 {
@@ -278,9 +313,14 @@ fn check_text(content: &str, crate_name: &str, out: &mut Vec<LintError>) {
 ///
 /// What counts: a `**` or `__` pair for bold, and a `*` or `_` pair for italic.
 /// Every form requires both ends to sit against a word, so `*this*` and
-/// `**this**` are emphasis while `a * b`, `**a + **b`, `snake_case`, `_unused`
-/// and a bare `---` rule are not. A markdown list's leading `*` never pairs and
-/// so never fires.
+/// `**this**` are emphasis while `a * b`, `**a + **b` and a bare `---` rule are
+/// not. A markdown list's leading `*` never pairs and so never fires.
+///
+/// One identifier carrying an underscore does not pair either, since a single
+/// `snake_case` or `_unused` has one marker. Two on a line do: `_private and
+/// public_` reads as an italic run and is reported. That is a known cost of
+/// pairing by shape rather than by parsing, and the tests pin both halves so
+/// the boundary is where somebody put it rather than where it drifted to.
 ///
 /// Runs over prose that has already had code fences and inline code spans
 /// stripped, so a doubled star inside backticks does not reach here.
@@ -364,15 +404,10 @@ fn line_of_first_match(lines: &[&str], needle: &str) -> usize {
 /// Used for prose-level checks so code examples and quoted tokens don't
 /// trip the heuristics.
 fn strip_code_spans(content: &str) -> String {
+    let fenced = fenced_lines(content);
     let mut out = String::with_capacity(content.len());
-    let mut in_fence = false;
-    for line in content.lines() {
-        if line.trim_start().starts_with("```") {
-            in_fence = !in_fence;
-            out.push('\n');
-            continue;
-        }
-        if in_fence {
+    for (index, line) in content.lines().enumerate() {
+        if fenced[index] {
             out.push('\n');
             continue;
         }
@@ -389,16 +424,35 @@ fn strip_code_spans(content: &str) -> String {
     out
 }
 
-fn count_exclamations_in_prose(content: &str) -> usize {
-    let mut in_code_fence = false;
-    let mut count = 0;
-    for line in content.lines() {
-        let trimmed = line.trim_start();
-        if trimmed.starts_with("```") {
-            in_code_fence = !in_code_fence;
-            continue;
+/// Which lines a fenced block covers, the fence markers included.
+///
+/// Markers are paired off in order, so a body ending on an unclosed fence has
+/// one marker left over and that one covers nothing. Toggling a flag instead
+/// blanks every line after it, which is the worst shape a check can take: the
+/// caller reads zero findings and nothing says the tail was never looked at.
+/// One unterminated fence in one comment is enough to do it, and a rust file
+/// carrying a `// ```" in a doc example is how it arrives.
+fn fenced_lines(content: &str) -> Vec<bool> {
+    let markers: Vec<usize> = content
+        .lines()
+        .enumerate()
+        .filter(|(_, l)| l.trim_start().starts_with("```"))
+        .map(|(i, _)| i)
+        .collect();
+    let mut fenced = vec![false; content.lines().count()];
+    for pair in markers.chunks_exact(2) {
+        for line in &mut fenced[pair[0]..=pair[1]] {
+            *line = true;
         }
-        if in_code_fence { continue; }
+    }
+    fenced
+}
+
+fn count_exclamations_in_prose(content: &str) -> usize {
+    let fenced = fenced_lines(content);
+    let mut count = 0;
+    for (index, line) in content.lines().enumerate() {
+        if fenced[index] { continue; }
         // Skip inline code `...` spans roughly.
         let mut in_code = false;
         for ch in line.chars() {
@@ -503,8 +557,9 @@ fn comment_corpus(source: &str) -> (String, Vec<usize>) {
 ///
 /// `check_text` counts over the corpus, which is a different document, so a
 /// number it returns names nothing a reader can open until it goes through the
-/// map. The document-level checks report line one, which maps to the first
-/// comment in the file.
+/// map. The source's own length goes in with it, so a density is measured
+/// against the file rather than against however many of its lines happened to
+/// be comments.
 fn check_rust_comments(
     rel_path: &str,
     source: &str,
@@ -514,16 +569,20 @@ fn check_rust_comments(
     let (corpus, map) = comment_corpus(source);
     if corpus.trim().is_empty() { return; }
     let mut found = Vec::new();
-    check_text(&corpus, crate_name, &mut found);
+    check_text(
+        &corpus,
+        crate_name,
+        Body::Comments {
+            lines: source.lines().count(),
+        },
+        &mut found,
+    );
     for mut e in found {
         e.line = map.get(e.line.saturating_sub(1)).copied().unwrap_or(e.line);
         e.path = Some(rel_path.to_string());
         out.push(e);
     }
 }
-
-#[allow(dead_code)]
-fn _keep_path_alive(_p: PathBuf) {}
 
 #[cfg(test)]
 mod emphasis_tests {
@@ -776,5 +835,126 @@ mod corpus_tests {
                 `//` inside one reads as a comment"]
     fn a_trailing_comment_is_collected() {
         assert_eq!(lines("let x = 1; // a **loud** claim\n"), vec![1]);
+    }
+}
+
+/// What a comment corpus is and is not checked for.
+///
+/// The three structural checks are about a document's shape and each was
+/// measured firing on ordinary rust before `Body` split them off. Every arm
+/// here is one of those measurements, kept so the split cannot quietly close.
+#[cfg(test)]
+mod body_tests {
+    use super::{Body, check_text, fenced_lines, word_paired};
+
+    fn on(body: Body, text: &str) -> Vec<String> {
+        let mut out = Vec::new();
+        check_text(text, "c", body, &mut out);
+        out.into_iter().map(|e| e.message).collect()
+    }
+
+    fn comments(text: &str) -> Vec<String> {
+        on(
+            Body::Comments {
+                lines: text.lines().count().max(40),
+            },
+            text,
+        )
+    }
+
+    fn fired(found: &[String], needle: &str) -> bool {
+        found.iter().any(|m| m.contains(needle))
+    }
+
+    #[test]
+    fn commented_out_code_is_not_exclamations_in_prose() {
+        let found = comments(" debug_assert!(x > 0);\n todo!();\n if !ready {\n");
+        assert!(!fired(&found, "exclamation"), "{found:?}");
+    }
+
+    #[test]
+    fn a_module_doc_opening_on_bullets_is_not_a_feature_dump() {
+        let found = comments(" what this holds:\n - one\n - two\n - three\n - four\n");
+        assert!(!fired(&found, "flat bulleted list"), "{found:?}");
+    }
+
+    #[test]
+    fn a_rustdoc_argument_list_is_not_a_glossary() {
+        let found = comments(
+            " - path: where it lands\n - name: what it is called\n - out: where findings go\n \
+             - root: what paths hang off\n",
+        );
+        assert!(!fired(&found, "glossary table"), "{found:?}");
+    }
+
+    /// The same three fire on a document, which is what makes the split a split
+    /// rather than a deletion.
+    #[test]
+    fn a_document_still_gets_all_three() {
+        let bullets = "# t\n\n- one\n- two\n- three\n- four\n";
+        assert!(fired(&on(Body::Document, bullets), "flat bulleted list"));
+
+        let excl = "# t\n\nwow! really! yes!\n";
+        assert!(fired(&on(Body::Document, excl), "exclamation"));
+
+        let labels = "# t\n\n- a: one\n- b: two\n- c: three\n- d: four\n";
+        assert!(fired(&on(Body::Document, labels), "glossary table"));
+    }
+
+    /// The density is over the source, not over however many of its lines were
+    /// comments. Two em-dashes in a two-line corpus out of a hundred-line file
+    /// is under the threshold; the same two in a two-line file is over it.
+    #[test]
+    fn an_em_dash_density_is_measured_against_the_file() {
+        let text = " one — two\n three — four\n";
+        assert!(!fired(
+            &on(
+                Body::Comments {
+                    lines: 100,
+                },
+                text
+            ),
+            "em-dash density"
+        ));
+        assert!(fired(
+            &on(
+                Body::Comments {
+                    lines: 2,
+                },
+                text
+            ),
+            "em-dash density"
+        ));
+    }
+
+    /// The silent zero, and the reason it is the worst shape available: nothing
+    /// in the output says the tail went unread.
+    #[test]
+    fn an_unterminated_fence_does_not_blank_what_follows() {
+        let found = comments(" ```\n let x = 1;\n ```\n a **loud** claim\n");
+        assert!(fired(&found, "inline emphasis"), "{found:?}");
+
+        let unclosed = comments(" ```\n let x = 1;\n a **loud** claim\n");
+        assert!(fired(&unclosed, "inline emphasis"), "{unclosed:?}");
+    }
+
+    #[test]
+    fn a_fence_pairs_in_order_and_an_odd_one_covers_nothing() {
+        assert_eq!(fenced_lines("a\n```\nb\n```\nc\n"), vec![
+            false, true, true, true, false
+        ]);
+        assert_eq!(fenced_lines("a\n```\nb\nc\n"), vec![false, false, false, false]);
+        assert_eq!(fenced_lines(""), Vec::<bool>::new());
+    }
+
+    /// The known cost of pairing by shape. One identifier carrying an
+    /// underscore does not pair; two on a line do, and that is a false positive
+    /// the check accepts rather than one it avoids.
+    #[test]
+    fn one_underscored_identifier_is_not_italic_and_two_are() {
+        assert!(!word_paired("snake_case is a name", "_"));
+        assert!(!word_paired("the _unused binding", "_"));
+        assert!(word_paired("_private and public_", "_"));
+        assert!(word_paired("the _start and the field_", "_"));
     }
 }
