@@ -39,7 +39,15 @@ confidence-threshold = 0.9
 exceptions = []
 
 [licenses.private]
-ignore = false
+# Skip workspace members that cannot be published. A crate carrying
+# `publish = false` reaches nobody, so it is not a supply-chain question, which
+# is what the rest of this file is for. Left at cargo-deny's default of `false`
+# it refuses on `unlicensed` for every research probe and spike in the tree, and
+# the repair it asks for is a licence header on throwaway code.
+#
+# It only ever skips a crate that is unpublishable. Anything with `publish` left
+# alone is checked exactly as before.
+ignore = true
 registries = []
 
 [bans]
