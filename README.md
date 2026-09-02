@@ -113,27 +113,17 @@ apart. Two corpora had independently grown tools for the provenance of a ruling
 and for coverage of a namespace, under different names, neither citing the
 other, and a fix to either was a fix to one.
 
-Still living in their own repositories, and each is a candidate to come here on
-the same argument. From arvo: `obligation-coverage`, `awaiting-a-ruling`,
-`unasked-questions`, `a-panel-catalogue-is-readable`, `the-positions`. From
-kamu: `slot-coverage`, `claim-inventory`, `already-said`, `provenance-sweep`,
-`parallel-statements`, `intent-or-mechanism`, `tackle`, `corpus`, `corpus-talk`,
-`unearth`. One of those pairs is the same check twice: `obligation-coverage`
-against `slot-coverage` is coverage of a namespace by what reaches it, differing
-only in which namespace, and it wants consolidating into one tool taking the
-namespace as an argument rather than naming it in a constant.
+Two things make a pair worth folding into one tool, and a resemblance in the
+name is neither of them. The check has to ask the same question, and the thing
+it differs on has to be expressible as an argument. Coverage of a namespace by
+what reaches it is one question wherever it is asked, so the namespace is an
+argument and one implementation serves. A check that takes no argument and reads
+one namespace from a constant is not the same shape as one that takes a required
+term and sweeps every namespace declared, however alike the two read, and
+merging them would change what one of them does.
 
-Two others look like pairs and are not, which is worth saying because the
-resemblance is in the name and the difference is in the contract.
-`awaiting-a-ruling` and `claim-inventory` read the same namespace and ask
-different things of it, one for the rows op stated and never ruled on, the other
-for every ruling grouped by what it owes. `unasked-questions` and `already-said`
-are different kinds of check under the taxonomy below: the first has no failing
-case, takes no argument and reads one namespace named in a constant, while the
-second takes a required question and sweeps every namespace the registry
-declares. Folding either pair into a tool taking a namespace argument would
-change what the second half of it does. `rounding-vocabulary` is genuinely
-arvo's own and should stay there.
+So the test is the contract rather than the noun. Where a check is genuinely one
+repository's, it stays there.
 
 ## Per-file and per-crate dispatch
 
