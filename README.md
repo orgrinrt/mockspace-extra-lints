@@ -106,6 +106,25 @@ holes are. Where a corpus records a `ratified_by` of `experts` those rows are
 out of scope, and a corpus declaring no such field makes no such distinction, so
 all of its rulings are in scope.
 
+`coverage` takes a namespace holding the demand side, the rows enumerating what
+a project owes rather than what it has already said, and reports what reaches
+each of them and at what authority. The tier comes from the rung of whatever
+names a row and never from the namespace it sits in, so a ruling that is only
+somebody's direction does not read as met, and a proposal a ratified ruling
+stamped does. A rung vocabulary belongs to the corpus, so a tier no rung there
+spells simply holds nobody, and a namespace the corpus does not declare
+contributes nothing rather than needing an arm of its own. Nothing gates on it
+either: a row nothing reaches is unfinished work, not a defect, and gating on a
+count would invent a deadline nobody set.
+
+Two things it does not fold in, both on purpose. A row named from a namespace
+whose authority cannot be read is printed under it and sets no tier, since
+tiering it would invent an authority nobody declared and dropping it would say
+nothing names the row when something does. Preconditions are reported beside the
+tiers and never inside them, because a precondition is a dependency somebody
+established, so a row with four of them and no answer is the worst-placed one
+rather than the best-attended.
+
 What belongs here rather than in one repository is the same question a lint
 answers. A check only one repo will ever want stays in that repo. A check
 several want is one implementation here instead of one per consumer, drifting
