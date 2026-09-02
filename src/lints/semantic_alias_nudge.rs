@@ -1,6 +1,23 @@
-//! Lint: advisory warn on raw arvo primitives at public API boundaries.
-//! Encourages flipping `QWord` → `RecordIndex`, `UFixed<I32, F0, Hot>` →
-//! `SlotId`, etc. A semantic alias reads better than the primitive.
+//! Lint: advisory warn on container-shaped primitives at public API boundaries.
+//!
+//! A width-shaped primitive at a public position says how many bits the value
+//! occupies and nothing about what it is, so an index that is a `QWord` reads
+//! better as whatever the domain calls it. That is the whole of what this
+//! advises.
+//!
+//! # What it does not cover, and why the list is shorter than it looks
+//!
+//! **A primitive that already names the domain answer is not nudged.** `Bool` is
+//! the case that matters: the workspace's own no-bare-primitives rule names it
+//! as the replacement for a host `bool`, so a predicate returning `Bool` has
+//! done exactly what it was asked, and there is no alias that reads better than
+//! a truth value called a truth value. Nudging it means two rules in one pack
+//! pulling opposite ways on one position, with this one arriving at a default
+//! severity the consumer never chose.
+//!
+//! `Cap` is out for the same reason, being a bound rather than a width, and
+//! `USize` and `ISize` are out because a platform-sized index is already as
+//! specific as the position usually gets.
 //!
 //! Default severity: ADVISORY (warn everywhere, blocks nothing).
 
@@ -10,10 +27,14 @@ use tree_sitter::Node;
 use crate::util::{for_each_fn, is_public, txt};
 use crate::util::line_lint_allowed;
 
-const RAW_ARVO_PRIMITIVES: &[&str] = &[
+/// Primitives whose name states a width rather than a meaning.
+///
+/// `Bool`, `Cap`, `USize` and `ISize` were here and are deliberately not, per
+/// the module doc: each already names what the value is, so an alias over one
+/// is a rename rather than a reading.
+const WIDTH_SHAPED_PRIMITIVES: &[&str] = &[
     "UFixed", "IFixed", "FastFloat", "StrictFloat",
     "Byte", "Word", "DWord", "QWord", "Nibble", "Bit",
-    "USize", "ISize", "Cap", "Bool",
 ];
 
 pub struct SemanticAliasNudge;
@@ -49,7 +70,7 @@ fn check_fn(node: Node, ctx: &LintContext, out: &mut Vec<LintError>) {
         sig.push_str(txt(ret, ctx.source));
     }
 
-    for prim in RAW_ARVO_PRIMITIVES {
+    for prim in WIDTH_SHAPED_PRIMITIVES {
         if contains_token(&sig, prim) {
             let name = node.child_by_field_name("name")
                 .map(|n| txt(n, ctx.source))
@@ -58,7 +79,10 @@ fn check_fn(node: Node, ctx: &LintContext, out: &mut Vec<LintError>) {
                 ctx.crate_name.to_string(),
                 line,
                 "semantic-alias-nudge",
-                format!("`{name}` exposes raw `{prim}` in its signature. Consider a domain alias (NodeId / SlotId / RecordIndex / etc.) for readability"),
+                format!(
+                    "`{name}` exposes `{prim}` in its signature, which states a width rather than \
+                     what the value is. An alias naming the domain reads better at a public position."
+                ),
             ));
             return;
         }
