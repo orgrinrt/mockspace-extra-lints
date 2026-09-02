@@ -1,12 +1,18 @@
 schema_version = "1.0"
 name = "lint-allow-requires-task-id"
 primitive = "suppression-meta"
-description = "every lint:allow scope must carry a tracked task id and reason"
+description = "every lint:allow scope must say what it is escaping"
 
+# `require_tracked` is gone rather than false. No standard was ever settled for
+# what the identifier refers to, so it pointed at nothing and got written to
+# satisfy the gate rather than to be followed. A marker carrying one still
+# passes; nothing asks for one.
+#
+# The two keys below are the preset's statement of intent. The lint hardcodes
+# its own behaviour and reads neither, which is a gap worth closing when the
+# config surface reaches these.
 [config]
-require_tracked = true
 require_reason = true
-require_reason_min_words = 3
 forbid_expired = false
 
 [severity]
