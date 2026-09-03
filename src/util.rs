@@ -108,75 +108,6 @@ pub fn is_lint_allowed(node: Node, ctx: &LintContext, rule_name: &str) -> bool {
     line_lint_allowed(line, rule_name)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::line_lint_allowed;
-
-    #[test]
-    fn single_name_matches() {
-        assert!(line_lint_allowed("use std::env; // lint:allow(no-std)", "no-std"));
-    }
-
-    #[test]
-    fn comma_list_matches_first() {
-        assert!(line_lint_allowed(
-            "use std::env; // lint:allow(no-std, forbidden-imports)",
-            "no-std",
-        ));
-    }
-
-    #[test]
-    fn comma_list_matches_second() {
-        assert!(line_lint_allowed(
-            "use std::env; // lint:allow(forbidden-imports, no-std)",
-            "no-std",
-        ));
-    }
-
-    #[test]
-    fn comma_list_matches_third() {
-        assert!(line_lint_allowed("x // lint:allow(a, b, c)", "c"));
-    }
-
-    #[test]
-    fn whitespace_tolerated() {
-        assert!(line_lint_allowed("x // lint:allow(  a  ,  b  )", "a"));
-        assert!(line_lint_allowed("x // lint:allow(  a  ,  b  )", "b"));
-    }
-
-    #[test]
-    fn non_match_returns_false() {
-        assert!(!line_lint_allowed("x // lint:allow(other)", "no-std"));
-        assert!(!line_lint_allowed("x // lint:allow(a, b)", "c"));
-        assert!(!line_lint_allowed("no lint marker here", "no-std"));
-    }
-
-    #[test]
-    fn malformed_unclosed_returns_false() {
-        assert!(!line_lint_allowed("x // lint:allow(no-std", "no-std"));
-    }
-
-    #[test]
-    fn similar_name_does_not_match_partial() {
-        assert!(!line_lint_allowed("x // lint:allow(no-std-extra)", "no-std"));
-        assert!(!line_lint_allowed("x // lint:allow(extra-no-std)", "no-std"));
-    }
-
-    #[test]
-    fn multiple_markers_on_line() {
-        let line = "x // lint:allow(a) further text lint:allow(b, c)";
-        assert!(line_lint_allowed(line, "a"));
-        assert!(line_lint_allowed(line, "b"));
-        assert!(line_lint_allowed(line, "c"));
-        assert!(!line_lint_allowed(line, "d"));
-    }
-
-    #[test]
-    fn empty_parens_matches_nothing() {
-        assert!(!line_lint_allowed("x // lint:allow()", "anything"));
-    }
-}
-
 /// Build a blocking error with the standard (crate, line, lint, message) shape.
 pub fn err(
     ctx: &LintContext,
@@ -303,4 +234,73 @@ pub fn names_type(hay: &str, needle: &str) -> bool {
         i += 1;
     }
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::line_lint_allowed;
+
+    #[test]
+    fn single_name_matches() {
+        assert!(line_lint_allowed("use std::env; // lint:allow(no-std)", "no-std"));
+    }
+
+    #[test]
+    fn comma_list_matches_first() {
+        assert!(line_lint_allowed(
+            "use std::env; // lint:allow(no-std, forbidden-imports)",
+            "no-std",
+        ));
+    }
+
+    #[test]
+    fn comma_list_matches_second() {
+        assert!(line_lint_allowed(
+            "use std::env; // lint:allow(forbidden-imports, no-std)",
+            "no-std",
+        ));
+    }
+
+    #[test]
+    fn comma_list_matches_third() {
+        assert!(line_lint_allowed("x // lint:allow(a, b, c)", "c"));
+    }
+
+    #[test]
+    fn whitespace_tolerated() {
+        assert!(line_lint_allowed("x // lint:allow(  a  ,  b  )", "a"));
+        assert!(line_lint_allowed("x // lint:allow(  a  ,  b  )", "b"));
+    }
+
+    #[test]
+    fn non_match_returns_false() {
+        assert!(!line_lint_allowed("x // lint:allow(other)", "no-std"));
+        assert!(!line_lint_allowed("x // lint:allow(a, b)", "c"));
+        assert!(!line_lint_allowed("no lint marker here", "no-std"));
+    }
+
+    #[test]
+    fn malformed_unclosed_returns_false() {
+        assert!(!line_lint_allowed("x // lint:allow(no-std", "no-std"));
+    }
+
+    #[test]
+    fn similar_name_does_not_match_partial() {
+        assert!(!line_lint_allowed("x // lint:allow(no-std-extra)", "no-std"));
+        assert!(!line_lint_allowed("x // lint:allow(extra-no-std)", "no-std"));
+    }
+
+    #[test]
+    fn multiple_markers_on_line() {
+        let line = "x // lint:allow(a) further text lint:allow(b, c)";
+        assert!(line_lint_allowed(line, "a"));
+        assert!(line_lint_allowed(line, "b"));
+        assert!(line_lint_allowed(line, "c"));
+        assert!(!line_lint_allowed(line, "d"));
+    }
+
+    #[test]
+    fn empty_parens_matches_nothing() {
+        assert!(!line_lint_allowed("x // lint:allow()", "anything"));
+    }
 }

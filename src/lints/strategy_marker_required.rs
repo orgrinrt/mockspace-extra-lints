@@ -75,8 +75,8 @@ fn find_generic_invocations<'a>(hay: &'a str, ty: &str) -> Vec<&'a str> {
         let mut depth = 0;
         let bytes = hay.as_bytes();
         let mut close = None;
-        for i in open..bytes.len() {
-            match bytes[i] {
+        for (i, byte) in bytes.iter().enumerate().skip(open) {
+            match byte {
                 b'<' => depth += 1,
                 b'>' => {
                     depth -= 1;

@@ -148,15 +148,15 @@ fn walk_md_tmpl(dir: &Path, workspace_root: &Path, out: &mut Vec<LintError>) {
         let path = entry.path();
         if path.is_dir() {
             walk_md_tmpl(&path, workspace_root, out);
-        } else if path.extension().map(|e| e == "tmpl").unwrap_or(false) {
-            if path.file_name().map(|n| n.to_string_lossy().ends_with(".md.tmpl")).unwrap_or(false) {
-                let label = path
-                    .strip_prefix(workspace_root)
-                    .unwrap_or(&path)
-                    .display()
-                    .to_string();
-                check_file(&path, &label, None, out);
-            }
+        } else if path.extension().is_some_and(|e| e == "tmpl")
+            && path.file_name().is_some_and(|n| n.to_string_lossy().ends_with(".md.tmpl"))
+        {
+            let label = path
+                .strip_prefix(workspace_root)
+                .unwrap_or(&path)
+                .display()
+                .to_string();
+            check_file(&path, &label, None, out);
         }
     }
 }
@@ -518,7 +518,7 @@ fn count_label_colon_bullets(lines: &[&str]) -> usize {
         if let Some(colon_pos) = rest.find(':') {
             let before = &rest[..colon_pos];
             let after = rest[colon_pos + 1..].trim();
-            let is_short_label = before.len() < 40 && !before.contains(' ').then_some(true).unwrap_or(false);
+            let is_short_label = before.len() < 40 && !before.contains(' ');
             let short_after = after.len() < 80 && !after.is_empty();
             if is_short_label && short_after {
                 n += 1;

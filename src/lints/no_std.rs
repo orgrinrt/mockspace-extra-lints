@@ -35,7 +35,7 @@ impl CrateLint for NoStd {
         let is_crate_root = ctx
             .all_sources
             .first()
-            .map_or(true, |f| f.text == ctx.source);
+            .is_none_or(|f| f.text == ctx.source);
         let head = crate_prelude(ctx.source);
         let has_no_std = head.contains("#![no_std]");
         let allowed_at_root = line_lint_allowed(&head, "no-std");

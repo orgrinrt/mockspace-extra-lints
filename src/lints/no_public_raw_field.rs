@@ -194,7 +194,7 @@ fn report_if_forbidden(
             if crate_introduces_category(ctx, category) { return; }
             out.push(err_in_file(
                 ctx,
-                &rel_path,
+                rel_path,
                 line,
                 "no-public-raw-field",
                 format!(
@@ -212,6 +212,6 @@ fn type_is(text: &str, ty: &str) -> bool {
         || t.starts_with(&format!("{ty}<"))
         || t == format!("&{ty}")
         || t == format!("&mut {ty}")
-        || t.starts_with(&format!("&'"))
+        || t.starts_with("&'")
             && (t.ends_with(&format!(" {ty}")) || t.ends_with(&format!("> {ty}")))
 }
