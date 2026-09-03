@@ -887,6 +887,24 @@ mod body_tests {
         assert!(!fired(&found, "glossary table"), "{found:?}");
     }
 
+    /// A label is one word. Four bullets whose left side of the colon is a
+    /// phrase are ordinary prose written as a list, not a glossary, and the
+    /// `!before.contains(' ')` half of `is_short_label` is the only thing that
+    /// tells the two apart. Deleting that clause leaves every other test in
+    /// this file green, which is what this one is here to stop.
+    #[test]
+    fn a_multi_word_label_is_prose_rather_than_a_glossary() {
+        let phrases = "# t\n\n- the first thing: one\n- the second thing: two\n\
+                       - the third thing: three\n- the fourth thing: four\n";
+        let found = on(Body::Document, phrases);
+        assert!(!fired(&found, "glossary table"), "{found:?}");
+
+        // The control: the same four bullets with one-word labels do fire, so
+        // the assertion above is about the labels rather than about the shape.
+        let words = "# t\n\n- first: one\n- second: two\n- third: three\n- fourth: four\n";
+        assert!(fired(&on(Body::Document, words), "glossary table"));
+    }
+
     /// The same three fire on a document, which is what makes the split a split
     /// rather than a deletion.
     #[test]
