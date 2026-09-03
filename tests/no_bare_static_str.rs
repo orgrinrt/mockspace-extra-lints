@@ -9,7 +9,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use mockspace_extra_lints::lints::no_bare_static_str::NoBareStaticStr;
-use mockspace_lint_rules::{CrateLint, CrateSourceFile, Lint, LintContext};
+use mockspace_lint_rules::{CrateLint, CrateSourceFile, LintContext};
 
 fn ctx(crate_name: &'static str, introductions: Vec<(&'static str, Vec<&'static str>)>, source: &'static str) -> LintContext<'static> {
     let mut parser = tree_sitter::Parser::new();
