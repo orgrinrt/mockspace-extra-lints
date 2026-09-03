@@ -10,7 +10,16 @@ publish = false
 [dependencies]
 # Committed state points at the canonical mockspace repo. For local
 # iteration, use `[patch]` in `.cargo/config.toml` to redirect.
-mockspace-lint-rules = { git = "ssh://git@github.com/hiisi-digital/mockspace.git", branch = "dev" }
+#
+# The URL spelling has to match the one the engine pins, character for
+# character. Cargo keys a git source by its URL, so `ssh://` here against
+# the `https://` the engine writes into its generated lint crate is two
+# copies of one crate in one graph, and what surfaces is a type mismatch
+# between `LintPack` and `LintPack` at the same file and the same line,
+# with nothing in the error naming the cause. The engine's generated
+# manifest also carries a `[patch]` keyed on the `https://` spelling,
+# which covers this crate only once the two agree.
+mockspace-lint-rules = { git = "https://github.com/hiisi-digital/mockspace.git", branch = "dev" }
 tree-sitter = "0.24"
 tree-sitter-rust = "0.23"
 
