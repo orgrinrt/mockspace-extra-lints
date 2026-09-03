@@ -14,6 +14,13 @@
 //! for, and it is the half that would go silently if one were deleted on the
 //! strength of the names matching.
 //!
+//! On `no-dyn-dispatch` the second kind is wider than the erasure shapes it
+//! first looked like. The lint scans a fixed list of ten literal markers rather
+//! than for `dyn` in a type position, so `&'a dyn Trait`, `&'static dyn Trait`
+//! and a `dyn` behind a type alias all pass it, and the first of those is the
+//! ordinary way to write a borrowed trait object. arvo's enforcer matches
+//! ` dyn ` at whitespace boundaries and catches all three.
+//!
 //! The fixtures are planted rather than read off arvo's tree, so the arms say
 //! what the shapes are and do not move when arvo does. arvo's tree is green
 //! under all six today, which is exactly why running them over it distinguishes
@@ -136,6 +143,10 @@ fn a_fixed_size_array_is_silent() {
 
 // ---- no-dyn-dispatch ------------------------------------------------------
 
+/// The markers the lint does carry. These are three of the ten literals in
+/// `no_dyn_dispatch.rs`, so this arm samples the implementation rather than the
+/// shape space, and it is a control for the two silence tests below rather than
+/// a claim that the lint covers `dyn`.
 #[test]
 fn the_dyn_shapes_fire() {
     for src in [
@@ -148,12 +159,45 @@ fn the_dyn_shapes_fire() {
     }
 }
 
-/// The load-bearing half of this file. Runtime type erasure reaches the same
-/// end as `dyn` by a different spelling, and this lint has no notion of it: it
-/// scans for `dyn` in a type position and nothing else. A consumer that forbids
-/// dynamic dispatch because monomorphisation is the dispatch is not served by
-/// this lint alone, and deleting a local enforcer that does catch these leaves
-/// no gate on them and no report that a gate went.
+/// The `dyn` shapes this lint does not reach, which is the load-bearing half
+/// of the file and the half I first got wrong.
+///
+/// The lint does not scan for `dyn` in a type position. It scans a fixed list
+/// of ten literal markers, and a `dyn` that reaches a type position by any
+/// other spelling is invisible to it. A lifetime between the ampersand and the
+/// keyword is enough, and `&'a dyn Trait` is the commonest borrowed trait
+/// object there is in a `no_std` crate.
+///
+/// arvo's `no_dynamic_dispatch` matches ` dyn ` at whitespace boundaries and
+/// catches every one of these, which is the concrete answer to whether a
+/// consumer may delete its local enforcer.
+#[test]
+fn a_dyn_reached_by_another_spelling_is_not_caught() {
+    for src in [
+        "fn f(t: &'a dyn Trait) {}\n",
+        "fn f(t: &'static dyn Trait) {}\n",
+        "type A = dyn Trait;\n",
+        "    type Item = dyn Trait;\n",
+    ] {
+        let hits = NoDynDispatch.check(&ctx(Box::leak(src.to_string().into_boxed_str())));
+        assert!(
+            hits.is_empty(),
+            "the marker list does not reach {src:?}; if it now does, the pack \
+             has widened and this boundary has moved: {hits:?}"
+        );
+    }
+}
+
+/// Runtime type erasure reaches the same end as `dyn` by a different mechanism
+/// rather than a different spelling, and this lint has no notion of it at all.
+/// A consumer forbidding dynamic dispatch because monomorphisation is the
+/// dispatch is not served by this lint alone, and deleting a local enforcer
+/// that does catch these leaves no gate on them and no report that a gate went.
+///
+/// Only the last case is a boundary this lint could plausibly have reached. The
+/// first three carry no `dyn` anywhere, so a `dyn` scanner staying silent on
+/// them establishes little on its own; they are here because they are the
+/// shapes arvo's enforcer names explicitly, and the point is the contrast.
 #[test]
 fn type_erasure_without_the_dyn_keyword_is_not_caught() {
     for src in [
