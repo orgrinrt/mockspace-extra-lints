@@ -15,7 +15,7 @@ use mockspace_extra_lints::lints::{
     no_bare_option::NoBareOption, no_bare_result::NoBareResult,
     no_bare_string::NoBareString, no_public_raw_field::NoPublicRawField,
 };
-use mockspace_lint_rules::{CrateLint, CrateSourceFile, Lint, LintContext};
+use mockspace_lint_rules::{CrateLint, CrateSourceFile, LintContext};
 
 fn ctx_with(source: &'static str) -> LintContext<'static> {
     let mut parser = tree_sitter::Parser::new();
