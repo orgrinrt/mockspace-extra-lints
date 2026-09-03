@@ -125,7 +125,7 @@ fn walk(
                             let keyword = if node.kind() == "const_item" { "const" } else { "static" };
                             out.push(err_in_file(
                                 ctx,
-                                &rel_path,
+                                rel_path,
                                 line,
                                 "no-bare-static-str",
                                 format!(

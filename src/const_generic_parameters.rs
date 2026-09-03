@@ -286,6 +286,7 @@ mod tests {
     #[test]
     fn a_span_past_the_end_is_ignored_rather_than_panicking() {
         let source = "abc\n";
-        assert_eq!(blank_spans(source, &[0 .. 99]), source);
+        let past_the_end = 0 .. 99;
+        assert_eq!(blank_spans(source, &[past_the_end]), source);
     }
 }

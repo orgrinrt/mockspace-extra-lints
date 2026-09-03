@@ -31,6 +31,7 @@ use mockspace_lint_rules::{
 
 const LINT_NAME: &str = "forge-body";
 
+#[derive(Default)]
 pub struct ForgeBody {
     /// Headings the body must contain, matched case-insensitively as substrings.
     required_sections: Vec<String>,
@@ -39,16 +40,6 @@ pub struct ForgeBody {
     /// Patterns forbidden anywhere in the body, as `pattern` or
     /// `pattern=reason`, matched case-insensitively as substrings.
     forbidden:         Vec<(String, Option<String>)>,
-}
-
-impl Default for ForgeBody {
-    fn default() -> Self {
-        Self {
-            required_sections: Vec::new(),
-            min_length:        0,
-            forbidden:         Vec::new(),
-        }
-    }
 }
 
 impl Lint for ForgeBody {
