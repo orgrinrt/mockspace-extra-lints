@@ -34,4 +34,5 @@
 //! distinction" rather than to assume a value. Assuming reads as working and is
 //! wrong in one direction only, which is the direction nobody checks.
 
+pub mod coverage;
 pub mod rulings_with_no_verbatim;

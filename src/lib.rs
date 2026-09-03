@@ -67,6 +67,7 @@ use lints::{
     semantic_alias_nudge::SemanticAliasNudge, strategy_marker_required::StrategyMarkerRequired,
     trait_first_signatures::TraitFirstSignatures, writing_style::WritingStyle,
 };
+use crate::tools::coverage::Coverage;
 use crate::tools::rulings_with_no_verbatim::RulingsWithNoVerbatim;
 
 mockspace_lint_rules::lint_pack! {
@@ -104,6 +105,7 @@ mockspace_lint_rules::lint_pack! {
     // no `<mock>/tools/` directory of its own. See `tools` for which checks
     // belong here rather than in one repository.
     tools: [
+        Coverage,
         RulingsWithNoVerbatim,
     ],
 }
