@@ -21,6 +21,8 @@
 //! which of the copies is the one that is right.
 
 mod const_generic_parameters;
+mod dep_surface;
+mod paths;
 pub mod tools;
 mod util;
 
@@ -46,6 +48,7 @@ pub mod lints {
     pub mod no_runtime_registration;
     pub mod no_public_raw_field;
     pub mod no_vec_in_trait_sig;
+    pub mod re_export_foreign_names;
     pub mod strategy_marker_required;
     pub mod semantic_alias_nudge;
     pub mod trait_first_signatures;
@@ -64,7 +67,8 @@ use lints::{
     no_bare_string::NoBareString, no_dyn_dispatch::NoDynDispatch,
     no_public_raw_field::NoPublicRawField, no_runtime_registration::NoRuntimeRegistration,
     no_runtime_spawn::NoRuntimeSpawn, no_std::NoStd, no_vec_in_trait_sig::NoVecInTraitSig,
-    semantic_alias_nudge::SemanticAliasNudge, strategy_marker_required::StrategyMarkerRequired,
+    re_export_foreign_names::ReExportForeignNames, semantic_alias_nudge::SemanticAliasNudge,
+    strategy_marker_required::StrategyMarkerRequired,
     trait_first_signatures::TraitFirstSignatures, writing_style::WritingStyle,
 };
 use crate::tools::coverage::Coverage;
@@ -84,6 +88,7 @@ mockspace_lint_rules::lint_pack! {
         NoRuntimeRegistration,
         NoPublicRawField,
         NoVecInTraitSig,
+        ReExportForeignNames,
         StrategyMarkerRequired,
         SemanticAliasNudge,
         TraitFirstSignatures,
