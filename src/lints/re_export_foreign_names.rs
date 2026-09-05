@@ -216,18 +216,39 @@ fn own_signatures(
                 if named.name == "Self" || generics.contains(&named.name) {
                     continue;
                 }
-                let (root, original) = match &named.root {
-                    Some(root) => (root.clone(), named.name.clone()),
+                // Every crate the name could have come from. A qualified
+                // path's root is a crate or an alias of a module in one, and a
+                // bare name is whatever the file's `use` lines bound it to,
+                // all of them where the file bound it more than once.
+                let candidates: Vec<(String, String)> = match &named.root {
+                    Some(root) => {
+                        match imports.named.get(root) {
+                            Some(bindings) => {
+                                bindings
+                                    .iter()
+                                    .map(|b| (b.root.clone(), named.name.clone()))
+                                    .collect()
+                            },
+                            None => vec![(root.clone(), named.name.clone())],
+                        }
+                    },
                     None => {
                         match imports.named.get(&named.name) {
-                            Some(imported) => (imported.root.clone(), imported.name.clone()),
+                            Some(bindings) => {
+                                bindings
+                                    .iter()
+                                    .map(|b| (b.root.clone(), b.name.clone()))
+                                    .collect()
+                            },
                             None => continue,
                         }
                     },
                 };
-                if !krate.is_foreign(&root) || krate.re_exported(&root, &original) {
+                let Some((root, original)) = candidates.into_iter().find(|(root, original)| {
+                    krate.is_foreign(root) && !krate.re_exported(root, original)
+                }) else {
                     continue;
-                }
+                };
                 if !seen.insert((line, original.clone())) {
                     continue;
                 }

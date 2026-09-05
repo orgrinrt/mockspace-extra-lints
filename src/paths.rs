@@ -179,17 +179,26 @@ fn has_cfg_test(node: Node, src: &str) -> bool {
 }
 
 /// A file's imports, keyed by the local name, plus every wildcard's root.
+///
+/// A local name maps to every import that binds it, because one file can
+/// bind the same name twice in two modules and a map keeping the last one
+/// would drop the first, which is the one a signature above the second
+/// resolves to. A reader asks whether any binding is foreign.
 #[derive(Default, Debug)]
 pub struct Imports {
-    pub named:     BTreeMap<String, Imported>,
+    pub named:     BTreeMap<String, Vec<Imported>>,
     pub wildcards: BTreeSet<String>,
 }
 
 /// The imports of one file, at every module depth, as one map.
 ///
 /// A `use` inside a submodule scopes to that module and this flattens it to
-/// the file, which is wider than the language and never narrower: a name the
-/// map resolves as foreign came from a foreign crate somewhere in the file.
+/// the file, keeping every binding of a name rather than the last, so the map
+/// is wider than the language and never narrower: a name it resolves as
+/// foreign was bound to a foreign crate somewhere in the file. A local
+/// binding shadowing a foreign one in another module is the price, reported
+/// rather than hidden, since a false finding is visible and a missed one is
+/// not.
 pub fn imports_of(root: Node, src: &str) -> Imports {
     let mut imports = Imports::default();
     for_each_kind(root, "use_declaration", &mut |node| {
@@ -197,7 +206,7 @@ pub fn imports_of(root: Node, src: &str) -> Imports {
             if local == "*" {
                 imports.wildcards.insert(root);
             } else {
-                imports.named.insert(local, Imported {
+                imports.named.entry(local).or_default().push(Imported {
                     root,
                     name: original,
                 });

@@ -35,28 +35,24 @@ pub struct Dependencies {
 /// The dependencies of the package at `crate_dir`, resolved through
 /// `cargo metadata` over the workspace at `workspace_root`.
 ///
-/// Offline first, because the gate runs after a build and everything the
-/// build fetched is on disk; online only where offline refuses, which is a
-/// fresh clone whose first command is a commit. What comes back on failure is
-/// the tool's own stderr rather than nothing, so a lint reporting it says why.
+/// Offline, and only offline. The gate runs after a build and everything the
+/// build fetched is on disk, so a refusal here is a fresh clone whose first
+/// command is a commit, and the answer to that is the report below rather
+/// than a fetch: a fetch from inside a commit hook has no timeout, and a
+/// credential helper on this machine blocks it indefinitely rather than
+/// failing. What comes back on failure is the tool's own stderr rather than
+/// nothing, so a lint reporting it says why.
 pub fn dependencies(workspace_root: &Path, crate_name: &str) -> Result<Dependencies, String> {
     let manifest = workspace_root.join("Cargo.toml");
-    let run = |offline: bool| {
-        let mut cmd = Command::new("cargo");
-        cmd.arg("metadata")
-            .arg("--format-version")
-            .arg("1")
-            .arg("--manifest-path")
-            .arg(&manifest);
-        if offline {
-            cmd.arg("--offline");
-        }
-        cmd.output()
-    };
-    let output = match run(true) {
-        Ok(o) if o.status.success() => o,
-        _ => run(false).map_err(|e| format!("cargo metadata could not run: {e}"))?,
-    };
+    let output = Command::new("cargo")
+        .arg("metadata")
+        .arg("--format-version")
+        .arg("1")
+        .arg("--offline")
+        .arg("--manifest-path")
+        .arg(&manifest)
+        .output()
+        .map_err(|e| format!("cargo metadata could not run: {e}"))?;
     if !output.status.success() {
         return Err(format!(
             "cargo metadata failed for {}: {}",

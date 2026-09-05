@@ -130,7 +130,11 @@ fn a_private_method_carries_nothing() {
 
 #[test]
 fn a_public_field_of_a_re_exported_struct_is_part_of_its_surface() {
-    let face = "pub struct Units;\npub struct Metrics { pub ascent: Units, descent: Units }\n";
+    // Two fields of two types, one public and one not, so the private one
+    // has a name of its own to be absent. With both fields typed alike the
+    // case passed with the visibility check deleted outright, which a
+    // reviewer established by mutation; the dedupe on the name hid it.
+    let face = "pub struct Units;\npub struct Hidden;\npub struct Metrics { pub ascent: Units, descent: Hidden }\n";
     let kit = "pub use face::Metrics;\n";
     let ws = workspace(kit, face);
     let hits = check(ws.path(), face_kit(kit));
@@ -139,6 +143,10 @@ fn a_public_field_of_a_re_exported_struct_is_part_of_its_surface() {
         hits[0].contains("`Units`") && hits[0].contains("field"),
         "{}",
         hits[0]
+    );
+    assert!(
+        !hits.iter().any(|h| h.contains("`Hidden`")),
+        "a private field is not part of the surface: {hits:?}"
     );
 }
 
@@ -231,6 +239,22 @@ fn a_workspace_that_cannot_be_read_is_reported_rather_than_passed() {
     let hits = check(dir.path(), face_kit(kit));
     assert_eq!(hits.len(), 1, "{hits:?}");
     assert!(hits[0].contains("could not be read"), "{}", hits[0]);
+}
+
+#[test]
+#[ignore = "catalogue: an associated type bound to a foreign type in a trait impl is not reached; \
+            a consumer of the impl's method still writes the type"]
+fn an_associated_type_in_a_trait_impl_is_part_of_the_surface() {
+    // `Held::go` answers `<Held as Reads>::Out`, which is `Face`, and the
+    // module doc's line that a trait impl is the trait's signature leaves the
+    // binding unreported. The consumer writes `Face` all the same.
+    let face = "pub struct Face;\npub trait Reads { type Out; fn go(&self) -> Self::Out; }\n\
+                pub struct Held;\nimpl Reads for Held { type Out = Face; fn go(&self) -> Face { Face } }\n";
+    let kit = "pub use face::{Held, Reads};\n";
+    let ws = workspace(kit, face);
+    let hits = check(ws.path(), face_kit(kit));
+    assert_eq!(hits.len(), 1, "{hits:?}");
+    assert!(hits[0].contains("`Face`"), "{}", hits[0]);
 }
 
 /// The kit root as a `'static` string, which the context borrows for the life

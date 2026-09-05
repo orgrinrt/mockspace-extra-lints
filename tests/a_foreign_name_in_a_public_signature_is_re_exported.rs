@@ -305,9 +305,9 @@ fn the_standard_library_is_never_foreign() {
 fn the_stacks_foundation_is_the_standard_library_here() {
     // `USize` and `Maybe` are the stack's vocabulary, which every consumer
     // depends on the way it depends on `core`, and the family prefix carries
-    // `arvo_bits` with `arvo`. Measured on the real kit before this arm: 25 of
-    // 31 findings were `USize`, `Bool` and `Maybe`, and none of them was a
-    // leak.
+    // `arvo_bits` with `arvo`. Run over a real kit crate before this arm, most
+    // of what the lint reported was `USize`, `Bool` and `Maybe`, and none of
+    // it was a leak.
     let files: &'static [(&'static str, &'static str)] = Box::leak(Box::new([(
         "src/lib.rs",
         "use arvo::USize;\nuse arvo_bits::Byte;\nuse notko::Maybe;\nuse hilavitkutin_str::Str;\npub fn f(n: USize, b: Byte, s: Str) -> Maybe<()> { todo!() }\n",
@@ -381,6 +381,31 @@ fn with_no_manifest_in_hand_every_unreserved_root_is_foreign() {
         &[],
     );
     assert_eq!(ReExportForeignNames.check(&ctx).len(), 1);
+}
+
+#[test]
+fn a_path_whose_root_is_an_alias_of_a_foreign_module_is_reached() {
+    // `tbl` is `riimu_face::table` under another name, so `tbl::Cmap` is a
+    // foreign name spelled through the alias. The first shape of the lint
+    // read a qualified path's root as a crate and never asked the `use`
+    // lines, so this whole spelling passed silently, which a reviewer found.
+    let src = "use riimu_face::table as tbl;\npub fn cmap() -> tbl::Cmap { todo!() }\n";
+    assert_eq!(names(src), ["Cmap"]);
+    // And the control: the same spelling with the name re-exported.
+    let fixed = "use riimu_face::table as tbl;\npub use riimu_face::table::Cmap;\npub fn cmap() -> tbl::Cmap { todo!() }\n";
+    assert!(findings(fixed).is_empty(), "{:?}", findings(fixed));
+}
+
+#[test]
+fn a_local_binding_of_the_same_name_in_another_module_does_not_hide_a_foreign_one() {
+    // The file binds `Face` twice: to the foreign one at the top, where the
+    // public signature is, and to a local one in a submodule below it. A map
+    // keeping the last binding resolved the signature's `Face` as local and
+    // reported nothing, which a reviewer found; every binding is kept now
+    // and the foreign one is reported.
+    let src = "use riimu_face::Face;\npub fn measure(face: &Face) {}\n\
+               mod local {\n    pub struct Face;\n}\nmod other {\n    use super::local::Face;\n    fn f(_: Face) {}\n}\n";
+    assert_eq!(names(src), ["Face"]);
 }
 
 // --- the escape hatch and the reporting ---------------------------------------
