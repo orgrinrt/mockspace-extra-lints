@@ -86,6 +86,18 @@ yet, and the gap is catalogued as a test rather than left to be rediscovered.
 `semantic-alias-nudge`. Advisory in tone, and mostly about whether a signature
 says what it means.
 
+`re-export-foreign-names` is the one in this group with teeth. A public
+signature that takes or returns a type from a dependency has made every caller
+depend on that crate, unless the name is reachable from here, so every foreign
+type, trait or alias in a public parameter, return, field, bound, where clause
+or alias wants a `pub use` in the crate that names it, under any name. The
+second half is the one that gets forgotten: re-exporting a type hands a
+consumer every public method on it, so what those methods take and return is a
+name the consumer has to write too, and the lint reads the dependency's own
+source through `cargo metadata` to find them. It stops at the dependency's own
+declarations, and crates of the same workspace are not foreign, on the
+reasoning that a consumer names a kit's crates and nothing under them.
+
 ### Prose and process
 
 `writing-style`, `commit-style`, `forge-body`, `message-attribution`,

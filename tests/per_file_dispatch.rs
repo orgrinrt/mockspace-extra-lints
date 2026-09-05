@@ -22,6 +22,7 @@ use mockspace_extra_lints::lints::{
     no_bare_option::NoBareOption, no_bare_result::NoBareResult,
     no_bare_static_str::NoBareStaticStr, no_bare_string::NoBareString,
     no_public_raw_field::NoPublicRawField, no_std::NoStd,
+    re_export_foreign_names::ReExportForeignNames,
 };
 use mockspace_lint_rules::{CrateLint, CrateSourceFile, Lint, LintContext};
 
@@ -106,6 +107,10 @@ fn every_all_sources_walker_declares_per_crate_dispatch() {
     assert!(
         !NoPublicRawField.per_file(),
         "no-public-raw-field walks all_sources"
+    );
+    assert!(
+        !ReExportForeignNames.per_file(),
+        "re-export-foreign-names walks all_sources"
     );
 }
 

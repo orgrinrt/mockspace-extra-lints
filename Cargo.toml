@@ -22,6 +22,11 @@ publish = false
 mockspace-lint-rules = { git = "https://github.com/hiisi-digital/mockspace.git", branch = "dev" }
 tree-sitter = "0.24"
 tree-sitter-rust = "0.23"
+# `re-export-foreign-names` reads the surface of a re-exported type out of the
+# dependency that declares it, and `cargo metadata` is what says where that
+# dependency's source is: a git revision, a path and a `[patch]` all end at a
+# manifest path there and nowhere else reliably.
+serde_json = "1"
 
 [dev-dependencies]
 tempfile = "3"

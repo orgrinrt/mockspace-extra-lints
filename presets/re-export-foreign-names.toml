@@ -1,0 +1,16 @@
+schema_version = "1.0"
+name = "re-export-foreign-names"
+primitive = "ast-type-position"
+description = "a foreign name in a public signature, or in the surface of a re-exported type, is re-exported"
+
+[config]
+positions = ["fn-param", "fn-return", "where", "field", "alias", "const", "bound", "re-export"]
+visibility = "public"
+
+[severity]
+commit = "error"
+build = "error"
+push = "error"
+
+[scope]
+paths = ["**/*.rs"]
