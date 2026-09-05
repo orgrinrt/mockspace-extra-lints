@@ -25,10 +25,17 @@
 use std::collections::BTreeMap;
 
 use mockspace_extra_lints::tools::coverage::{
-    also_named_by, preconditions, reach, stamps, tally, Coverage, Reach, TIERS,
+    Coverage,
+    Reach,
+    TIERS,
+    also_named_by,
+    preconditions,
+    reach,
+    stamps,
+    tally,
 };
-use mockspace_lint_rules::tool::{NotALint, Outcome, Tool, ToolContext};
 use mockspace_lint_rules::RegistryView;
+use mockspace_lint_rules::tool::{NotALint, Outcome, Tool, ToolContext};
 
 // ---------------------------------------------------------------------------
 // The harness
@@ -73,7 +80,9 @@ fn run(v: &RegistryView, args: &[&str]) -> (Outcome, String) {
     // `output` empty, so a test reading `output` alone cannot tell a refusal
     // from a silent pass.
     let text = match &rep.outcome {
-        Outcome::Inconclusive { reason } => reason.clone(),
+        Outcome::Inconclusive {
+            reason,
+        } => reason.clone(),
         _ => rep.output.clone(),
     };
     (rep.outcome, text)
@@ -97,10 +106,10 @@ fn alone() -> RegistryView {
 fn ruling_at(rung: &str) -> RegistryView {
     view(&[
         DEMAND,
-        (
-            "ruling::he_said_so",
-            &[("rung", rung), ("obligation", "the_thing")],
-        ),
+        ("ruling::he_said_so", &[
+            ("rung", rung),
+            ("obligation", "the_thing"),
+        ]),
     ])
 }
 
@@ -111,28 +120,22 @@ fn ruling_at(rung: &str) -> RegistryView {
 fn stamped_by(rung: &str) -> RegistryView {
     view(&[
         DEMAND,
-        (
-            "ruling::he_said_so",
-            &[("rung", rung), ("ratifies", "a_claim")],
-        ),
+        ("ruling::he_said_so", &[
+            ("rung", rung),
+            ("ratifies", "a_claim"),
+        ]),
         ("proposal::a_claim", &[("obligation", "the_thing")]),
     ])
 }
 
 /// A proposal naming the demand row with nothing stamping it.
 fn unstamped() -> RegistryView {
-    view(&[
-        DEMAND,
-        ("proposal::a_claim", &[("obligation", "the_thing")]),
-    ])
+    view(&[DEMAND, ("proposal::a_claim", &[("obligation", "the_thing")])])
 }
 
 /// A retirement naming the demand row and nothing else doing so.
 fn retired() -> RegistryView {
-    view(&[
-        DEMAND,
-        ("retirement::a_dead_end", &[("obligation", "the_thing")]),
-    ])
+    view(&[DEMAND, ("retirement::a_dead_end", &[("obligation", "the_thing")])])
 }
 
 /// The tier the fixtures above put `the_thing` at.
@@ -224,12 +227,7 @@ fn answered_holds_exactly_where_something_constructive_reaches_it() {
     // Driven over every tier rather than over the two a not-equals form would
     // name. That form puts a newly added tier on the unanswered side in
     // silence.
-    for t in [
-        Reach::Ratified,
-        Reach::InForce,
-        Reach::Stated,
-        Reach::Proposed,
-    ] {
+    for t in [Reach::Ratified, Reach::InForce, Reach::Stated, Reach::Proposed] {
         assert!(t.answered(), "{}", t.word());
     }
     for t in [Reach::Unsettled, Reach::RouteClosed, Reach::Nothing] {
@@ -285,10 +283,7 @@ fn a_rung_the_walk_cannot_read_does_not_reach_the_top_tier() {
     for v in [
         ruling_at("whatever_comes_next"),
         ruling_at(""),
-        view(&[
-            DEMAND,
-            ("ruling::he_said_so", &[("obligation", "the_thing")]),
-        ]),
+        view(&[DEMAND, ("ruling::he_said_so", &[("obligation", "the_thing")])]),
     ] {
         assert_eq!(tier(&v), Reach::Unsettled);
     }
@@ -302,10 +297,7 @@ fn the_report_prints_a_rulings_rung_beside_it() {
     let (_, open) = run(&ruling_at("open"), &[NS]);
     assert!(open.contains("rung = open"), "{open}");
     let (_, absent) = run(
-        &view(&[
-            DEMAND,
-            ("ruling::he_said_so", &[("obligation", "the_thing")]),
-        ]),
+        &view(&[DEMAND, ("ruling::he_said_so", &[("obligation", "the_thing")])]),
         &[NS],
     );
     assert!(absent.contains("rung = (absent)"), "{absent}");
@@ -366,10 +358,10 @@ fn several_stamps_on_one_ruling_are_all_followed() {
     let v = view(&[
         ("obligation::first", &[("what", "one")]),
         ("obligation::second", &[("what", "two")]),
-        (
-            "ruling::he_said_so",
-            &[("rung", "ratified"), ("ratifies", "a_claim, another_claim")],
-        ),
+        ("ruling::he_said_so", &[
+            ("rung", "ratified"),
+            ("ratifies", "a_claim, another_claim"),
+        ]),
         ("proposal::a_claim", &[("obligation", "first")]),
         ("proposal::another_claim", &[("obligation", "second")]),
     ]);
@@ -382,10 +374,10 @@ fn several_stamps_on_one_ruling_are_all_followed() {
 fn a_stamp_naming_no_proposal_changes_nothing_and_does_not_panic() {
     let v = view(&[
         DEMAND,
-        (
-            "ruling::he_said_so",
-            &[("rung", "ratified"), ("ratifies", "a_ghost")],
-        ),
+        ("ruling::he_said_so", &[
+            ("rung", "ratified"),
+            ("ratifies", "a_ghost"),
+        ]),
         ("proposal::a_claim", &[("obligation", "the_thing")]),
     ]);
     assert_eq!(tier(&v), Reach::Proposed);
@@ -412,31 +404,24 @@ fn the_tally_counts_every_row_once_and_at_one_tier() {
         ("obligation::unsettled", &[("what", "e")]),
         ("obligation::closed", &[("what", "f")]),
         ("obligation::nothing", &[("what", "g")]),
-        (
-            "ruling::r",
-            &[("rung", "ratified"), ("obligation", "ratified")],
-        ),
-        (
-            "ruling::f",
-            &[("rung", "in_force"), ("obligation", "in_force")],
-        ),
+        ("ruling::r", &[
+            ("rung", "ratified"),
+            ("obligation", "ratified"),
+        ]),
+        ("ruling::f", &[
+            ("rung", "in_force"),
+            ("obligation", "in_force"),
+        ]),
         ("ruling::s", &[("rung", "stated"), ("obligation", "stated")]),
-        (
-            "ruling::o",
-            &[("rung", "open"), ("obligation", "unsettled")],
-        ),
+        ("ruling::o", &[
+            ("rung", "open"),
+            ("obligation", "unsettled"),
+        ]),
         ("proposal::p", &[("obligation", "proposed")]),
         ("retirement::x", &[("obligation", "closed")]),
     ]);
     let t = tally(&v, NS);
-    for word in [
-        "ratified",
-        "in_force",
-        "stated",
-        "proposed",
-        "unsettled",
-        "route-closed",
-    ] {
+    for word in ["ratified", "in_force", "stated", "proposed", "unsettled", "route-closed"] {
         assert_eq!(t[word], 1, "{word} in {t:?}");
     }
     assert_eq!(t["nothing"], 1);
@@ -461,10 +446,7 @@ fn the_tally_names_every_tier_even_where_none_sits_there() {
 fn a_precondition_is_never_a_tier_and_never_counted_as_coverage() {
     // The arithmetic temptation, refused. A row with a precondition and nothing
     // else is further from met than one with nothing at all.
-    let v = view(&[
-        DEMAND,
-        ("law::a_result", &[("precondition_for", "the_thing")]),
-    ]);
+    let v = view(&[DEMAND, ("law::a_result", &[("precondition_for", "the_thing")])]);
     assert_eq!(reach(&v, NS)["the_thing"].0, Reach::Nothing);
     assert_eq!(preconditions(&v, NS)["the_thing"].len(), 1);
 }
@@ -503,10 +485,10 @@ fn control_a_row_carrying_no_precondition_field_establishes_none() {
     let v = view(&[
         DEMAND,
         ("law::a_result", &[("what", "an unrelated result")]),
-        (
-            "ruling::he_said_so",
-            &[("rung", "ratified"), ("obligation", "the_thing")],
-        ),
+        ("ruling::he_said_so", &[
+            ("rung", "ratified"),
+            ("obligation", "the_thing"),
+        ]),
     ]);
     assert!(preconditions(&v, NS)["the_thing"].is_empty());
 }
@@ -519,14 +501,14 @@ fn a_stamp_does_not_turn_a_proposals_precondition_into_coverage() {
     let v = view(&[
         DEMAND,
         ("obligation::other", &[("what", "another")]),
-        (
-            "ruling::he_said_so",
-            &[("rung", "ratified"), ("ratifies", "a_claim")],
-        ),
-        (
-            "proposal::a_claim",
-            &[("obligation", "the_thing"), ("precondition_for", "other")],
-        ),
+        ("ruling::he_said_so", &[
+            ("rung", "ratified"),
+            ("ratifies", "a_claim"),
+        ]),
+        ("proposal::a_claim", &[
+            ("obligation", "the_thing"),
+            ("precondition_for", "other"),
+        ]),
     ]);
     let r = reach(&v, NS);
     assert_eq!(r["the_thing"].0, Reach::Ratified);
@@ -560,32 +542,27 @@ fn a_row_nothing_names_reaches_nothing() {
 type Rung = (Reach, &'static str, &'static [(&'static str, &'static str)]);
 
 const LADDER: [Rung; 6] = [
-    (
-        Reach::Ratified,
-        "ruling",
-        &[("rung", "ratified"), ("obligation", "the_thing")],
-    ),
-    (
-        Reach::InForce,
-        "ruling",
-        &[("rung", "in_force"), ("obligation", "the_thing")],
-    ),
-    (
-        Reach::Stated,
-        "ruling",
-        &[("rung", "stated"), ("obligation", "the_thing")],
-    ),
+    (Reach::Ratified, "ruling", &[
+        ("rung", "ratified"),
+        ("obligation", "the_thing"),
+    ]),
+    (Reach::InForce, "ruling", &[
+        ("rung", "in_force"),
+        ("obligation", "the_thing"),
+    ]),
+    (Reach::Stated, "ruling", &[
+        ("rung", "stated"),
+        ("obligation", "the_thing"),
+    ]),
     (Reach::Proposed, "proposal", &[("obligation", "the_thing")]),
-    (
-        Reach::Unsettled,
-        "ruling",
-        &[("rung", "open"), ("obligation", "the_thing")],
-    ),
-    (
-        Reach::RouteClosed,
-        "retirement",
-        &[("obligation", "the_thing")],
-    ),
+    (Reach::Unsettled, "ruling", &[
+        ("rung", "open"),
+        ("obligation", "the_thing"),
+    ]),
+    (Reach::RouteClosed, "retirement", &[(
+        "obligation",
+        "the_thing",
+    )]),
 ];
 
 #[test]
@@ -649,10 +626,12 @@ fn control_the_pairs_that_walk_the_stronger_row_first_are_the_ones_that_bite() {
                 // What a walk that took the last edge would report, derived the
                 // same way the walk derives it: namespace order first, slug
                 // order inside one namespace.
-                let ns_rank = |ns: &str| match ns {
-                    "ruling" => 0,
-                    "proposal" => 1,
-                    _ => 2,
+                let ns_rank = |ns: &str| {
+                    match ns {
+                        "ruling" => 0,
+                        "proposal" => 1,
+                        _ => 2,
+                    }
                 };
                 let strong_last = (ns_rank(strong_ns), strong_slug) > (ns_rank(weak_ns), weak_slug);
                 if !strong_last {
@@ -681,10 +660,10 @@ fn control_the_pairs_that_walk_the_stronger_row_first_are_the_ones_that_bite() {
 fn a_slug_naming_no_demand_row_contributes_nothing_rather_than_panicking() {
     let v = view(&[
         DEMAND,
-        (
-            "ruling::he_said_so",
-            &[("rung", "ratified"), ("obligation", "a_ghost")],
-        ),
+        ("ruling::he_said_so", &[
+            ("rung", "ratified"),
+            ("obligation", "a_ghost"),
+        ]),
     ]);
     assert_eq!(reach(&v, NS)["the_thing"].0, Reach::Nothing);
 }
@@ -696,10 +675,10 @@ fn several_demand_slugs_on_one_row_are_all_reached() {
     let v = view(&[
         ("obligation::first", &[("what", "one")]),
         ("obligation::second", &[("what", "two")]),
-        (
-            "ruling::he_said_so",
-            &[("rung", "ratified"), ("obligation", "first, second")],
-        ),
+        ("ruling::he_said_so", &[
+            ("rung", "ratified"),
+            ("obligation", "first, second"),
+        ]),
     ]);
     let r = reach(&v, NS);
     assert_eq!(r["first"].0, Reach::Ratified);
@@ -726,13 +705,18 @@ fn the_report_names_every_tier_and_the_rows_that_got_each_there() {
     let v = view(&[
         ("obligation::reached", &[("what", "a")]),
         ("obligation::nothing", &[("what", "d")]),
-        (
-            "ruling::he_said_so",
-            &[("rung", "ratified"), ("obligation", "reached")],
-        ),
+        ("ruling::he_said_so", &[
+            ("rung", "ratified"),
+            ("obligation", "reached"),
+        ]),
     ]);
     let (outcome, text) = run(&v, &[NS]);
-    assert!(matches!(outcome, Outcome::Clean { examined: 2 }), "{text}");
+    assert!(
+        matches!(outcome, Outcome::Clean {
+            examined: 2,
+        }),
+        "{text}"
+    );
     assert!(text.contains("ruling::he_said_so"), "{text}");
     for t in TIERS {
         assert!(text.contains(t.word()), "{} missing: {text}", t.word());
@@ -750,14 +734,14 @@ fn the_report_orders_the_tally_strongest_first_and_the_rows_weakest_first() {
         ("obligation::zeta", &[("what", "a")]),
         ("obligation::alpha", &[("what", "b")]),
         ("obligation::mid", &[("what", "c")]),
-        (
-            "ruling::ratifies_zeta",
-            &[("rung", "ratified"), ("obligation", "zeta")],
-        ),
-        (
-            "ruling::ratifies_alpha",
-            &[("rung", "ratified"), ("obligation", "alpha")],
-        ),
+        ("ruling::ratifies_zeta", &[
+            ("rung", "ratified"),
+            ("obligation", "zeta"),
+        ]),
+        ("ruling::ratifies_alpha", &[
+            ("rung", "ratified"),
+            ("obligation", "alpha"),
+        ]),
         ("proposal::proposes_mid", &[("obligation", "mid")]),
     ]);
     let (_, text) = run(&v, &[NS]);
@@ -810,14 +794,11 @@ fn a_ruling_whose_kind_is_a_refusal_still_tiers_by_its_rung_today() {
     for kind in ["refusal", "deferral"] {
         let v = view(&[
             DEMAND,
-            (
-                "ruling::he_said_so",
-                &[
-                    ("rung", "ratified"),
-                    ("kind", kind),
-                    ("obligation", "the_thing"),
-                ],
-            ),
+            ("ruling::he_said_so", &[
+                ("rung", "ratified"),
+                ("kind", kind),
+                ("obligation", "the_thing"),
+            ]),
         ]);
         assert_eq!(
             tier(&v),
@@ -849,10 +830,7 @@ fn the_report_marks_a_route_closed_row_rather_than_letting_it_read_as_untouched(
 #[test]
 fn the_report_names_an_unanswered_row_carrying_a_precondition() {
     for v in [
-        view(&[
-            DEMAND,
-            ("law::a_result", &[("precondition_for", "the_thing")]),
-        ]),
+        view(&[DEMAND, ("law::a_result", &[("precondition_for", "the_thing")])]),
         view(&[
             DEMAND,
             ("retirement::a_dead_end", &[("obligation", "the_thing")]),
@@ -860,10 +838,10 @@ fn the_report_names_an_unanswered_row_carrying_a_precondition() {
         ]),
         view(&[
             DEMAND,
-            (
-                "ruling::he_said_so",
-                &[("rung", "open"), ("obligation", "the_thing")],
-            ),
+            ("ruling::he_said_so", &[
+                ("rung", "open"),
+                ("obligation", "the_thing"),
+            ]),
             ("law::a_result", &[("precondition_for", "the_thing")]),
         ]),
     ] {
@@ -898,10 +876,8 @@ fn control_an_answered_row_carrying_a_precondition_is_not_in_that_list() {
         )],
         vec![("proposal::a_claim", &[("obligation", "the_thing")][..])],
     ] {
-        let mut rows: Vec<(&str, &[(&str, &str)])> = vec![
-            DEMAND,
-            ("law::a_result", &[("precondition_for", "the_thing")]),
-        ];
+        let mut rows: Vec<(&str, &[(&str, &str)])> =
+            vec![DEMAND, ("law::a_result", &[("precondition_for", "the_thing")])];
         rows.extend(reaching.iter().copied());
         let (_, text) = run(&view(&rows), &[NS]);
         assert!(
@@ -914,18 +890,23 @@ fn control_an_answered_row_carrying_a_precondition_is_not_in_that_list() {
 #[test]
 fn one_row_can_be_read_in_full_by_its_slug() {
     let v = view(&[
-        (
-            "obligation::the_thing",
-            &[("what", "a demand"), ("note", "a note")],
-        ),
+        ("obligation::the_thing", &[
+            ("what", "a demand"),
+            ("note", "a note"),
+        ]),
         ("obligation::other", &[("what", "another")]),
-        (
-            "ruling::he_said_so",
-            &[("rung", "ratified"), ("obligation", "the_thing")],
-        ),
+        ("ruling::he_said_so", &[
+            ("rung", "ratified"),
+            ("obligation", "the_thing"),
+        ]),
     ]);
     let (outcome, text) = run(&v, &[NS, "the_thing"]);
-    assert!(matches!(outcome, Outcome::Clean { examined: 1 }), "{text}");
+    assert!(
+        matches!(outcome, Outcome::Clean {
+            examined: 1,
+        }),
+        "{text}"
+    );
     assert!(text.contains("a demand"), "{text}");
     assert!(text.contains("a note"), "{text}");
     assert!(text.contains("tier: ratified"), "{text}");
@@ -956,10 +937,10 @@ fn other_corpus() -> RegistryView {
     view(&[
         ("slot::a_person_needs_this", &[("what", "a demand")]),
         ("slot::nothing_answers_this", &[("what", "another")]),
-        (
-            "ruling::he_said_so",
-            &[("rung", "ratified"), ("slot", "a_person_needs_this")],
-        ),
+        ("ruling::he_said_so", &[
+            ("rung", "ratified"),
+            ("slot", "a_person_needs_this"),
+        ]),
     ])
 }
 
@@ -973,7 +954,12 @@ fn the_demand_namespace_is_an_argument_and_either_corpus_answers() {
     assert_eq!(r["a_person_needs_this"].0, Reach::Ratified);
     assert_eq!(r["nothing_answers_this"].0, Reach::Nothing);
     let (outcome, text) = run(&v, &["slot"]);
-    assert!(matches!(outcome, Outcome::Clean { examined: 2 }), "{text}");
+    assert!(
+        matches!(outcome, Outcome::Clean {
+            examined: 2,
+        }),
+        "{text}"
+    );
     assert!(text.contains("2 `slot` rows"), "{text}");
     assert!(text.contains("By slot, weakest first"), "{text}");
 }
@@ -1039,10 +1025,10 @@ fn a_corpus_where_no_edge_was_read_at_all_says_so_and_still_reports() {
     // with a precondition and no coverage.
     let v = view(&[
         ("slot::a_person_needs_this", &[("what", "a demand")]),
-        (
-            "ruling::he_said_so",
-            &[("rung", "ratified"), ("answers", "a_person_needs_this")],
-        ),
+        ("ruling::he_said_so", &[
+            ("rung", "ratified"),
+            ("answers", "a_person_needs_this"),
+        ]),
     ]);
     let (outcome, text) = run(&v, &["slot"]);
     assert!(
@@ -1050,7 +1036,10 @@ fn a_corpus_where_no_edge_was_read_at_all_says_so_and_still_reports() {
         "a corpus nothing has answered yet is reported, not refused: {text}"
     );
     assert!(text.contains("carries a `slot` field"), "{text}");
-    assert!(text.contains("records the relation under another name"), "{text}");
+    assert!(
+        text.contains("records the relation under another name"),
+        "{text}"
+    );
 }
 
 #[test]
@@ -1068,10 +1057,10 @@ fn control_a_corpus_that_does_spell_the_field_is_not_given_that_line() {
     // relation resolves, which is a different defect with a different report.
     let dangling = view(&[
         ("slot::a_person_needs_this", &[("what", "a demand")]),
-        (
-            "ruling::he_said_so",
-            &[("rung", "ratified"), ("slot", "a_ghost")],
-        ),
+        ("ruling::he_said_so", &[
+            ("rung", "ratified"),
+            ("slot", "a_ghost"),
+        ]),
     ]);
     let (_, text) = run(&dangling, &["slot"]);
     assert!(!text.contains("no edge was read at all"), "{text}");
@@ -1083,7 +1072,10 @@ fn a_field_holding_only_whitespace_does_not_count_as_the_corpus_spelling_it() {
     // one does, so the check trims before asking.
     let v = view(&[
         ("slot::a_person_needs_this", &[("what", "a demand")]),
-        ("ruling::he_said_so", &[("rung", "ratified"), ("slot", "  \n ")]),
+        ("ruling::he_said_so", &[
+            ("rung", "ratified"),
+            ("slot", "  \n "),
+        ]),
     ]);
     let (_, text) = run(&v, &["slot"]);
     assert!(text.contains("no edge was read at all"), "{text}");
@@ -1096,10 +1088,7 @@ fn a_namespace_whose_authority_cannot_be_read_is_named_and_sets_no_tier() {
     // said nothing named the row. Tiering it would be worse, because it would
     // invent an authority nobody declared. So it is printed and counts for
     // nothing.
-    let v = view(&[
-        DEMAND,
-        ("sketch::somebody_tried", &[("obligation", "the_thing")]),
-    ]);
+    let v = view(&[DEMAND, ("sketch::somebody_tried", &[("obligation", "the_thing")])]);
     assert_eq!(
         reach(&v, NS)["the_thing"].0,
         Reach::Nothing,
@@ -1127,10 +1116,7 @@ fn control_the_three_namespaces_that_can_be_tiered_are_not_reported_as_untierabl
         );
     }
     // And the demand namespace itself is not reported against its own rows.
-    let self_naming = view(&[
-        DEMAND,
-        ("obligation::other", &[("obligation", "the_thing")]),
-    ]);
+    let self_naming = view(&[DEMAND, ("obligation::other", &[("obligation", "the_thing")])]);
     assert!(also_named_by(&self_naming, NS)["the_thing"].is_empty());
 }
 
@@ -1143,10 +1129,10 @@ fn the_arms_above_run_against_both_spellings_of_the_demand_namespace() {
         let row = format!("{demand}::the_thing");
         let v = view(&[
             (&row, &[("what", "a demand")]),
-            (
-                "ruling::he_said_so",
-                &[("rung", "stated"), (demand, "the_thing")],
-            ),
+            ("ruling::he_said_so", &[
+                ("rung", "stated"),
+                (demand, "the_thing"),
+            ]),
         ]);
         assert_eq!(
             reach(&v, demand)["the_thing"].0,
@@ -1154,7 +1140,12 @@ fn the_arms_above_run_against_both_spellings_of_the_demand_namespace() {
             "the demand namespace `{demand}` is read from the argument"
         );
         let (outcome, text) = run(&v, &[demand]);
-        assert!(matches!(outcome, Outcome::Clean { examined: 1 }), "{text}");
+        assert!(
+            matches!(outcome, Outcome::Clean {
+                examined: 1,
+            }),
+            "{text}"
+        );
         assert!(text.contains(&format!("1 `{demand}` rows")), "{text}");
     }
 }

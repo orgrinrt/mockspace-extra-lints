@@ -17,13 +17,15 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use mockspace_extra_lints::lints::{
-    arvo_types_only::ArvoTypesOnly, no_bare_numeric::NoBareNumeric,
-    no_bare_option::NoBareOption, no_bare_result::NoBareResult,
-    no_bare_static_str::NoBareStaticStr, no_bare_string::NoBareString,
-    no_public_raw_field::NoPublicRawField, no_std::NoStd,
-    re_export_foreign_names::ReExportForeignNames,
-};
+use mockspace_extra_lints::lints::arvo_types_only::ArvoTypesOnly;
+use mockspace_extra_lints::lints::no_bare_numeric::NoBareNumeric;
+use mockspace_extra_lints::lints::no_bare_option::NoBareOption;
+use mockspace_extra_lints::lints::no_bare_result::NoBareResult;
+use mockspace_extra_lints::lints::no_bare_static_str::NoBareStaticStr;
+use mockspace_extra_lints::lints::no_bare_string::NoBareString;
+use mockspace_extra_lints::lints::no_public_raw_field::NoPublicRawField;
+use mockspace_extra_lints::lints::no_std::NoStd;
+use mockspace_extra_lints::lints::re_export_foreign_names::ReExportForeignNames;
 use mockspace_lint_rules::{CrateLint, CrateSourceFile, Lint, LintContext};
 
 /// A crate of several files. `files[0]` is the root, as the engine documents.
@@ -38,9 +40,11 @@ fn ctx_over(files: &'static [(&'static str, &'static str)]) -> LintContext<'stat
     let all_sources: &'static [CrateSourceFile] = Box::leak(Box::new(
         files
             .iter()
-            .map(|(p, text)| CrateSourceFile {
-                rel_path: std::path::PathBuf::from(*p),
-                text:     text.to_string(),
+            .map(|(p, text)| {
+                CrateSourceFile {
+                    rel_path: std::path::PathBuf::from(*p),
+                    text:     text.to_string(),
+                }
             })
             .collect::<Vec<_>>(),
     ));
@@ -95,8 +99,14 @@ const THREE_FILE_CRATE: &[(&str, &str)] = &[
 fn every_all_sources_walker_declares_per_crate_dispatch() {
     // Left at the engine's default, each of these reports its whole crate once
     // per file. The declaration is the fix, so assert the declaration.
-    assert!(!ArvoTypesOnly.per_file(), "arvo-types-only walks all_sources");
-    assert!(!NoBareNumeric.per_file(), "no-bare-numeric walks all_sources");
+    assert!(
+        !ArvoTypesOnly.per_file(),
+        "arvo-types-only walks all_sources"
+    );
+    assert!(
+        !NoBareNumeric.per_file(),
+        "no-bare-numeric walks all_sources"
+    );
     assert!(!NoBareOption.per_file(), "no-bare-option walks all_sources");
     assert!(!NoBareResult.per_file(), "no-bare-result walks all_sources");
     assert!(!NoBareString.per_file(), "no-bare-string walks all_sources");

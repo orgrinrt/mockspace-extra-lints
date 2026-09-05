@@ -24,15 +24,11 @@
 use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 
 use crate::const_generic_parameters::without_const_generic_parameter_types;
-use crate::util::{categories, crate_introduces_category, err_in_file};
-use crate::util::line_lint_allowed;
+use crate::util::{categories, crate_introduces_category, err_in_file, line_lint_allowed};
 
 const BARE_NUMERICS: &[&str] = &[
-    "u8", "u16", "u32", "u64", "u128",
-    "i8", "i16", "i32", "i64", "i128",
-    "f32", "f64",
-    "usize", "isize",
-    "bool",
+    "u8", "u16", "u32", "u64", "u128", "i8", "i16", "i32", "i64", "i128", "f32", "f64", "usize",
+    "isize", "bool",
 ];
 
 pub struct NoBareNumeric;
@@ -45,14 +41,23 @@ impl Lint for NoBareNumeric {
         false
     }
 
-    fn name(&self) -> &'static str { "no-bare-numeric" }
-    fn default_severity(&self) -> Severity { Severity::HARD_ERROR }
+    fn name(&self) -> &'static str {
+        "no-bare-numeric"
+    }
+
+    fn default_severity(&self) -> Severity {
+        Severity::HARD_ERROR
+    }
 }
 
 impl CrateLint for NoBareNumeric {
     fn check(&self, ctx: &LintContext) -> Vec<LintError> {
-        if ctx.should_skip_proc_macro_source_lint() { return Vec::new(); }
-        if crate_introduces_category(ctx, categories::NUMERIC) { return Vec::new(); }
+        if ctx.should_skip_proc_macro_source_lint() {
+            return Vec::new();
+        }
+        if crate_introduces_category(ctx, categories::NUMERIC) {
+            return Vec::new();
+        }
         let mut out = Vec::new();
 
         let sources: Vec<(String, &str)> = if ctx.all_sources.is_empty() {
@@ -70,8 +75,12 @@ impl CrateLint for NoBareNumeric {
             let excepted = without_const_generic_parameter_types(source);
             for (idx, (raw_line, kept)) in source.lines().zip(excepted.lines()).enumerate() {
                 let trimmed = raw_line.trim_start();
-                if trimmed.starts_with("//") { continue; }
-                if line_lint_allowed(raw_line, "no-bare-numeric") { continue; }
+                if trimmed.starts_with("//") {
+                    continue;
+                }
+                if line_lint_allowed(raw_line, "no-bare-numeric") {
+                    continue;
+                }
 
                 let scan = strip_strings_and_chars(kept);
                 let scan = strip_line_comment(&scan);
@@ -110,8 +119,15 @@ fn strip_strings_and_chars(line: &str) -> String {
             i += 1;
             while i < bytes.len() {
                 let c = bytes[i];
-                if c == b'\\' && i + 1 < bytes.len() { i += 2; continue; }
-                if c == b'"' { out.push('"'); i += 1; break; }
+                if c == b'\\' && i + 1 < bytes.len() {
+                    i += 2;
+                    continue;
+                }
+                if c == b'"' {
+                    out.push('"');
+                    i += 1;
+                    break;
+                }
                 i += 1;
             }
         } else if b == b'\'' {
@@ -120,8 +136,15 @@ fn strip_strings_and_chars(line: &str) -> String {
             let start = i;
             while i < bytes.len() {
                 let c = bytes[i];
-                if c == b'\\' && i + 1 < bytes.len() { i += 2; continue; }
-                if c == b'\'' && i != start { out.push('\''); i += 1; break; }
+                if c == b'\\' && i + 1 < bytes.len() {
+                    i += 2;
+                    continue;
+                }
+                if c == b'\'' && i != start {
+                    out.push('\'');
+                    i += 1;
+                    break;
+                }
                 i += 1;
             }
         } else {
@@ -133,24 +156,34 @@ fn strip_strings_and_chars(line: &str) -> String {
 }
 
 fn strip_line_comment(line: &str) -> String {
-    if let Some(idx) = line.find("//") { line[..idx].to_string() } else { line.to_string() }
+    if let Some(idx) = line.find("//") {
+        line[.. idx].to_string()
+    } else {
+        line.to_string()
+    }
 }
 
 fn contains_bare_word(hay: &str, needle: &str) -> bool {
     let bytes = hay.as_bytes();
     let n = needle.as_bytes();
-    if n.is_empty() || n.len() > bytes.len() { return false; }
+    if n.is_empty() || n.len() > bytes.len() {
+        return false;
+    }
     let mut i = 0;
     while i + n.len() <= bytes.len() {
-        if &bytes[i..i + n.len()] == n {
+        if &bytes[i .. i + n.len()] == n {
             let before_ok = i == 0 || !is_ident(bytes[i - 1]);
             let after_pos = i + n.len();
             let after_ok = after_pos >= bytes.len() || !is_ident(bytes[after_pos]);
-            if before_ok && after_ok { return true; }
+            if before_ok && after_ok {
+                return true;
+            }
         }
         i += 1;
     }
     false
 }
 
-fn is_ident(b: u8) -> bool { b.is_ascii_alphanumeric() || b == b'_' }
+fn is_ident(b: u8) -> bool {
+    b.is_ascii_alphanumeric() || b == b'_'
+}

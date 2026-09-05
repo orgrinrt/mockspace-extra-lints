@@ -46,7 +46,7 @@ fn ctx(source: &'static str) -> LintContext<'static> {
     // file or the root half of the lint never runs on it.
     let all_sources: &'static [CrateSourceFile] = Box::leak(Box::new(vec![CrateSourceFile {
         rel_path: std::path::PathBuf::from("src/lib.rs"),
-        text: source.to_string(),
+        text:     source.to_string(),
     }]));
 
     LintContext {
@@ -103,7 +103,10 @@ fn a_root_missing_the_attribute_fires_with_no_offending_line() {
 fn core_paths_under_the_attribute_are_silent() {
     let src = "#![no_std]\nuse core::fmt;\n";
     let hits = NoStd.check(&ctx(src));
-    assert!(hits.is_empty(), "`core::` is the replacement, not a hit: {hits:?}");
+    assert!(
+        hits.is_empty(),
+        "`core::` is the replacement, not a hit: {hits:?}"
+    );
 }
 
 // ---- no-alloc -------------------------------------------------------------

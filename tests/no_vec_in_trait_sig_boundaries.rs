@@ -13,9 +13,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use mockspace_extra_lints::lints::{
-    no_vec_in_trait_sig::NoVecInTraitSig, trait_first_signatures::TraitFirstSignatures,
-};
+use mockspace_extra_lints::lints::no_vec_in_trait_sig::NoVecInTraitSig;
+use mockspace_extra_lints::lints::trait_first_signatures::TraitFirstSignatures;
 use mockspace_lint_rules::{CrateLint, CrateSourceFile, LintContext};
 
 fn ctx_with(source: &'static str) -> LintContext<'static> {
@@ -26,11 +25,10 @@ fn ctx_with(source: &'static str) -> LintContext<'static> {
     let tree = parser.parse(source, None).unwrap();
     let tree: &'static tree_sitter::Tree = Box::leak(Box::new(tree));
 
-    let all_sources: &'static [CrateSourceFile] =
-        Box::leak(Box::new(vec![CrateSourceFile {
-            rel_path: std::path::PathBuf::from("src/lib.rs"),
-            text:     source.to_string(),
-        }]));
+    let all_sources: &'static [CrateSourceFile] = Box::leak(Box::new(vec![CrateSourceFile {
+        rel_path: std::path::PathBuf::from("src/lib.rs"),
+        text:     source.to_string(),
+    }]));
 
     LintContext {
         crate_name: "test-crate",

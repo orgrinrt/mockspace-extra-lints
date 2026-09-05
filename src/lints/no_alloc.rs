@@ -8,8 +8,7 @@
 
 use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 
-use crate::util::err;
-use crate::util::line_lint_allowed;
+use crate::util::{err, line_lint_allowed};
 
 const ALLOC_PATHS: &[&str] = &[
     "alloc::",
@@ -29,22 +28,39 @@ const ALLOC_PATHS: &[&str] = &[
 ];
 
 const ALLOC_IDENTS: &[&str] = &[
-    "Vec", "String", "Box", "HashMap", "BTreeMap", "HashSet", "BTreeSet",
-    "VecDeque", "LinkedList", "BinaryHeap", "Rc", "Arc",
+    "Vec",
+    "String",
+    "Box",
+    "HashMap",
+    "BTreeMap",
+    "HashSet",
+    "BTreeSet",
+    "VecDeque",
+    "LinkedList",
+    "BinaryHeap",
+    "Rc",
+    "Arc",
 ];
 
 pub struct NoAlloc;
 
 impl Lint for NoAlloc {
-    fn name(&self) -> &'static str { "no-alloc" }
-    fn default_severity(&self) -> Severity { Severity::HARD_ERROR }
+    fn name(&self) -> &'static str {
+        "no-alloc"
+    }
+
+    fn default_severity(&self) -> Severity {
+        Severity::HARD_ERROR
+    }
 }
 
 impl CrateLint for NoAlloc {
     fn check(&self, ctx: &LintContext) -> Vec<LintError> {
         // Proc-macro crates run in the compiler host context and use std
         // by construction. Their heap usage is not consumer-runtime heap.
-        if ctx.should_skip_proc_macro_source_lint() { return Vec::new(); }
+        if ctx.should_skip_proc_macro_source_lint() {
+            return Vec::new();
+        }
 
         let mut out = Vec::new();
 
@@ -97,7 +113,7 @@ fn bare_ident_in_type_position(line: &str, ident: &str) -> bool {
     let needle = ident.as_bytes();
     let mut i = 0;
     while i + needle.len() <= bytes.len() {
-        if &bytes[i..i + needle.len()] == needle {
+        if &bytes[i .. i + needle.len()] == needle {
             let before_ok = i == 0 || !is_ident_byte(bytes[i - 1]);
             let after_pos = i + needle.len();
             let after_ok = after_pos >= bytes.len() || !is_ident_byte(bytes[after_pos]);
@@ -105,8 +121,8 @@ fn bare_ident_in_type_position(line: &str, ident: &str) -> bool {
                 let prev = prev_non_space(bytes, i);
                 let next = next_non_space(bytes, after_pos);
                 let type_before = matches!(prev, Some(b':' | b'<' | b'&' | b',' | b'(' | b'>'));
-                let type_after = matches!(next, Some(b'<' | b',' | b'>' | b')' | b';' | b'{'))
-                    || next.is_none();
+                let type_after =
+                    matches!(next, Some(b'<' | b',' | b'>' | b')' | b';' | b'{')) || next.is_none();
                 if type_before && type_after {
                     return true;
                 }

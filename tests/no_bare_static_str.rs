@@ -11,7 +11,11 @@ use std::collections::{BTreeMap, BTreeSet};
 use mockspace_extra_lints::lints::no_bare_static_str::NoBareStaticStr;
 use mockspace_lint_rules::{CrateLint, CrateSourceFile, LintContext};
 
-fn ctx(crate_name: &'static str, introductions: Vec<(&'static str, Vec<&'static str>)>, source: &'static str) -> LintContext<'static> {
+fn ctx(
+    crate_name: &'static str,
+    introductions: Vec<(&'static str, Vec<&'static str>)>,
+    source: &'static str,
+) -> LintContext<'static> {
     let mut parser = tree_sitter::Parser::new();
     parser
         .set_language(&tree_sitter_rust::LANGUAGE.into())
@@ -19,16 +23,19 @@ fn ctx(crate_name: &'static str, introductions: Vec<(&'static str, Vec<&'static 
     let tree = parser.parse(source, None).unwrap();
     let tree: &'static tree_sitter::Tree = Box::leak(Box::new(tree));
 
-    let all_sources: &'static [CrateSourceFile] = Box::leak(Box::new(vec![
-        CrateSourceFile {
-            rel_path: std::path::PathBuf::from("src/lib.rs"),
-            text: source.to_string(),
-        },
-    ]));
+    let all_sources: &'static [CrateSourceFile] = Box::leak(Box::new(vec![CrateSourceFile {
+        rel_path: std::path::PathBuf::from("src/lib.rs"),
+        text:     source.to_string(),
+    }]));
 
     let introductions_map: BTreeMap<String, Vec<String>> = introductions
         .into_iter()
-        .map(|(k, v)| (k.to_string(), v.into_iter().map(|s| s.to_string()).collect()))
+        .map(|(k, v)| {
+            (
+                k.to_string(),
+                v.into_iter().map(|s| s.to_string()).collect(),
+            )
+        })
         .collect();
     let introductions_leaked: &'static BTreeMap<String, Vec<String>> =
         Box::leak(Box::new(introductions_map));
@@ -96,7 +103,10 @@ fn fires_on_private_const_str() {
 fn accepts_cfg_debug_assertions_on_item() {
     let src = "#[cfg(debug_assertions)]\npub const NAME: &str = \"hi\";\n";
     let hits = NoBareStaticStr.check(&plain_ctx(src));
-    assert!(hits.is_empty(), "#[cfg(debug_assertions)] on item must silence");
+    assert!(
+        hits.is_empty(),
+        "#[cfg(debug_assertions)] on item must silence"
+    );
 }
 
 // ---- (c) debug-gated enclosing module allowed -----------------------------
@@ -190,7 +200,8 @@ fn accepts_cfg_any_with_debug_assertions() {
 
 #[test]
 fn accepts_cfg_all_with_debug_assertions() {
-    let src = "#[cfg(all(debug_assertions, feature = \"trace\"))]\npub const NAME: &str = \"hi\";\n";
+    let src =
+        "#[cfg(all(debug_assertions, feature = \"trace\"))]\npub const NAME: &str = \"hi\";\n";
     let hits = NoBareStaticStr.check(&plain_ctx(src));
     assert!(
         hits.is_empty(),

@@ -26,8 +26,13 @@ use crate::util::err;
 pub struct LintAllowRequiresTaskId;
 
 impl Lint for LintAllowRequiresTaskId {
-    fn name(&self) -> &'static str { "lint-allow-requires-task-id" }
-    fn default_severity(&self) -> Severity { Severity::HARD_ERROR }
+    fn name(&self) -> &'static str {
+        "lint-allow-requires-task-id"
+    }
+
+    fn default_severity(&self) -> Severity {
+        Severity::HARD_ERROR
+    }
 }
 
 impl CrateLint for LintAllowRequiresTaskId {
@@ -37,7 +42,7 @@ impl CrateLint for LintAllowRequiresTaskId {
             let Some(pos) = line.find("lint:allow(") else {
                 continue;
             };
-            if !has_reason(&line[pos..]) {
+            if !has_reason(&line[pos ..]) {
                 out.push(err(
                     ctx,
                     idx + 1,
@@ -60,7 +65,7 @@ fn has_reason(s: &str) -> bool {
     let Some(pos) = s.find("reason:") else {
         return false;
     };
-    !s[pos + "reason:".len()..].trim().is_empty()
+    !s[pos + "reason:".len() ..].trim().is_empty()
 }
 
 #[cfg(test)]

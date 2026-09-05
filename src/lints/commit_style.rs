@@ -15,14 +15,7 @@
 
 use std::collections::HashMap;
 
-use mockspace_lint_rules::{
-    Lint,
-    LintError,
-    MessageContext,
-    MessageDomain,
-    MessageLint,
-    Severity,
-};
+use mockspace_lint_rules::{Lint, LintError, MessageContext, MessageDomain, MessageLint, Severity};
 
 const LINT_NAME: &str = "commit-style";
 
@@ -282,7 +275,7 @@ impl CommitStyle {
             return subject;
         };
         let (head, rest) = subject.split_at(sep_at);
-        let rest = &rest[self.separator.len()..];
+        let rest = &rest[self.separator.len() ..];
 
         // Strip the breaking marker before matching, so `feat!` is the `feat`
         // type rather than an unknown one.
@@ -292,7 +285,9 @@ impl CommitStyle {
         }
 
         // A parenthesised scope, as Conventional Commits permits.
-        let scoped = ty.split_once('(').map(|(base, tail)| (base, tail.ends_with(')')));
+        let scoped = ty
+            .split_once('(')
+            .map(|(base, tail)| (base, tail.ends_with(')')));
         let base = match scoped {
             Some((base, closed)) => {
                 if !self.allow_scope {
@@ -345,9 +340,7 @@ fn authored_body(message: &str) -> String {
 
 /// Whether git generated this subject rather than a person authoring it.
 fn is_generated_subject(subject: &str) -> bool {
-    const GENERATED: &[&str] = &[
-        "merge ", "revert ", "fixup! ", "squash! ", "amend! ", "rebase ",
-    ];
+    const GENERATED: &[&str] = &["merge ", "revert ", "fixup! ", "squash! ", "amend! ", "rebase "];
     let lower = subject.to_ascii_lowercase();
     GENERATED.iter().any(|p| lower.starts_with(p))
 }
@@ -393,7 +386,10 @@ mod tests {
     fn conventional() -> CommitStyle {
         let mut l = CommitStyle::default();
         let mut p = HashMap::new();
-        p.insert("types".into(), "feat,fix,docs,style,refactor,test,chore".into());
+        p.insert(
+            "types".into(),
+            "feat,fix,docs,style,refactor,test,chore".into(),
+        );
         p.insert("require_type".into(), "true".into());
         p.insert("allow_scope".into(), "true".into());
         l.configure(&p);
@@ -441,15 +437,14 @@ mod tests {
         assert_eq!(check(&l, "feat: add data store."), vec!["trailing-period"]);
         // both, and correctly so: it has no type prefix and it is capitalised.
         // With no type to strip, the case rule applies to the whole subject.
-        assert_eq!(
-            check(&l, "Added new feature"),
-            vec!["missing-type", "subject-case"]
-        );
+        assert_eq!(check(&l, "Added new feature"), vec![
+            "missing-type",
+            "subject-case"
+        ]);
         assert_eq!(check(&l, "wip: something"), vec!["unknown-type"]);
-        assert_eq!(
-            check(&l, "feat: x\nbody with no blank line"),
-            vec!["missing-blank-line"]
-        );
+        assert_eq!(check(&l, "feat: x\nbody with no blank line"), vec![
+            "missing-blank-line"
+        ]);
     }
 
     #[test]
@@ -457,10 +452,9 @@ mod tests {
         // The two presets must genuinely differ, or shipping both is pointless.
         let c = conventional();
         assert!(check(&c, "feat(parser): add lookahead").is_empty());
-        assert_eq!(
-            check(&hiisi(), "feat(parser): add lookahead"),
-            vec!["scope-forbidden"]
-        );
+        assert_eq!(check(&hiisi(), "feat(parser): add lookahead"), vec![
+            "scope-forbidden"
+        ]);
     }
 
     #[test]
@@ -523,7 +517,9 @@ mod tests {
     #[test]
     fn an_unclosed_scope_parenthesis_is_reported() {
         let c = conventional();
-        assert_eq!(check(&c, "feat(parser: add lookahead"), vec!["unknown-type"]);
+        assert_eq!(check(&c, "feat(parser: add lookahead"), vec![
+            "unknown-type"
+        ]);
     }
 
     #[test]

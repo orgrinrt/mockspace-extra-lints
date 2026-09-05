@@ -4,8 +4,7 @@
 
 use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 
-use crate::util::err;
-use crate::util::line_lint_allowed;
+use crate::util::{err, line_lint_allowed};
 
 const PATTERNS: &[&str] = &[
     "std::thread::spawn",
@@ -21,18 +20,29 @@ const PATTERNS: &[&str] = &[
 pub struct NoRuntimeSpawn;
 
 impl Lint for NoRuntimeSpawn {
-    fn name(&self) -> &'static str { "no-runtime-spawn" }
-    fn default_severity(&self) -> Severity { Severity::HARD_ERROR }
+    fn name(&self) -> &'static str {
+        "no-runtime-spawn"
+    }
+
+    fn default_severity(&self) -> Severity {
+        Severity::HARD_ERROR
+    }
 }
 
 impl CrateLint for NoRuntimeSpawn {
     fn check(&self, ctx: &LintContext) -> Vec<LintError> {
-        if ctx.should_skip_proc_macro_source_lint() { return Vec::new(); }
+        if ctx.should_skip_proc_macro_source_lint() {
+            return Vec::new();
+        }
         let mut out = Vec::new();
         for (idx, line) in ctx.source.lines().enumerate() {
             let trimmed = line.trim_start();
-            if trimmed.starts_with("//") { continue; }
-            if line_lint_allowed(line, "no-runtime-spawn") { continue; }
+            if trimmed.starts_with("//") {
+                continue;
+            }
+            if line_lint_allowed(line, "no-runtime-spawn") {
+                continue;
+            }
             for p in PATTERNS {
                 if line.contains(p) {
                     out.push(err(

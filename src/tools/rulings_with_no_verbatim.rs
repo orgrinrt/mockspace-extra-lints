@@ -78,8 +78,8 @@ impl Tool for RulingsWithNoVerbatim {
 
     fn args(&self) -> &'static [ArgSpec] {
         &[ArgSpec {
-            name: "slug",
-            required: false,
+            name:        "slug",
+            required:    false,
             description: "report one ruling in full, by its slug, before quoting it",
         }]
     }
@@ -185,8 +185,10 @@ fn all(ctx: &ToolContext<'_>, rows: &[String]) -> ToolReport {
          carrying a note are the ones somebody has looked at.\n",
     );
     ToolReport {
-        outcome: Outcome::Clean { examined: total },
-        output: s,
+        outcome: Outcome::Clean {
+            examined: total,
+        },
+        output:  s,
     }
 }
 
@@ -209,11 +211,7 @@ fn one(ctx: &ToolContext<'_>, rows: &[String], key: &str) -> ToolReport {
     // quoting it, which is exactly when a wrong yes costs something.
     s.push_str(&format!(
         "\n  carries the words themselves: {}\n",
-        if carries_verbatim(ctx, q) {
-            "yes"
-        } else {
-            "no"
-        }
+        if carries_verbatim(ctx, q) { "yes" } else { "no" }
     ));
     if outside_the_question(ctx, q) {
         s.push_str(
@@ -234,7 +232,9 @@ fn one(ctx: &ToolContext<'_>, rows: &[String], key: &str) -> ToolReport {
         }
     }
     ToolReport {
-        outcome: Outcome::Clean { examined: 1 },
-        output: s,
+        outcome: Outcome::Clean {
+            examined: 1,
+        },
+        output:  s,
     }
 }

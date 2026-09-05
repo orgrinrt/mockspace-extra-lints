@@ -13,8 +13,7 @@
 
 use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 
-use crate::util::{categories, crate_introduces_category, err_in_file};
-use crate::util::line_lint_allowed;
+use crate::util::{categories, crate_introduces_category, err_in_file, line_lint_allowed};
 
 pub struct NoBareOption;
 
@@ -26,13 +25,20 @@ impl Lint for NoBareOption {
         false
     }
 
-    fn name(&self) -> &'static str { "no-bare-option" }
-    fn default_severity(&self) -> Severity { Severity::HARD_ERROR }
+    fn name(&self) -> &'static str {
+        "no-bare-option"
+    }
+
+    fn default_severity(&self) -> Severity {
+        Severity::HARD_ERROR
+    }
 }
 
 impl CrateLint for NoBareOption {
     fn check(&self, ctx: &LintContext) -> Vec<LintError> {
-        if ctx.should_skip_proc_macro_source_lint() { return Vec::new(); }
+        if ctx.should_skip_proc_macro_source_lint() {
+            return Vec::new();
+        }
         let mut out = Vec::new();
 
         let sources: Vec<(String, &str)> = if ctx.all_sources.is_empty() {
@@ -44,12 +50,18 @@ impl CrateLint for NoBareOption {
                 .collect()
         };
 
-        if crate_introduces_category(ctx, categories::FALLIBILITY) { return Vec::new(); }
+        if crate_introduces_category(ctx, categories::FALLIBILITY) {
+            return Vec::new();
+        }
         for (rel_path, source) in sources {
             for (idx, raw_line) in source.lines().enumerate() {
                 let trimmed = raw_line.trim_start();
-                if trimmed.starts_with("//") { continue; }
-                if line_lint_allowed(raw_line, "no-bare-option") { continue; }
+                if trimmed.starts_with("//") {
+                    continue;
+                }
+                if line_lint_allowed(raw_line, "no-bare-option") {
+                    continue;
+                }
 
                 let scan = strip_strings_and_chars(raw_line);
                 let scan = strip_line_comment(&scan);
@@ -82,7 +94,7 @@ fn contains_option_token(hay: &str) -> bool {
     let needle = b"Option";
     let mut i = 0;
     while i + needle.len() <= bytes.len() {
-        if &bytes[i..i + needle.len()] == needle {
+        if &bytes[i .. i + needle.len()] == needle {
             let before_ok = i == 0 || !is_ident(bytes[i - 1]);
             let after_pos = i + needle.len();
             let after_ok = after_pos >= bytes.len() || !is_ident(bytes[after_pos]);
@@ -95,7 +107,9 @@ fn contains_option_token(hay: &str) -> bool {
     false
 }
 
-fn is_ident(b: u8) -> bool { b.is_ascii_alphanumeric() || b == b'_' }
+fn is_ident(b: u8) -> bool {
+    b.is_ascii_alphanumeric() || b == b'_'
+}
 
 fn strip_strings_and_chars(line: &str) -> String {
     let bytes = line.as_bytes();
@@ -108,8 +122,15 @@ fn strip_strings_and_chars(line: &str) -> String {
             i += 1;
             while i < bytes.len() {
                 let c = bytes[i];
-                if c == b'\\' && i + 1 < bytes.len() { i += 2; continue; }
-                if c == b'"' { out.push('"'); i += 1; break; }
+                if c == b'\\' && i + 1 < bytes.len() {
+                    i += 2;
+                    continue;
+                }
+                if c == b'"' {
+                    out.push('"');
+                    i += 1;
+                    break;
+                }
                 i += 1;
             }
         } else if b == b'\'' {
@@ -118,8 +139,15 @@ fn strip_strings_and_chars(line: &str) -> String {
             let start = i;
             while i < bytes.len() {
                 let c = bytes[i];
-                if c == b'\\' && i + 1 < bytes.len() { i += 2; continue; }
-                if c == b'\'' && i != start { out.push('\''); i += 1; break; }
+                if c == b'\\' && i + 1 < bytes.len() {
+                    i += 2;
+                    continue;
+                }
+                if c == b'\'' && i != start {
+                    out.push('\'');
+                    i += 1;
+                    break;
+                }
                 i += 1;
             }
         } else {
@@ -131,5 +159,9 @@ fn strip_strings_and_chars(line: &str) -> String {
 }
 
 fn strip_line_comment(line: &str) -> String {
-    if let Some(idx) = line.find("//") { line[..idx].to_string() } else { line.to_string() }
+    if let Some(idx) = line.find("//") {
+        line[.. idx].to_string()
+    } else {
+        line.to_string()
+    }
 }
