@@ -20,14 +20,7 @@
 
 use std::collections::HashMap;
 
-use mockspace_lint_rules::{
-    Lint,
-    LintError,
-    MessageContext,
-    MessageDomain,
-    MessageLint,
-    Severity,
-};
+use mockspace_lint_rules::{Lint, LintError, MessageContext, MessageDomain, MessageLint, Severity};
 
 const LINT_NAME: &str = "forge-body";
 
@@ -129,14 +122,10 @@ impl MessageLint for ForgeBody {
 
         for (pattern, reason) in &self.forbidden {
             if lower.contains(&pattern.to_ascii_lowercase()) {
-                out.push(finding(
-                    ctx,
-                    "forbidden-pattern",
-                    &match reason {
-                        Some(r) => format!("`{pattern}` is not permitted here: {r}"),
-                        None => format!("`{pattern}` is not permitted here"),
-                    },
-                ));
+                out.push(finding(ctx, "forbidden-pattern", &match reason {
+                    Some(r) => format!("`{pattern}` is not permitted here: {r}"),
+                    None => format!("`{pattern}` is not permitted here"),
+                }));
             }
         }
 
@@ -164,8 +153,9 @@ fn finding(ctx: &MessageContext, kind: &'static str, message: &str) -> LintError
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use mockspace_lint_rules::AgentMode;
+
+    use super::*;
 
     fn check(l: &ForgeBody, domain: MessageDomain, msg: &str) -> Vec<String> {
         let ctx = MessageContext {
@@ -207,7 +197,12 @@ mod tests {
             vec!["missing-section"]
         );
         assert!(
-            check(&l, MessageDomain::PullRequestBody, "## Summary\nx\n\n## Test plan\ny").is_empty()
+            check(
+                &l,
+                MessageDomain::PullRequestBody,
+                "## Summary\nx\n\n## Test plan\ny"
+            )
+            .is_empty()
         );
     }
 
@@ -225,8 +220,12 @@ mod tests {
             vec!["too-short"]
         );
         assert!(
-            check(&l, MessageDomain::PullRequestBody, "a body long enough to pass the check")
-                .is_empty()
+            check(
+                &l,
+                MessageDomain::PullRequestBody,
+                "a body long enough to pass the check"
+            )
+            .is_empty()
         );
     }
 
@@ -234,7 +233,10 @@ mod tests {
     fn a_forbidden_pattern_can_carry_its_reason() {
         // The reason is the point: a bare "not permitted" leaves the author
         // guessing why, and they will work around it rather than fix it.
-        let l = with(&[("forbidden", "staging.internal=internal hosts do not belong in a public record")]);
+        let l = with(&[(
+            "forbidden",
+            "staging.internal=internal hosts do not belong in a public record",
+        )]);
         let ctx = MessageContext {
             domain:     MessageDomain::PullRequestBody,
             mode:       AgentMode::Assistant,
@@ -289,7 +291,10 @@ mod tests {
         ]);
         let declared = l.finding_kinds();
         for kind in check(&l, MessageDomain::PullRequestBody, "wip") {
-            assert!(declared.contains(&kind.as_str()), "`{kind}` is not declared");
+            assert!(
+                declared.contains(&kind.as_str()),
+                "`{kind}` is not declared"
+            );
         }
     }
 }

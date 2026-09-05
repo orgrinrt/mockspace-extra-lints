@@ -5,21 +5,28 @@
 use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 use tree_sitter::Node;
 
-use crate::util::{err, for_each_trait, names_type, txt};
-use crate::util::line_lint_allowed;
+use crate::util::{err, for_each_trait, line_lint_allowed, names_type, txt};
 
-const FORBIDDEN_IN_TRAIT: &[&str] = &["Vec<", "HashMap<", "BTreeMap<", "HashSet<", "BTreeSet<", "VecDeque<", "String"];
+const FORBIDDEN_IN_TRAIT: &[&str] =
+    &["Vec<", "HashMap<", "BTreeMap<", "HashSet<", "BTreeSet<", "VecDeque<", "String"];
 
 pub struct NoVecInTraitSig;
 
 impl Lint for NoVecInTraitSig {
-    fn name(&self) -> &'static str { "no-vec-in-trait-sig" }
-    fn default_severity(&self) -> Severity { Severity::HARD_ERROR }
+    fn name(&self) -> &'static str {
+        "no-vec-in-trait-sig"
+    }
+
+    fn default_severity(&self) -> Severity {
+        Severity::HARD_ERROR
+    }
 }
 
 impl CrateLint for NoVecInTraitSig {
     fn check(&self, ctx: &LintContext) -> Vec<LintError> {
-        if ctx.should_skip_proc_macro_source_lint() { return Vec::new(); }
+        if ctx.should_skip_proc_macro_source_lint() {
+            return Vec::new();
+        }
         let mut out = Vec::new();
         for_each_trait(ctx.tree.root_node(), |node| {
             check_trait(node, ctx, &mut out);
@@ -40,10 +47,17 @@ fn check_trait(node: Node, ctx: &LintContext, out: &mut Vec<LintError>) {
             continue;
         }
         let line = item.start_position().row + 1;
-        let src_line = ctx.source.lines().nth(item.start_position().row).unwrap_or("");
-        if line_lint_allowed(src_line, "no-vec-in-trait-sig") { continue; }
+        let src_line = ctx
+            .source
+            .lines()
+            .nth(item.start_position().row)
+            .unwrap_or("");
+        if line_lint_allowed(src_line, "no-vec-in-trait-sig") {
+            continue;
+        }
 
-        let name = item.child_by_field_name("name")
+        let name = item
+            .child_by_field_name("name")
             .map(|n| txt(n, ctx.source))
             .unwrap_or("<unknown>");
 
@@ -69,4 +83,3 @@ fn check_trait(node: Node, ctx: &LintContext, out: &mut Vec<LintError>) {
         }
     }
 }
-

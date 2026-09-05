@@ -18,8 +18,8 @@
 use std::collections::BTreeMap;
 
 use mockspace_extra_lints::tools::rulings_with_no_verbatim::RulingsWithNoVerbatim;
-use mockspace_lint_rules::tool::{NotALint, Outcome, Tool, ToolContext};
 use mockspace_lint_rules::RegistryView;
+use mockspace_lint_rules::tool::{NotALint, Outcome, Tool, ToolContext};
 
 fn row(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
     pairs
@@ -53,7 +53,9 @@ fn run(registry: &RegistryView, args: &[&str]) -> (Outcome, String) {
 
 fn examined(outcome: &Outcome) -> usize {
     match outcome {
-        Outcome::Clean { examined } => *examined,
+        Outcome::Clean {
+            examined,
+        } => *examined,
         _ => panic!("expected a clean report, got {outcome:?}"),
     }
 }
@@ -151,10 +153,7 @@ fn a_corpus_declaring_no_ratified_by_excludes_nothing() {
     let v = view(&[
         (
             "ruling::one",
-            row(&[
-                ("says", "restated"),
-                ("note", "the corpus holds no verbatim"),
-            ]),
+            row(&[("says", "restated"), ("note", "the corpus holds no verbatim")]),
         ),
         ("ruling::two", row(&[("says", "restated")])),
     ]);
@@ -174,10 +173,7 @@ fn the_listing_distinguishes_a_hole_somebody_has_looked_at() {
     let v = view(&[
         (
             "ruling::looked_at",
-            row(&[
-                ("says", "s"),
-                ("note", "no verbatim exists, the call was made in a meeting"),
-            ]),
+            row(&[("says", "s"), ("note", "no verbatim exists, the call was made in a meeting")]),
         ),
         ("ruling::untouched", row(&[("says", "s")])),
     ]);
@@ -238,10 +234,7 @@ fn the_single_row_form_takes_a_bare_slug_and_prints_the_fields_that_carry_anythi
 fn a_row_out_of_scope_and_carrying_no_quote_does_not_claim_to_carry_one() {
     let v = view(&[(
         "ruling::stamped",
-        row(&[
-            ("says", "an agent's restatement"),
-            ("ratified_by", "experts"),
-        ]),
+        row(&[("says", "an agent's restatement"), ("ratified_by", "experts")]),
     )]);
     let (_, out) = run(&v, &["stamped"]);
     assert!(

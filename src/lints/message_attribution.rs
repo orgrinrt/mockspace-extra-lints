@@ -29,14 +29,7 @@
 
 use std::collections::HashMap;
 
-use mockspace_lint_rules::{
-    AgentMode,
-    Lint,
-    LintError,
-    MessageContext,
-    MessageLint,
-    Severity,
-};
+use mockspace_lint_rules::{AgentMode, Lint, LintError, MessageContext, MessageLint, Severity};
 
 const LINT_NAME: &str = "message-attribution";
 
@@ -100,9 +93,15 @@ impl Default for MessageAttribution {
             assistant_glob:   String::new(),
             autonomous_glob:  String::new(),
             advert_glob:      String::new(),
-            advert_patterns:  DEFAULT_ADVERT_PATTERNS.iter().map(|s| (*s).to_string()).collect(),
+            advert_patterns:  DEFAULT_ADVERT_PATTERNS
+                .iter()
+                .map(|s| (*s).to_string())
+                .collect(),
             extra_patterns:   Vec::new(),
-            agent_identities: DEFAULT_AGENT_IDENTITIES.iter().map(|s| (*s).to_string()).collect(),
+            agent_identities: DEFAULT_AGENT_IDENTITIES
+                .iter()
+                .map(|s| (*s).to_string())
+                .collect(),
         }
     }
 }
@@ -284,7 +283,7 @@ fn authored_lines(message: &str) -> Vec<(usize, &str)> {
 fn coauthor_value(line: &str) -> Option<String> {
     let lower = line.to_ascii_lowercase();
     let at = lower.find("co-authored-by:")?;
-    Some(line[at + "co-authored-by:".len()..].to_string())
+    Some(line[at + "co-authored-by:".len() ..].to_string())
 }
 
 /// Whether `value` matches `pattern`, a glob supporting `*` and `?`.
@@ -303,10 +302,10 @@ fn glob_rec(p: &[u8], v: &[u8]) -> bool {
         (None, None) => true,
         (Some(b'*'), _) => {
             // match zero characters, or one more then retry
-            glob_rec(&p[1..], v) || (!v.is_empty() && glob_rec(p, &v[1..]))
+            glob_rec(&p[1 ..], v) || (!v.is_empty() && glob_rec(p, &v[1 ..]))
         },
-        (Some(b'?'), Some(_)) => glob_rec(&p[1..], &v[1..]),
-        (Some(a), Some(b)) if a.eq_ignore_ascii_case(b) => glob_rec(&p[1..], &v[1..]),
+        (Some(b'?'), Some(_)) => glob_rec(&p[1 ..], &v[1 ..]),
+        (Some(a), Some(b)) if a.eq_ignore_ascii_case(b) => glob_rec(&p[1 ..], &v[1 ..]),
         _ => false,
     }
 }
@@ -331,16 +330,17 @@ fn finding(ctx: &MessageContext, line: usize, kind: &'static str, message: &str)
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use mockspace_lint_rules::MessageDomain;
+
+    use super::*;
 
     fn check(l: &MessageAttribution, mode: AgentMode, msg: &str) -> Vec<String> {
         let ctx = MessageContext {
-            domain:     MessageDomain::CommitMessage,
+            domain: MessageDomain::CommitMessage,
             mode,
-            message:    msg,
-            origin:     "COMMIT_EDITMSG",
-            repo_root:  std::path::Path::new("/tmp"),
+            message: msg,
+            origin: "COMMIT_EDITMSG",
+            repo_root: std::path::Path::new("/tmp"),
             invocation: None,
         };
         l.check_message(&ctx)
@@ -365,7 +365,11 @@ mod tests {
     fn an_agent_byline_is_denied_when_a_human_was_in_the_loop() {
         let l = MessageAttribution::default();
         assert_eq!(
-            check(&l, AgentMode::Assistant, "feat: x\n\nCo-Authored-By: Claude <noreply@anthropic.com>"),
+            check(
+                &l,
+                AgentMode::Assistant,
+                "feat: x\n\nCo-Authored-By: Claude <noreply@anthropic.com>"
+            ),
             vec!["byline"]
         );
     }
@@ -375,7 +379,11 @@ mod tests {
         let l = MessageAttribution::default();
         for mode in [AgentMode::Assistant, AgentMode::Autonomous] {
             assert_eq!(
-                check(&l, mode, "feat: x\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)"),
+                check(
+                    &l,
+                    mode,
+                    "feat: x\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)"
+                ),
                 vec!["advert"],
                 "adverts must be denied under {mode:?}"
             );
@@ -386,7 +394,11 @@ mod tests {
     fn a_session_trailer_is_an_advert() {
         let l = MessageAttribution::default();
         assert_eq!(
-            check(&l, AgentMode::Assistant, "feat: x\n\nClaude-Session: https://claude.ai/code/session_abc"),
+            check(
+                &l,
+                AgentMode::Assistant,
+                "feat: x\n\nClaude-Session: https://claude.ai/code/session_abc"
+            ),
             vec!["advert"]
         );
     }
@@ -398,7 +410,12 @@ mod tests {
         let l = MessageAttribution::default();
         for mode in [AgentMode::Assistant, AgentMode::Autonomous] {
             assert!(
-                check(&l, mode, "feat: x\n\nCo-Authored-By: Jane Smith <jane@example.com>").is_empty()
+                check(
+                    &l,
+                    mode,
+                    "feat: x\n\nCo-Authored-By: Jane Smith <jane@example.com>"
+                )
+                .is_empty()
             );
         }
     }
@@ -456,7 +473,11 @@ mod tests {
         // mode permits one specific byline, not any byline.
         let l = with(&[("autonomous", "Claude *<noreply@anthropic.com>")]);
         assert_eq!(
-            check(&l, AgentMode::Autonomous, "feat: x\n\nCo-Authored-By: Copilot <x@github.test>"),
+            check(
+                &l,
+                AgentMode::Autonomous,
+                "feat: x\n\nCo-Authored-By: Copilot <x@github.test>"
+            ),
             vec!["byline"]
         );
     }
@@ -469,12 +490,20 @@ mod tests {
         // so it is a known boundary rather than a surprise.
         let l = MessageAttribution::default();
         assert!(
-            check(&l, AgentMode::Assistant, "feat: x\n\nCo-Authored-By: Somebot <x@evil.test>")
-                .is_empty()
+            check(
+                &l,
+                AgentMode::Assistant,
+                "feat: x\n\nCo-Authored-By: Somebot <x@evil.test>"
+            )
+            .is_empty()
         );
         let named = with(&[("agent_identities", "claude,somebot")]);
         assert_eq!(
-            check(&named, AgentMode::Assistant, "feat: x\n\nCo-Authored-By: Somebot <x@evil.test>"),
+            check(
+                &named,
+                AgentMode::Assistant,
+                "feat: x\n\nCo-Authored-By: Somebot <x@evil.test>"
+            ),
             vec!["byline"]
         );
     }
@@ -484,10 +513,9 @@ mod tests {
         // Provenance is the point of the mode: work with nobody watching and no
         // byline has no record of who produced it.
         let l = with(&[("autonomous", "Claude *")]);
-        assert_eq!(
-            check(&l, AgentMode::Autonomous, "feat: x"),
-            vec!["missing-byline"]
-        );
+        assert_eq!(check(&l, AgentMode::Autonomous, "feat: x"), vec![
+            "missing-byline"
+        ]);
         // and it is not required when the mode does not configure one
         let bare = MessageAttribution::default();
         assert!(check(&bare, AgentMode::Autonomous, "feat: x").is_empty());
@@ -499,8 +527,12 @@ mod tests {
         // rather than a hardcoded rule.
         let l = with(&[("adverts", "*Generated with [OurTool]*")]);
         assert!(
-            check(&l, AgentMode::Assistant, "feat: x\n\nGenerated with [OurTool](https://x.test)")
-                .is_empty()
+            check(
+                &l,
+                AgentMode::Assistant,
+                "feat: x\n\nGenerated with [OurTool](https://x.test)"
+            )
+            .is_empty()
         );
     }
 
@@ -514,14 +546,19 @@ mod tests {
             vec!["advert"]
         );
         // and the shipped defaults still apply alongside it
-        assert_eq!(check(&l, AgentMode::Assistant, "feat: x\n\n🤖"), vec!["advert"]);
+        assert_eq!(check(&l, AgentMode::Assistant, "feat: x\n\n🤖"), vec![
+            "advert"
+        ]);
     }
 
     #[test]
     fn a_project_can_replace_the_default_advert_set_entirely() {
         let l = with(&[("advert_patterns", "only-this")]);
         assert!(check(&l, AgentMode::Assistant, "feat: x\n\n🤖").is_empty());
-        assert_eq!(check(&l, AgentMode::Assistant, "feat: x\n\nonly-this"), vec!["advert"]);
+        assert_eq!(
+            check(&l, AgentMode::Assistant, "feat: x\n\nonly-this"),
+            vec!["advert"]
+        );
     }
 
     #[test]
@@ -529,10 +566,19 @@ mod tests {
         let l = with(&[("agent_identities", "robotron")]);
         // Claude is no longer an agent identity here, so it reads as a human
         assert!(
-            check(&l, AgentMode::Assistant, "feat: x\n\nCo-Authored-By: Claude <a@b.test>").is_empty()
+            check(
+                &l,
+                AgentMode::Assistant,
+                "feat: x\n\nCo-Authored-By: Claude <a@b.test>"
+            )
+            .is_empty()
         );
         assert_eq!(
-            check(&l, AgentMode::Assistant, "feat: x\n\nCo-Authored-By: Robotron <a@b.test>"),
+            check(
+                &l,
+                AgentMode::Assistant,
+                "feat: x\n\nCo-Authored-By: Robotron <a@b.test>"
+            ),
             vec!["byline"]
         );
     }
@@ -553,7 +599,11 @@ mod tests {
         let l = MessageAttribution::default();
         for form in ["Co-Authored-By:", "co-authored-by:", "CO-AUTHORED-BY:"] {
             assert_eq!(
-                check(&l, AgentMode::Assistant, &format!("feat: x\n\n{form} Claude <a@b.test>")),
+                check(
+                    &l,
+                    AgentMode::Assistant,
+                    &format!("feat: x\n\n{form} Claude <a@b.test>")
+                ),
                 vec!["byline"],
                 "{form} should be recognised"
             );
@@ -566,7 +616,11 @@ mod tests {
         // advert. Reporting it twice would be noise.
         let l = MessageAttribution::default();
         assert_eq!(
-            check(&l, AgentMode::Assistant, "feat: x\n\nCo-Authored-By: Claude Code <noreply@anthropic.com>"),
+            check(
+                &l,
+                AgentMode::Assistant,
+                "feat: x\n\nCo-Authored-By: Claude Code <noreply@anthropic.com>"
+            ),
             vec!["advert"]
         );
     }
@@ -574,7 +628,10 @@ mod tests {
     #[test]
     fn the_glob_supports_star_and_question_mark() {
         assert!(glob_matches("Claude *", "Claude Opus <x@y>"));
-        assert!(glob_matches("*<noreply@anthropic.com>", "Claude <noreply@anthropic.com>"));
+        assert!(glob_matches(
+            "*<noreply@anthropic.com>",
+            "Claude <noreply@anthropic.com>"
+        ));
         assert!(glob_matches("a?c", "abc"));
         assert!(!glob_matches("a?c", "ac"));
         assert!(!glob_matches("Claude *", "Somebot <x@y>"));
@@ -587,11 +644,18 @@ mod tests {
         let l = with(&[("autonomous", "Claude *")]);
         let declared = l.finding_kinds();
         let mut emitted = Vec::new();
-        emitted.extend(check(&l, AgentMode::Assistant, "x\n\nCo-Authored-By: Claude <a@b>"));
+        emitted.extend(check(
+            &l,
+            AgentMode::Assistant,
+            "x\n\nCo-Authored-By: Claude <a@b>",
+        ));
         emitted.extend(check(&l, AgentMode::Assistant, "x\n\n🤖"));
         emitted.extend(check(&l, AgentMode::Autonomous, "x"));
         for kind in emitted {
-            assert!(declared.contains(&kind.as_str()), "`{kind}` is not declared");
+            assert!(
+                declared.contains(&kind.as_str()),
+                "`{kind}` is not declared"
+            );
         }
     }
 }

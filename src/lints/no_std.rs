@@ -6,14 +6,18 @@
 
 use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 
-use crate::util::err;
-use crate::util::line_lint_allowed;
+use crate::util::{err, line_lint_allowed};
 
 pub struct NoStd;
 
 impl Lint for NoStd {
-    fn name(&self) -> &'static str { "no-std" }
-    fn default_severity(&self) -> Severity { Severity::HARD_ERROR }
+    fn name(&self) -> &'static str {
+        "no-std"
+    }
+
+    fn default_severity(&self) -> Severity {
+        Severity::HARD_ERROR
+    }
 }
 
 impl CrateLint for NoStd {
@@ -32,10 +36,7 @@ impl CrateLint for NoStd {
         // per-file lint the same context with `source` swapped for each module
         // file, so it must fire only when `source` IS the root; otherwise every
         // module file is reported as a root missing its attribute.
-        let is_crate_root = ctx
-            .all_sources
-            .first()
-            .is_none_or(|f| f.text == ctx.source);
+        let is_crate_root = ctx.all_sources.first().is_none_or(|f| f.text == ctx.source);
         let head = crate_prelude(ctx.source);
         let has_no_std = head.contains("#![no_std]");
         let allowed_at_root = line_lint_allowed(&head, "no-std");
@@ -57,7 +58,8 @@ impl CrateLint for NoStd {
                 continue;
             }
             let has_use_std = line.contains("use std::");
-            let has_std_path = line.contains(" std::") || line.starts_with("std::") || line.contains("(std::");
+            let has_std_path =
+                line.contains(" std::") || line.starts_with("std::") || line.contains("(std::");
             let has_extern_std = line.contains("extern crate std");
             if has_use_std || has_std_path || has_extern_std {
                 out.push(err(

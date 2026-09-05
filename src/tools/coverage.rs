@@ -82,8 +82,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use mockspace_lint_rules::tool::{ArgSpec, NotALint, Outcome, Tool, ToolContext, ToolReport};
 use mockspace_lint_rules::RegistryView;
+use mockspace_lint_rules::tool::{ArgSpec, NotALint, Outcome, Tool, ToolContext, ToolReport};
 
 /// The namespace carrying a rung and a stamp.
 ///
@@ -324,12 +324,16 @@ pub fn reach(reg: &RegistryView, demand: &str) -> BTreeMap<String, (Reach, Vec<S
                     let r = rung(reg, q);
                     (tier_of_rung(r), format!("{q}   (rung = {r})"))
                 },
-                Edge::Proposal => match stamped.get(slug(q)) {
-                    Some(by) => (
-                        Reach::Ratified,
-                        format!("{q}   (stamped by {})", by.join(", ")),
-                    ),
-                    None => (Reach::Proposed, q.clone()),
+                Edge::Proposal => {
+                    match stamped.get(slug(q)) {
+                        Some(by) => {
+                            (
+                                Reach::Ratified,
+                                format!("{q}   (stamped by {})", by.join(", ")),
+                            )
+                        },
+                        None => (Reach::Proposed, q.clone()),
+                    }
                 },
                 Edge::Retirement => (Reach::RouteClosed, q.clone()),
             };
@@ -433,13 +437,13 @@ impl Tool for Coverage {
     fn args(&self) -> &'static [ArgSpec] {
         &[
             ArgSpec {
-                name: "namespace",
-                required: true,
+                name:        "namespace",
+                required:    true,
                 description: "the demand namespace to measure, whichever this corpus calls it",
             },
             ArgSpec {
-                name: "slug",
-                required: false,
+                name:        "slug",
+                required:    false,
                 description: "report one row of it in full rather than all of them",
             },
         ]
@@ -586,8 +590,10 @@ fn all(reg: &RegistryView, demand: &str, _rows: &[String]) -> ToolReport {
     }
 
     ToolReport {
-        outcome: Outcome::Clean { examined: total },
-        output: s,
+        outcome: Outcome::Clean {
+            examined: total,
+        },
+        output:  s,
     }
 }
 
@@ -626,9 +632,7 @@ fn one(reg: &RegistryView, demand: &str, _rows: &[String], wanted: &str) -> Tool
         },
     }
     if let Some(on) = others.get(wanted).filter(|on| !on.is_empty()) {
-        s.push_str(
-            "\n  Also named from a namespace this cannot tier, so these set no tier:\n",
-        );
+        s.push_str("\n  Also named from a namespace this cannot tier, so these set no tier:\n");
         for who in on {
             s.push_str(&format!("    {who} ({})\n", namespace_of(who)));
         }
@@ -644,7 +648,9 @@ fn one(reg: &RegistryView, demand: &str, _rows: &[String], wanted: &str) -> Tool
         }
     }
     ToolReport {
-        outcome: Outcome::Clean { examined: 1 },
-        output: s,
+        outcome: Outcome::Clean {
+            examined: 1,
+        },
+        output:  s,
     }
 }

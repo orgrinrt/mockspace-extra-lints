@@ -118,6 +118,53 @@ fn re_exporting_the_tables_beside_the_face_is_the_fix() {
     assert!(hits.is_empty(), "{hits:?}");
 }
 
+/// The same two crates housed under `mock/crates/` with the workspace
+/// manifest at the repository root, which is how muisti and the stack
+/// repositories with a root workspace are laid out; the mock dir itself
+/// holds no manifest, and the lint is handed the mock dir.
+fn workspace_under_mock(kit_root: &str, face_lib: &str) -> tempfile::TempDir {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    std::fs::create_dir_all(root.join(".git")).unwrap();
+    std::fs::write(
+        root.join("Cargo.toml"),
+        "[workspace]\nmembers = [\"mock/crates/*\"]\nresolver = \"2\"\n",
+    )
+    .unwrap();
+    for (name, lib, deps) in
+        [("face", face_lib, ""), ("kit", kit_root, "face = { path = \"../face\" }\n")]
+    {
+        let crate_dir = root.join("mock/crates").join(name);
+        std::fs::create_dir_all(crate_dir.join("src")).unwrap();
+        std::fs::write(
+            crate_dir.join("Cargo.toml"),
+            format!(
+                "[package]\nname = \"{name}\"\nversion = \"0.0.0\"\nedition = \"2021\"\n\n[dependencies]\n{deps}"
+            ),
+        )
+        .unwrap();
+        std::fs::write(crate_dir.join("src/lib.rs"), lib).unwrap();
+    }
+    dir
+}
+
+#[test]
+fn a_workspace_whose_manifest_sits_above_the_mock_dir_resolves_the_same() {
+    let kit = "pub use face::Face;\n";
+    let ws = workspace_under_mock(kit, FACE);
+    let mut hits = check(&ws.path().join("mock"), kit);
+    hits.sort();
+    assert_eq!(hits.len(), 2, "{hits:?}");
+    assert!(hits[0].contains("`Hmtx`"), "{}", hits[0]);
+    assert!(hits[1].contains("`Subtable`"), "{}", hits[1]);
+    // and the control: the fix, under the same layout, is clean rather
+    // than a resolution failure dressed as a finding
+    let kit = "pub use face::{Face, Hmtx, Subtable};\n";
+    let ws = workspace_under_mock(kit, FACE);
+    let hits = check(&ws.path().join("mock"), kit);
+    assert!(hits.is_empty(), "{hits:?}");
+}
+
 #[test]
 fn a_private_method_carries_nothing() {
     // `Face::private` returns `Fault`, and nobody outside the dependency can

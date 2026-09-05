@@ -33,7 +33,8 @@ pub struct Dependencies {
 }
 
 /// The dependencies of the package at `crate_dir`, resolved through
-/// `cargo metadata` over the workspace at `workspace_root`.
+/// `cargo metadata` over the workspace `workspace_root` belongs to, whose
+/// manifest sits at `workspace_root` or above it within the repository.
 ///
 /// Offline, and only offline. The gate runs after a build and everything the
 /// build fetched is on disk, so a refusal here is a fresh clone whose first
@@ -43,7 +44,7 @@ pub struct Dependencies {
 /// failing. What comes back on failure is the tool's own stderr rather than
 /// nothing, so a lint reporting it says why.
 pub fn dependencies(workspace_root: &Path, crate_name: &str) -> Result<Dependencies, String> {
-    let manifest = workspace_root.join("Cargo.toml");
+    let manifest = manifest_above(workspace_root)?;
     let output = Command::new("cargo")
         .arg("metadata")
         .arg("--format-version")
@@ -63,6 +64,39 @@ pub fn dependencies(workspace_root: &Path, crate_name: &str) -> Result<Dependenc
     let json: serde_json::Value = serde_json::from_slice(&output.stdout)
         .map_err(|e| format!("cargo metadata produced something that is not json: {e}"))?;
     resolve(&json, crate_name)
+}
+
+/// The workspace manifest a mock dir's crates belong to: the mock dir's own
+/// `Cargo.toml` where it has one, else the nearest ancestor's up to the
+/// repository root, which is the directory holding `.git`. A repository
+/// that keeps its crates under `<mock>/crates/` and its workspace at the
+/// root, as muisti does, has no manifest in the mock dir at all, and `cargo
+/// metadata` wants the path of one that exists. The walk stops at the
+/// repository so a clone sitting under somebody else's workspace never
+/// resolves against that one and blames the crate for it.
+///
+/// # Errors
+///
+/// No `Cargo.toml` in the mock dir or above it within the repository,
+/// naming where the search started.
+pub fn manifest_above(workspace_root: &Path) -> Result<PathBuf, String> {
+    let mut found = None;
+    for dir in workspace_root.ancestors() {
+        let manifest = dir.join("Cargo.toml");
+        if manifest.is_file() {
+            found = Some(manifest);
+            break;
+        }
+        if dir.join(".git").exists() {
+            break;
+        }
+    }
+    found.ok_or_else(|| {
+        format!(
+            "no Cargo.toml in {} or any directory above it within the repository",
+            workspace_root.display()
+        )
+    })
 }
 
 fn resolve(json: &serde_json::Value, crate_name: &str) -> Result<Dependencies, String> {
@@ -368,4 +402,79 @@ fn take(
 /// Whether a path root names something that is never a dependency.
 pub fn is_reserved(root: &str) -> bool {
     RESERVED_ROOTS.contains(&root)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A repository under a directory of its own: `<dir>/repo/.git` marks
+    /// the repository, and `<dir>/repo/mock/crates` is where the crates sit.
+    fn plant() -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("repo/mock/crates")).unwrap();
+        std::fs::create_dir_all(dir.path().join("repo/.git")).unwrap();
+        dir
+    }
+
+    #[test]
+    fn the_manifest_is_the_mock_dirs_own_where_it_has_one() {
+        let dir = plant();
+        let repo = dir.path().join("repo");
+        std::fs::write(repo.join("mock/Cargo.toml"), "[workspace]\n").unwrap();
+        std::fs::write(repo.join("Cargo.toml"), "[workspace]\n").unwrap();
+        assert_eq!(
+            manifest_above(&repo.join("mock")).unwrap(),
+            repo.join("mock/Cargo.toml")
+        );
+    }
+
+    #[test]
+    fn the_manifest_is_the_nearest_ancestors_where_the_mock_dir_has_none() {
+        let dir = plant();
+        let repo = dir.path().join("repo");
+        std::fs::write(repo.join("Cargo.toml"), "[workspace]\n").unwrap();
+        assert_eq!(
+            manifest_above(&repo.join("mock")).unwrap(),
+            repo.join("Cargo.toml")
+        );
+        // a directory is not a manifest
+        std::fs::create_dir_all(repo.join("mock/Cargo.toml")).unwrap();
+        assert_eq!(
+            manifest_above(&repo.join("mock")).unwrap(),
+            repo.join("Cargo.toml")
+        );
+    }
+
+    #[test]
+    fn the_walk_stops_at_the_repository_and_never_takes_a_manifest_above_it() {
+        let dir = plant();
+        let repo = dir.path().join("repo");
+        // a workspace above the repository, which is somebody else's
+        std::fs::write(dir.path().join("Cargo.toml"), "[workspace]\n").unwrap();
+        let err = manifest_above(&repo.join("mock")).unwrap_err();
+        assert!(err.contains("no Cargo.toml in"), "{err}");
+        assert!(err.contains("within the repository"), "{err}");
+        assert!(err.contains("repo/mock"), "{err}");
+        // the control: the same tree with the repository's own manifest
+        // finds that one and not the outer
+        std::fs::write(repo.join("Cargo.toml"), "[workspace]\n").unwrap();
+        assert_eq!(
+            manifest_above(&repo.join("mock")).unwrap(),
+            repo.join("Cargo.toml")
+        );
+    }
+
+    #[test]
+    fn no_manifest_anywhere_above_is_a_refusal_naming_the_start() {
+        let dir = tempfile::tempdir().unwrap();
+        // no `.git` and no manifest anywhere: the walk runs to the root and
+        // finds nothing, since the temp dir has no manifest above it on any
+        // machine this runs on
+        let mock = dir.path().join("repo/mock");
+        std::fs::create_dir_all(&mock).unwrap();
+        let err = manifest_above(&mock).unwrap_err();
+        assert!(err.contains("no Cargo.toml in"), "{err}");
+        assert!(err.contains("repo/mock"), "{err}");
+    }
 }

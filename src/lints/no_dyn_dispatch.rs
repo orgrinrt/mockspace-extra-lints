@@ -5,24 +5,34 @@
 
 use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 
-use crate::util::err;
-use crate::util::line_lint_allowed;
+use crate::util::{err, line_lint_allowed};
 
 pub struct NoDynDispatch;
 
 impl Lint for NoDynDispatch {
-    fn name(&self) -> &'static str { "no-dyn-dispatch" }
-    fn default_severity(&self) -> Severity { Severity::HARD_ERROR }
+    fn name(&self) -> &'static str {
+        "no-dyn-dispatch"
+    }
+
+    fn default_severity(&self) -> Severity {
+        Severity::HARD_ERROR
+    }
 }
 
 impl CrateLint for NoDynDispatch {
     fn check(&self, ctx: &LintContext) -> Vec<LintError> {
-        if ctx.should_skip_proc_macro_source_lint() { return Vec::new(); }
+        if ctx.should_skip_proc_macro_source_lint() {
+            return Vec::new();
+        }
         let mut out = Vec::new();
         for (idx, line) in ctx.source.lines().enumerate() {
             let trimmed = line.trim_start();
-            if trimmed.starts_with("//") { continue; }
-            if line_lint_allowed(line, "no-dyn-dispatch") { continue; }
+            if trimmed.starts_with("//") {
+                continue;
+            }
+            if line_lint_allowed(line, "no-dyn-dispatch") {
+                continue;
+            }
             if contains_dyn_type(line) {
                 out.push(err(
                     ctx,
@@ -40,10 +50,20 @@ fn contains_dyn_type(line: &str) -> bool {
     // Tokens where `dyn` sits in a type position: `&dyn`, `&mut dyn`,
     // `Box<dyn`, `<dyn`, `(dyn`, `, dyn`, `: dyn`.
     for marker in &[
-        "&dyn ", "&mut dyn ", "Box<dyn ", "Arc<dyn ", "Rc<dyn ", "<dyn ",
-        "(dyn ", ", dyn ", ": dyn ", "impl dyn ",
+        "&dyn ",
+        "&mut dyn ",
+        "Box<dyn ",
+        "Arc<dyn ",
+        "Rc<dyn ",
+        "<dyn ",
+        "(dyn ",
+        ", dyn ",
+        ": dyn ",
+        "impl dyn ",
     ] {
-        if line.contains(marker) { return true; }
+        if line.contains(marker) {
+            return true;
+        }
     }
     // Catch leading-position `dyn ` that wasn't preceded by whitespace
     // marker above.

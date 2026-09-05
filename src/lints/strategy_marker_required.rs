@@ -7,22 +7,30 @@
 use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 use tree_sitter::Node;
 
-use crate::util::{err, for_each_fn, is_public, txt};
-use crate::util::line_lint_allowed;
+use crate::util::{err, for_each_fn, is_public, line_lint_allowed, txt};
 
 pub struct StrategyMarkerRequired;
 
 impl Lint for StrategyMarkerRequired {
-    fn name(&self) -> &'static str { "strategy-marker-required" }
-    fn default_severity(&self) -> Severity { Severity::HARD_ERROR }
+    fn name(&self) -> &'static str {
+        "strategy-marker-required"
+    }
+
+    fn default_severity(&self) -> Severity {
+        Severity::HARD_ERROR
+    }
 }
 
 impl CrateLint for StrategyMarkerRequired {
     fn check(&self, ctx: &LintContext) -> Vec<LintError> {
-        if ctx.should_skip_proc_macro_source_lint() { return Vec::new(); }
+        if ctx.should_skip_proc_macro_source_lint() {
+            return Vec::new();
+        }
         let mut out = Vec::new();
         for_each_fn(ctx.tree.root_node(), |node| {
-            if !is_public(node, ctx.source) { return; }
+            if !is_public(node, ctx.source) {
+                return;
+            }
             check_fn(node, ctx, &mut out);
         });
         out
@@ -31,8 +39,14 @@ impl CrateLint for StrategyMarkerRequired {
 
 fn check_fn(node: Node, ctx: &LintContext, out: &mut Vec<LintError>) {
     let line = node.start_position().row + 1;
-    let src_line = ctx.source.lines().nth(node.start_position().row).unwrap_or("");
-    if line_lint_allowed(src_line, "strategy-marker-required") { return; }
+    let src_line = ctx
+        .source
+        .lines()
+        .nth(node.start_position().row)
+        .unwrap_or("");
+    if line_lint_allowed(src_line, "strategy-marker-required") {
+        return;
+    }
 
     let mut sig = String::new();
     if let Some(params) = node.child_by_field_name("parameters") {
@@ -48,7 +62,8 @@ fn check_fn(node: Node, ctx: &LintContext, out: &mut Vec<LintError>) {
             // Count type params. UFixed<I, F, S> is 3. UFixed<I, F> is 2.
             let params = count_top_level_args(hit);
             if params < 3 {
-                let name = node.child_by_field_name("name")
+                let name = node
+                    .child_by_field_name("name")
                     .map(|n| txt(n, ctx.source))
                     .unwrap_or("<unknown>");
                 out.push(err(
@@ -69,7 +84,7 @@ fn find_generic_invocations<'a>(hay: &'a str, ty: &str) -> Vec<&'a str> {
     let mut hits = Vec::new();
     let pattern = format!("{ty}<");
     let mut start = 0;
-    while let Some(pos) = hay[start..].find(&pattern) {
+    while let Some(pos) = hay[start ..].find(&pattern) {
         let abs = start + pos;
         let open = abs + pattern.len() - 1;
         let mut depth = 0;
@@ -80,13 +95,16 @@ fn find_generic_invocations<'a>(hay: &'a str, ty: &str) -> Vec<&'a str> {
                 b'<' => depth += 1,
                 b'>' => {
                     depth -= 1;
-                    if depth == 0 { close = Some(i); break; }
-                }
-                _ => {}
+                    if depth == 0 {
+                        close = Some(i);
+                        break;
+                    }
+                },
+                _ => {},
             }
         }
         if let Some(c) = close {
-            hits.push(&hay[open + 1..c]);
+            hits.push(&hay[open + 1 .. c]);
             start = c + 1;
         } else {
             break;
@@ -103,7 +121,7 @@ fn count_top_level_args(inner: &str) -> usize {
             '<' => depth += 1,
             '>' => depth -= 1,
             ',' if depth == 0 => count += 1,
-            _ => {}
+            _ => {},
         }
     }
     if inner.trim().is_empty() { 0 } else { count }

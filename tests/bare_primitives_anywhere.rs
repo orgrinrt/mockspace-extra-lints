@@ -10,11 +10,12 @@
 
 use std::collections::BTreeSet;
 
-use mockspace_extra_lints::lints::{
-    arvo_types_only::ArvoTypesOnly, no_bare_numeric::NoBareNumeric,
-    no_bare_option::NoBareOption, no_bare_result::NoBareResult,
-    no_bare_string::NoBareString, no_public_raw_field::NoPublicRawField,
-};
+use mockspace_extra_lints::lints::arvo_types_only::ArvoTypesOnly;
+use mockspace_extra_lints::lints::no_bare_numeric::NoBareNumeric;
+use mockspace_extra_lints::lints::no_bare_option::NoBareOption;
+use mockspace_extra_lints::lints::no_bare_result::NoBareResult;
+use mockspace_extra_lints::lints::no_bare_string::NoBareString;
+use mockspace_extra_lints::lints::no_public_raw_field::NoPublicRawField;
 use mockspace_lint_rules::{CrateLint, CrateSourceFile, LintContext};
 
 fn ctx_with(source: &'static str) -> LintContext<'static> {
@@ -25,12 +26,10 @@ fn ctx_with(source: &'static str) -> LintContext<'static> {
     let tree = parser.parse(source, None).unwrap();
     let tree: &'static tree_sitter::Tree = Box::leak(Box::new(tree));
 
-    let all_sources: &'static [CrateSourceFile] = Box::leak(Box::new(vec![
-        CrateSourceFile {
-            rel_path: std::path::PathBuf::from("src/lib.rs"),
-            text: source.to_string(),
-        },
-    ]));
+    let all_sources: &'static [CrateSourceFile] = Box::leak(Box::new(vec![CrateSourceFile {
+        rel_path: std::path::PathBuf::from("src/lib.rs"),
+        text:     source.to_string(),
+    }]));
 
     LintContext {
         crate_name: "test-crate",
@@ -68,7 +67,10 @@ fn arvo_types_only_fires_on_private_tuple_struct_field() {
 fn arvo_types_only_fires_on_private_named_field() {
     let src = "pub struct Cache { count: usize }\n";
     let hits = ArvoTypesOnly.check(&ctx_with(src));
-    assert!(!hits.is_empty(), "private named usize field must be flagged");
+    assert!(
+        !hits.is_empty(),
+        "private named usize field must be flagged"
+    );
 }
 
 #[test]
@@ -99,7 +101,10 @@ fn arvo_types_only_fires_on_a_const_binding_beside_a_literal_suffix() {
 fn arvo_types_only_fires_on_trait_method_param() {
     let src = "pub trait Foo { fn bar(&self, x: bool); }\n";
     let hits = ArvoTypesOnly.check(&ctx_with(src));
-    assert!(!hits.is_empty(), "trait method bare `bool` param must be flagged");
+    assert!(
+        !hits.is_empty(),
+        "trait method bare `bool` param must be flagged"
+    );
 }
 
 #[test]
@@ -134,7 +139,10 @@ fn arvo_types_only_ignores_inside_string_literal() {
 fn no_bare_numeric_fires_on_private_fn_param() {
     let src = "fn helper(n: usize) -> usize { n }\n";
     let hits = NoBareNumeric.check(&ctx_with(src));
-    assert!(!hits.is_empty(), "private fn signature usize must be flagged");
+    assert!(
+        !hits.is_empty(),
+        "private fn signature usize must be flagged"
+    );
 }
 
 #[test]
@@ -180,20 +188,14 @@ fn no_bare_result_fires_on_private_fn_return() {
 fn no_bare_result_accepts_fmt_result() {
     let src = "pub fn fmt(f: &mut core::fmt::Formatter) -> fmt::Result { Ok(()) }\n";
     let hits = NoBareResult.check(&ctx_with(src));
-    assert!(
-        hits.is_empty(),
-        "fmt::Result (std trait parity) must pass"
-    );
+    assert!(hits.is_empty(), "fmt::Result (std trait parity) must pass");
 }
 
 #[test]
 fn no_bare_result_accepts_io_result() {
     let src = "pub fn open() -> io::Result<()> { Ok(()) }\n";
     let hits = NoBareResult.check(&ctx_with(src));
-    assert!(
-        hits.is_empty(),
-        "io::Result (std trait parity) must pass"
-    );
+    assert!(hits.is_empty(), "io::Result (std trait parity) must pass");
 }
 
 // ---- no-bare-string -------------------------------------------------------
@@ -209,7 +211,10 @@ fn no_bare_string_fires_on_private_field() {
 fn no_bare_string_fires_on_private_fn_param() {
     let src = "fn shout(s: &str) {}\n";
     let hits = NoBareString.check(&ctx_with(src));
-    assert!(!hits.is_empty(), "private fn non-static &str param must be flagged");
+    assert!(
+        !hits.is_empty(),
+        "private fn non-static &str param must be flagged"
+    );
 }
 
 #[test]
@@ -225,28 +230,40 @@ fn no_bare_string_accepts_static_str() {
 fn no_public_raw_field_fires_on_private_field() {
     let src = "pub struct Foo { inner: u64 }\n";
     let hits = NoPublicRawField.check(&ctx_with(src));
-    assert!(!hits.is_empty(), "private u64 field of pub struct must be flagged");
+    assert!(
+        !hits.is_empty(),
+        "private u64 field of pub struct must be flagged"
+    );
 }
 
 #[test]
 fn no_public_raw_field_fires_on_private_struct() {
     let src = "struct Internal { count: usize }\n";
     let hits = NoPublicRawField.check(&ctx_with(src));
-    assert!(!hits.is_empty(), "private struct with raw field must be flagged");
+    assert!(
+        !hits.is_empty(),
+        "private struct with raw field must be flagged"
+    );
 }
 
 #[test]
 fn no_public_raw_field_fires_on_tuple_struct() {
     let src = "pub struct Handle(u32);\n";
     let hits = NoPublicRawField.check(&ctx_with(src));
-    assert!(!hits.is_empty(), "tuple-struct raw u32 field must be flagged");
+    assert!(
+        !hits.is_empty(),
+        "tuple-struct raw u32 field must be flagged"
+    );
 }
 
 #[test]
 fn no_public_raw_field_accepts_allow_comment() {
     let src = "pub struct H { v: u32 } // lint:allow(no-public-raw-field) reason: rkyv Archived; tracked: #72\n";
     let hits = NoPublicRawField.check(&ctx_with(src));
-    assert!(hits.is_empty(), "lint:allow must silence no-public-raw-field");
+    assert!(
+        hits.is_empty(),
+        "lint:allow must silence no-public-raw-field"
+    );
 }
 
 // ---- multi-file coverage (LintContext.all_sources) ----------------------
@@ -272,9 +289,11 @@ fn ctx_with_files(files: Vec<(&'static str, &'static str)>) -> LintContext<'stat
     let all_sources: &'static [CrateSourceFile] = Box::leak(Box::new(
         files
             .into_iter()
-            .map(|(path, text)| CrateSourceFile {
-                rel_path: std::path::PathBuf::from(path),
-                text: text.to_string(),
+            .map(|(path, text)| {
+                CrateSourceFile {
+                    rel_path: std::path::PathBuf::from(path),
+                    text:     text.to_string(),
+                }
             })
             .collect::<Vec<_>>(),
     ));
@@ -320,10 +339,7 @@ fn arvo_types_only_fires_in_module_file_not_lib_rs() {
 fn no_bare_option_fires_in_module_file_not_lib_rs() {
     let ctx = ctx_with_files(vec![
         ("src/lib.rs", "pub mod resolve;\n"),
-        (
-            "src/resolve.rs",
-            "fn lookup() -> Option<u8> { None }\n",
-        ),
+        ("src/resolve.rs", "fn lookup() -> Option<u8> { None }\n"),
     ]);
     let hits = NoBareOption.check(&ctx);
     assert!(!hits.is_empty(), "Option in src/resolve.rs must be flagged");
@@ -347,16 +363,19 @@ fn ctx_with_crate_and_introductions(
     let tree = parser.parse(source, None).unwrap();
     let tree: &'static tree_sitter::Tree = Box::leak(Box::new(tree));
 
-    let all_sources: &'static [CrateSourceFile] = Box::leak(Box::new(vec![
-        CrateSourceFile {
-            rel_path: std::path::PathBuf::from("src/lib.rs"),
-            text: source.to_string(),
-        },
-    ]));
+    let all_sources: &'static [CrateSourceFile] = Box::leak(Box::new(vec![CrateSourceFile {
+        rel_path: std::path::PathBuf::from("src/lib.rs"),
+        text:     source.to_string(),
+    }]));
 
     let introductions_map: std::collections::BTreeMap<String, Vec<String>> = introductions
         .into_iter()
-        .map(|(k, v)| (k.to_string(), v.into_iter().map(|s| s.to_string()).collect()))
+        .map(|(k, v)| {
+            (
+                k.to_string(),
+                v.into_iter().map(|s| s.to_string()).collect(),
+            )
+        })
         .collect();
     let introductions_leaked: &'static std::collections::BTreeMap<String, Vec<String>> =
         Box::leak(Box::new(introductions_map));
@@ -506,10 +525,7 @@ fn no_public_raw_field_skips_numeric_introducer() {
 fn no_public_raw_field_fires_in_module_file_not_lib_rs() {
     let ctx = ctx_with_files(vec![
         ("src/lib.rs", "pub mod handle;\n"),
-        (
-            "src/handle.rs",
-            "pub struct Str(pub u32);\n",
-        ),
+        ("src/handle.rs", "pub struct Str(pub u32);\n"),
     ]);
     let hits = NoPublicRawField.check(&ctx);
     assert!(

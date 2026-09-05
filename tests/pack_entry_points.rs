@@ -53,7 +53,9 @@ fn the_pack_contributes_a_workspace_lint() {
 fn the_pack_contributes_its_tool_under_the_name_the_subcommand_uses() {
     let p = collected();
     assert!(
-        p.tools.iter().any(|t| t.name() == "rulings-with-no-verbatim"),
+        p.tools
+            .iter()
+            .any(|t| t.name() == "rulings-with-no-verbatim"),
         "a consumer gets this tool by depending on the pack, and the name is the subcommand: {:?}",
         p.tools.iter().map(|t| t.name()).collect::<Vec<_>>()
     );
@@ -126,7 +128,10 @@ fn every_preset_names_a_lint_the_pack_contributes() {
         );
         checked += 1;
     }
-    assert!(checked > 0, "no presets were checked; the glob found nothing");
+    assert!(
+        checked > 0,
+        "no presets were checked; the glob found nothing"
+    );
 }
 
 /// Every config key a preset sets is one its lint declares.

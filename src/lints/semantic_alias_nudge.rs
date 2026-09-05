@@ -24,8 +24,7 @@
 use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 use tree_sitter::Node;
 
-use crate::util::{for_each_fn, is_public, txt};
-use crate::util::line_lint_allowed;
+use crate::util::{for_each_fn, is_public, line_lint_allowed, txt};
 
 /// Primitives whose name states a width rather than a meaning.
 ///
@@ -33,23 +32,40 @@ use crate::util::line_lint_allowed;
 /// the module doc: each already names what the value is, so an alias over one
 /// is a rename rather than a reading.
 const WIDTH_SHAPED_PRIMITIVES: &[&str] = &[
-    "UFixed", "IFixed", "FastFloat", "StrictFloat",
-    "Byte", "Word", "DWord", "QWord", "Nibble", "Bit",
+    "UFixed",
+    "IFixed",
+    "FastFloat",
+    "StrictFloat",
+    "Byte",
+    "Word",
+    "DWord",
+    "QWord",
+    "Nibble",
+    "Bit",
 ];
 
 pub struct SemanticAliasNudge;
 
 impl Lint for SemanticAliasNudge {
-    fn name(&self) -> &'static str { "semantic-alias-nudge" }
-    fn default_severity(&self) -> Severity { Severity::ADVISORY }
+    fn name(&self) -> &'static str {
+        "semantic-alias-nudge"
+    }
+
+    fn default_severity(&self) -> Severity {
+        Severity::ADVISORY
+    }
 }
 
 impl CrateLint for SemanticAliasNudge {
     fn check(&self, ctx: &LintContext) -> Vec<LintError> {
-        if ctx.should_skip_proc_macro_source_lint() { return Vec::new(); }
+        if ctx.should_skip_proc_macro_source_lint() {
+            return Vec::new();
+        }
         let mut out = Vec::new();
         for_each_fn(ctx.tree.root_node(), |node| {
-            if !is_public(node, ctx.source) { return; }
+            if !is_public(node, ctx.source) {
+                return;
+            }
             check_fn(node, ctx, &mut out);
         });
         out
@@ -58,8 +74,14 @@ impl CrateLint for SemanticAliasNudge {
 
 fn check_fn(node: Node, ctx: &LintContext, out: &mut Vec<LintError>) {
     let line = node.start_position().row + 1;
-    let src_line = ctx.source.lines().nth(node.start_position().row).unwrap_or("");
-    if line_lint_allowed(src_line, "semantic-alias-nudge") { return; }
+    let src_line = ctx
+        .source
+        .lines()
+        .nth(node.start_position().row)
+        .unwrap_or("");
+    if line_lint_allowed(src_line, "semantic-alias-nudge") {
+        return;
+    }
 
     let mut sig = String::new();
     if let Some(params) = node.child_by_field_name("parameters") {
@@ -72,7 +94,8 @@ fn check_fn(node: Node, ctx: &LintContext, out: &mut Vec<LintError>) {
 
     for prim in WIDTH_SHAPED_PRIMITIVES {
         if contains_token(&sig, prim) {
-            let name = node.child_by_field_name("name")
+            let name = node
+                .child_by_field_name("name")
                 .map(|n| txt(n, ctx.source))
                 .unwrap_or("<unknown>");
             out.push(LintError::warning(
@@ -94,7 +117,7 @@ fn contains_token(hay: &str, tok: &str) -> bool {
     let needle = tok.as_bytes();
     let mut i = 0;
     while i + needle.len() <= bytes.len() {
-        if &bytes[i..i + needle.len()] == needle {
+        if &bytes[i .. i + needle.len()] == needle {
             let before_ok = i == 0 || !is_ident(bytes[i - 1]);
             let after_pos = i + needle.len();
             let after_ok = after_pos >= bytes.len() || !is_ident(bytes[after_pos]);
@@ -107,4 +130,6 @@ fn contains_token(hay: &str, tok: &str) -> bool {
     false
 }
 
-fn is_ident(b: u8) -> bool { b.is_ascii_alphanumeric() || b == b'_' }
+fn is_ident(b: u8) -> bool {
+    b.is_ascii_alphanumeric() || b == b'_'
+}

@@ -31,8 +31,7 @@
 use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 use tree_sitter::{Node, Parser, Tree};
 
-use crate::util::{categories, crate_introduces_category, err_in_file, txt};
-use crate::util::line_lint_allowed;
+use crate::util::{categories, crate_introduces_category, err_in_file, line_lint_allowed, txt};
 
 pub struct NoBareStaticStr;
 
@@ -44,13 +43,20 @@ impl Lint for NoBareStaticStr {
         false
     }
 
-    fn name(&self) -> &'static str { "no-bare-static-str" }
-    fn default_severity(&self) -> Severity { Severity::HARD_ERROR }
+    fn name(&self) -> &'static str {
+        "no-bare-static-str"
+    }
+
+    fn default_severity(&self) -> Severity {
+        Severity::HARD_ERROR
+    }
 }
 
 impl CrateLint for NoBareStaticStr {
     fn check(&self, ctx: &LintContext) -> Vec<LintError> {
-        if ctx.should_skip_proc_macro_source_lint() { return Vec::new(); }
+        if ctx.should_skip_proc_macro_source_lint() {
+            return Vec::new();
+        }
         // hilavitkutin-str introduces this category; it is the interning
         // home and its own internals are the legitimate site for static
         // string tables.
@@ -101,13 +107,7 @@ fn scan_source(ctx: &LintContext, rel_path: &str, source: &str, out: &mut Vec<Li
     walk(tree.root_node(), source, rel_path, out, ctx);
 }
 
-fn walk(
-    node: Node,
-    source: &str,
-    rel_path: &str,
-    out: &mut Vec<LintError>,
-    ctx: &LintContext,
-) {
+fn walk(node: Node, source: &str, rel_path: &str, out: &mut Vec<LintError>, ctx: &LintContext) {
     match node.kind() {
         "const_item" | "static_item" => {
             if let Some(ty) = node.child_by_field_name("type") {
@@ -122,7 +122,8 @@ fn walk(
                                 .child_by_field_name("name")
                                 .map(|n| txt(n, source).to_string())
                                 .unwrap_or_else(|| "<anon>".to_string());
-                            let keyword = if node.kind() == "const_item" { "const" } else { "static" };
+                            let keyword =
+                                if node.kind() == "const_item" { "const" } else { "static" };
                             out.push(err_in_file(
                                 ctx,
                                 rel_path,
@@ -136,8 +137,8 @@ fn walk(
                     }
                 }
             }
-        }
-        _ => {}
+        },
+        _ => {},
     }
 
     let mut cursor = node.walk();
@@ -157,7 +158,8 @@ fn type_is_str_ref(ty: Node, source: &str) -> bool {
     let mut cursor = ty.walk();
     for child in ty.children(&mut cursor) {
         let text = txt(child, source).trim();
-        if text == "str" && (child.kind() == "primitive_type" || child.kind() == "type_identifier") {
+        if text == "str" && (child.kind() == "primitive_type" || child.kind() == "type_identifier")
+        {
             return true;
         }
     }
@@ -214,7 +216,9 @@ fn item_has_debug_gate(node: Node, source: &str) -> bool {
                     let mut c2 = parent.walk();
                     let mut found_before: Option<Node> = None;
                     for s2 in parent.children(&mut c2) {
-                        if s2.id() == s.id() { break; }
+                        if s2.id() == s.id() {
+                            break;
+                        }
                         found_before = Some(s2);
                     }
                     p = found_before;

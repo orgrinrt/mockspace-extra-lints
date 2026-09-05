@@ -117,7 +117,11 @@ fn blank_spans(source: &str, spans: &[Range<usize>]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{blank_spans, const_generic_parameter_type_spans, without_const_generic_parameter_types};
+    use super::{
+        blank_spans,
+        const_generic_parameter_type_spans,
+        without_const_generic_parameter_types,
+    };
 
     fn masked(source: &str) -> String {
         without_const_generic_parameter_types(source)
@@ -126,13 +130,20 @@ mod tests {
     #[test]
     fn a_parameter_declaration_loses_its_type() {
         let out = masked("pub struct Signed<const BITS: u32>;\n");
-        assert!(!out.contains("u32"), "the parameter's type must be blanked: {out:?}");
-        assert!(out.contains("BITS"), "the parameter's name must survive: {out:?}");
+        assert!(
+            !out.contains("u32"),
+            "the parameter's type must be blanked: {out:?}"
+        );
+        assert!(
+            out.contains("BITS"),
+            "the parameter's name must survive: {out:?}"
+        );
     }
 
     #[test]
     fn an_impl_header_loses_its_parameter_types() {
-        let out = masked("impl<const BITS: u32, const FRAC: i32> Format for UFixed<BITS, FRAC> {}\n");
+        let out =
+            masked("impl<const BITS: u32, const FRAC: i32> Format for UFixed<BITS, FRAC> {}\n");
         assert!(!out.contains("u32"), "{out:?}");
         assert!(!out.contains("i32"), "{out:?}");
     }
@@ -140,7 +151,10 @@ mod tests {
     #[test]
     fn a_function_parameter_type_is_untouched() {
         let out = masked("fn f<const N: usize>(x: u32) -> i64 { 0 }\n");
-        assert!(!out.contains("usize"), "the const parameter's type goes: {out:?}");
+        assert!(
+            !out.contains("usize"),
+            "the const parameter's type goes: {out:?}"
+        );
         assert!(out.contains("u32"), "an ordinary parameter stays: {out:?}");
         assert!(out.contains("i64"), "a return type stays: {out:?}");
     }
@@ -148,13 +162,19 @@ mod tests {
     #[test]
     fn an_associated_constant_is_untouched() {
         let out = masked("pub trait Format { const PHASE_NUM: i64; }\n");
-        assert!(out.contains("i64"), "an associated const is not a parameter: {out:?}");
+        assert!(
+            out.contains("i64"),
+            "an associated const is not a parameter: {out:?}"
+        );
     }
 
     #[test]
     fn an_item_constant_is_untouched() {
         let out = masked("const WIDTH: u32 = 32;\n");
-        assert!(out.contains("u32"), "an item const is not a parameter: {out:?}");
+        assert!(
+            out.contains("u32"),
+            "an item const is not a parameter: {out:?}"
+        );
     }
 
     #[test]
@@ -180,7 +200,11 @@ mod tests {
     fn a_lifetime_or_type_parameter_is_not_a_const_parameter() {
         let source = "pub struct Pair<'a, T, const N: u8>(&'a T);\n";
         let spans = const_generic_parameter_type_spans(source);
-        assert_eq!(spans.len(), 1, "only the const parameter has a type to blank");
+        assert_eq!(
+            spans.len(),
+            1,
+            "only the const parameter has a type to blank"
+        );
         assert_eq!(&source[spans[0].clone()], "u8");
     }
 
@@ -225,10 +249,7 @@ mod tests {
             !out.contains("u32"),
             "the recovered parameter is excepted, broken file or not: {out:?}"
         );
-        assert!(
-            out.contains("u64"),
-            "and nothing else is: {out:?}"
-        );
+        assert!(out.contains("u64"), "and nothing else is: {out:?}");
     }
 
     #[test]

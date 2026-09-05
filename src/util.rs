@@ -82,15 +82,15 @@ pub fn line_lint_allowed(line: &str, rule_name: &str) -> bool {
     let mut search = line;
     let needle = "lint:allow(";
     while let Some(start) = search.find(needle) {
-        let after_open = &search[start + needle.len()..];
+        let after_open = &search[start + needle.len() ..];
         if let Some(close) = after_open.find(')') {
-            let names = &after_open[..close];
+            let names = &after_open[.. close];
             for name in names.split(',') {
                 if name.trim() == rule_name {
                     return true;
                 }
             }
-            search = &after_open[close..];
+            search = &after_open[close ..];
         } else {
             break;
         }
@@ -109,12 +109,7 @@ pub fn is_lint_allowed(node: Node, ctx: &LintContext, rule_name: &str) -> bool {
 }
 
 /// Build a blocking error with the standard (crate, line, lint, message) shape.
-pub fn err(
-    ctx: &LintContext,
-    line: usize,
-    lint_name: &'static str,
-    message: String,
-) -> LintError {
+pub fn err(ctx: &LintContext, line: usize, lint_name: &'static str, message: String) -> LintError {
     LintError::with_severity(
         ctx.crate_name.to_string(),
         line,
@@ -135,7 +130,7 @@ fn walk<F: FnMut(Node)>(node: Node, visit: &mut F) {
     for child in node.children(&mut cursor) {
         match child.kind() {
             "function_item" | "function_signature_item" => visit(child),
-            _ => {}
+            _ => {},
         }
         if child.named_child_count() > 0 {
             walk(child, visit);
@@ -242,7 +237,10 @@ mod tests {
 
     #[test]
     fn single_name_matches() {
-        assert!(line_lint_allowed("use std::env; // lint:allow(no-std)", "no-std"));
+        assert!(line_lint_allowed(
+            "use std::env; // lint:allow(no-std)",
+            "no-std"
+        ));
     }
 
     #[test]
@@ -286,8 +284,14 @@ mod tests {
 
     #[test]
     fn similar_name_does_not_match_partial() {
-        assert!(!line_lint_allowed("x // lint:allow(no-std-extra)", "no-std"));
-        assert!(!line_lint_allowed("x // lint:allow(extra-no-std)", "no-std"));
+        assert!(!line_lint_allowed(
+            "x // lint:allow(no-std-extra)",
+            "no-std"
+        ));
+        assert!(!line_lint_allowed(
+            "x // lint:allow(extra-no-std)",
+            "no-std"
+        ));
     }
 
     #[test]

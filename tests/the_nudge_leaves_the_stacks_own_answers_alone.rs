@@ -28,11 +28,10 @@ fn ctx_with(source: &'static str) -> LintContext<'static> {
     let tree = parser.parse(source, None).unwrap();
     let tree: &'static tree_sitter::Tree = Box::leak(Box::new(tree));
 
-    let all_sources: &'static [CrateSourceFile] =
-        Box::leak(Box::new(vec![CrateSourceFile {
-            rel_path: std::path::PathBuf::from("src/lib.rs"),
-            text:     source.to_string(),
-        }]));
+    let all_sources: &'static [CrateSourceFile] = Box::leak(Box::new(vec![CrateSourceFile {
+        rel_path: std::path::PathBuf::from("src/lib.rs"),
+        text:     source.to_string(),
+    }]));
 
     LintContext {
         crate_name: "test-crate",

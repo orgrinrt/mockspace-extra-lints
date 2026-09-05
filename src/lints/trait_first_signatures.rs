@@ -12,22 +12,30 @@
 use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 use tree_sitter::Node;
 
-use crate::util::{err, for_each_fn, is_public, names_type, txt};
-use crate::util::line_lint_allowed;
+use crate::util::{err, for_each_fn, is_public, line_lint_allowed, names_type, txt};
 
 pub struct TraitFirstSignatures;
 
 impl Lint for TraitFirstSignatures {
-    fn name(&self) -> &'static str { "trait-first-signatures" }
-    fn default_severity(&self) -> Severity { Severity::HARD_ERROR }
+    fn name(&self) -> &'static str {
+        "trait-first-signatures"
+    }
+
+    fn default_severity(&self) -> Severity {
+        Severity::HARD_ERROR
+    }
 }
 
 impl CrateLint for TraitFirstSignatures {
     fn check(&self, ctx: &LintContext) -> Vec<LintError> {
-        if ctx.should_skip_proc_macro_source_lint() { return Vec::new(); }
+        if ctx.should_skip_proc_macro_source_lint() {
+            return Vec::new();
+        }
         let mut out = Vec::new();
         for_each_fn(ctx.tree.root_node(), |node| {
-            if !is_public(node, ctx.source) { return; }
+            if !is_public(node, ctx.source) {
+                return;
+            }
             check_fn(node, ctx, &mut out);
         });
         out
@@ -36,10 +44,17 @@ impl CrateLint for TraitFirstSignatures {
 
 fn check_fn(node: Node, ctx: &LintContext, out: &mut Vec<LintError>) {
     let line = node.start_position().row + 1;
-    let src_line = ctx.source.lines().nth(node.start_position().row).unwrap_or("");
-    if line_lint_allowed(src_line, "trait-first-signatures") { return; }
+    let src_line = ctx
+        .source
+        .lines()
+        .nth(node.start_position().row)
+        .unwrap_or("");
+    if line_lint_allowed(src_line, "trait-first-signatures") {
+        return;
+    }
 
-    let name = node.child_by_field_name("name")
+    let name = node
+        .child_by_field_name("name")
         .map(|n| txt(n, ctx.source))
         .unwrap_or("<unknown>");
 

@@ -13,10 +13,9 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use mockspace_extra_lints::lints::{
-    arvo_types_only::ArvoTypesOnly, no_bare_numeric::NoBareNumeric,
-    no_public_raw_field::NoPublicRawField,
-};
+use mockspace_extra_lints::lints::arvo_types_only::ArvoTypesOnly;
+use mockspace_extra_lints::lints::no_bare_numeric::NoBareNumeric;
+use mockspace_extra_lints::lints::no_public_raw_field::NoPublicRawField;
 use mockspace_lint_rules::{CrateLint, CrateSourceFile, LintContext, LintError};
 
 fn ctx(source: &'static str) -> LintContext<'static> {
@@ -29,7 +28,7 @@ fn ctx(source: &'static str) -> LintContext<'static> {
 
     let all_sources: &'static [CrateSourceFile] = Box::leak(Box::new(vec![CrateSourceFile {
         rel_path: std::path::PathBuf::from("src/lib.rs"),
-        text: source.to_string(),
+        text:     source.to_string(),
     }]));
 
     LintContext {
@@ -78,10 +77,10 @@ fn a_const_generic_parameter_on_a_struct_passes() {
 
 #[test]
 fn a_const_generic_parameter_on_an_impl_header_passes() {
-    assert!(lines(
-        "impl<const BITS: u32, const FRAC: i32> Format for UFixed<BITS, FRAC> {}\n"
-    )
-    .is_empty());
+    assert!(
+        lines("impl<const BITS: u32, const FRAC: i32> Format for UFixed<BITS, FRAC> {}\n")
+            .is_empty()
+    );
 }
 
 #[test]
@@ -115,7 +114,9 @@ fn a_parameter_with_a_default_passes() {
 
 #[test]
 fn an_associated_constant_still_reports() {
-    assert_eq!(lines("pub trait Format { const PHASE_NUM: i64; }\n"), vec![1]);
+    assert_eq!(lines("pub trait Format { const PHASE_NUM: i64; }\n"), vec![
+        1
+    ]);
 }
 
 #[test]
@@ -194,7 +195,10 @@ fn a_const_generic_argument_at_a_use_site_carries_nothing_to_except() {
     // Nothing to report and nothing excepted: the argument is a value, so the
     // arm is here to pin that the exception is not doing the work.
     assert!(lines("pub type Byte = Signed<8>;\n").is_empty());
-    assert_eq!(lines("pub type Byte = Signed<8>;\npub fn n() -> u32 { 0 }\n"), vec![2]);
+    assert_eq!(
+        lines("pub type Byte = Signed<8>;\npub fn n() -> u32 { 0 }\n"),
+        vec![2]
+    );
 }
 
 // ---- the mixed line, which is where a blunt carve-out would fail ----------
@@ -229,10 +233,10 @@ fn an_impl_body_under_an_excepted_header_still_reports() {
 #[test]
 fn blanking_does_not_shift_the_reported_line() {
     let source = concat!(
-        "pub struct A<const N: u32>;\n",  // 1, excepted
-        "\n",                             // 2
+        "pub struct A<const N: u32>;\n",   // 1, excepted
+        "\n",                              // 2
         "pub struct B<const M: usize>;\n", // 3, excepted
-        "pub struct C(u64);\n",           // 4, reported
+        "pub struct C(u64);\n",            // 4, reported
     );
     assert_eq!(lines(source), vec![4]);
 }
@@ -288,31 +292,31 @@ fn the_raw_field_lint_never_read_a_parameter_as_a_field() {
 // is a law asserted over a sample.
 
 const THE_FORMAT_SURFACE: &str = concat!(
-    "pub struct Constant<const EXP: i32>;\n",                                     //  1 parameter
-    "pub struct Indexed<const MIN_EXP: i32, const COUNT: u32>;\n",                 //  2 parameters
-    "pub struct Signed<const BITS: u32>;\n",                                       //  1 parameter
-    "pub struct Unsigned<const BITS: u32>;\n",                                     //  1 parameter
-    "pub struct Integer<const BITS: u32>;\n",                                      //  1 parameter
+    "pub struct Constant<const EXP: i32>;\n", //  1 parameter
+    "pub struct Indexed<const MIN_EXP: i32, const COUNT: u32>;\n", //  2 parameters
+    "pub struct Signed<const BITS: u32>;\n",  //  1 parameter
+    "pub struct Unsigned<const BITS: u32>;\n", //  1 parameter
+    "pub struct Integer<const BITS: u32>;\n", //  1 parameter
     "pub trait Ambient {\n",
-    "    const RADIX: u32;\n",                                                     //  reported
-    "    const SIGNED: bool;\n",                                                   //  reported
+    "    const RADIX: u32;\n",   //  reported
+    "    const SIGNED: bool;\n", //  reported
     "}\n",
     "pub trait Quantum {\n",
-    "    const BASE: i32;\n",                                                      //  reported
-    "    const SLOPE: i32;\n",                                                     //  reported
-    "    const MAGNITUDES: u32;\n",                                                //  reported
+    "    const BASE: i32;\n",       //  reported
+    "    const SLOPE: i32;\n",      //  reported
+    "    const MAGNITUDES: u32;\n", //  reported
     "}\n",
     "pub trait Slots {\n",
-    "    const MIN: i64;\n",                                                       //  reported
-    "    const MAX: i64;\n",                                                       //  reported
-    "    const WIDTH: Width;\n",                                                   //  arvo's own
+    "    const MIN: i64;\n",     //  reported
+    "    const MAX: i64;\n",     //  reported
+    "    const WIDTH: Width;\n", //  arvo's own
     "}\n",
     "pub trait Format {\n",
-    "    const PHASE_NUM: i64;\n",                                                 //  reported
-    "    const PHASE_DEN: i64;\n",                                                 //  reported
+    "    const PHASE_NUM: i64;\n", //  reported
+    "    const PHASE_DEN: i64;\n", //  reported
     "}\n",
     "pub trait Operation {\n",
-    "    const ARITY: u32;\n",                                                     //  reported
+    "    const ARITY: u32;\n", //  reported
     "}\n",
 );
 
@@ -353,16 +357,16 @@ fn the_whole_surface_was_refused_before_the_exception_reached_it() {
         .lines()
         .enumerate()
         .filter(|(_, line)| {
-            ["u32", "i32", "i64", "bool"]
-                .iter()
-                .any(|p| line.split(|c: char| !c.is_ascii_alphanumeric() && c != '_').any(|w| w == *p))
+            ["u32", "i32", "i64", "bool"].iter().any(|p| {
+                line.split(|c: char| !c.is_ascii_alphanumeric() && c != '_')
+                    .any(|w| w == *p)
+            })
         })
         .map(|(idx, _)| idx + 1)
         .collect();
-    assert_eq!(
-        would_have_reported,
-        vec![1, 2, 3, 4, 5, 7, 8, 11, 12, 13, 16, 17, 21, 22, 25]
-    );
+    assert_eq!(would_have_reported, vec![
+        1, 2, 3, 4, 5, 7, 8, 11, 12, 13, 16, 17, 21, 22, 25
+    ]);
 
     let now = lines(THE_FORMAT_SURFACE);
     let changed: Vec<usize> = would_have_reported
@@ -370,7 +374,11 @@ fn the_whole_surface_was_refused_before_the_exception_reached_it() {
         .copied()
         .filter(|l| !now.contains(l))
         .collect();
-    assert_eq!(changed, vec![1, 2, 3, 4, 5], "only the parameter declarations moved");
+    assert_eq!(
+        changed,
+        vec![1, 2, 3, 4, 5],
+        "only the parameter declarations moved"
+    );
 }
 
 // ---- a lifetime tick opens what looks like a char literal -----------------
@@ -384,7 +392,11 @@ fn the_whole_surface_was_refused_before_the_exception_reached_it() {
             the parse, same as the literal suffix, and that is a separate change"]
 fn a_bare_primitive_between_two_lifetime_ticks_still_reports() {
     let source = "pub struct S<'a> { pub n: u32, pub r: &'a str }\n";
-    assert_eq!(lines(source), vec![1], "the `u32` field sits between two ticks");
+    assert_eq!(
+        lines(source),
+        vec![1],
+        "the `u32` field sits between two ticks"
+    );
 }
 
 #[test]

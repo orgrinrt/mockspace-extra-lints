@@ -17,13 +17,17 @@ use std::path::Path;
 use mockspace_lint_rules::{Lint, LintContext, LintError, Severity, WorkspaceLint};
 
 const HYPE_WORDS: &[&str] = &[
-    "blazing", "seamless", "powerful", "amazing", "incredible",
-    "game-changing", "best-in-class",
+    "blazing",
+    "seamless",
+    "powerful",
+    "amazing",
+    "incredible",
+    "game-changing",
+    "best-in-class",
 ];
 
-const CORPORATE_JARGON: &[&str] = &[
-    "leverage", "utilize", "utilise", "synergy", "holistic", "paradigm",
-];
+const CORPORATE_JARGON: &[&str] =
+    &["leverage", "utilize", "utilise", "synergy", "holistic", "paradigm"];
 
 const FILLER_PHRASES: &[&str] = &[
     "it should be noted that",
@@ -33,11 +37,7 @@ const FILLER_PHRASES: &[&str] = &[
     "for all intents and purposes",
 ];
 
-const GREETING_OPENERS: &[&str] = &[
-    "Sure!",
-    "Happy to help!",
-    "Let me explain",
-];
+const GREETING_OPENERS: &[&str] = &["Sure!", "Happy to help!", "Let me explain"];
 
 /// One em-dash per ~10 lines of prose is the threshold.
 const EM_DASH_PER_LINES: usize = 10;
@@ -45,9 +45,17 @@ const EM_DASH_PER_LINES: usize = 10;
 pub struct WritingStyle;
 
 impl Lint for WritingStyle {
-    fn name(&self) -> &'static str { "writing-style" }
-    fn source_only(&self) -> bool { false }
-    fn default_severity(&self) -> Severity { Severity::PUSH_GATE }
+    fn name(&self) -> &'static str {
+        "writing-style"
+    }
+
+    fn source_only(&self) -> bool {
+        false
+    }
+
+    fn default_severity(&self) -> Severity {
+        Severity::PUSH_GATE
+    }
 }
 
 impl WorkspaceLint for WritingStyle {
@@ -107,13 +115,10 @@ impl WorkspaceLint for WritingStyle {
 /// a crate's own readme reads `<crate>/README.md.tmpl:12` rather than naming a
 /// line in a crate root that has no such line. `None` where `crate_name` is
 /// already the file, which is the workspace-level case.
-fn check_file(
-    path: &Path,
-    crate_name: &str,
-    rel_label: Option<&str>,
-    out: &mut Vec<LintError>,
-) {
-    if is_self_exempt(path) { return; }
+fn check_file(path: &Path, crate_name: &str, rel_label: Option<&str>, out: &mut Vec<LintError>) {
+    if is_self_exempt(path) {
+        return;
+    }
     let content = match std::fs::read_to_string(path) {
         Ok(s) => s,
         Err(_) => return,
@@ -149,7 +154,9 @@ fn walk_md_tmpl(dir: &Path, workspace_root: &Path, out: &mut Vec<LintError>) {
         if path.is_dir() {
             walk_md_tmpl(&path, workspace_root, out);
         } else if path.extension().is_some_and(|e| e == "tmpl")
-            && path.file_name().is_some_and(|n| n.to_string_lossy().ends_with(".md.tmpl"))
+            && path
+                .file_name()
+                .is_some_and(|n| n.to_string_lossy().ends_with(".md.tmpl"))
         {
             let label = path
                 .strip_prefix(workspace_root)
@@ -231,7 +238,9 @@ fn check_text(content: &str, crate_name: &str, body: Body, out: &mut Vec<LintErr
 
     // 2. Hype words, corporate jargon, filler phrases, greeting openers.
     let lower = prose.to_lowercase();
-    for (word, category) in HYPE_WORDS.iter().map(|w| (*w, "hype"))
+    for (word, category) in HYPE_WORDS
+        .iter()
+        .map(|w| (*w, "hype"))
         .chain(CORPORATE_JARGON.iter().map(|w| (*w, "jargon")))
         .chain(FILLER_PHRASES.iter().map(|w| (*w, "filler")))
     {
@@ -242,7 +251,9 @@ fn check_text(content: &str, crate_name: &str, body: Body, out: &mut Vec<LintErr
                 crate_name.to_string(),
                 line,
                 "writing-style",
-                format!("`{word}` ({category}) used {count}x; see .shared/writing-style-fragment.md"),
+                format!(
+                    "`{word}` ({category}) used {count}x; see .shared/writing-style-fragment.md"
+                ),
                 Severity::PUSH_GATE,
             ));
         }
@@ -355,7 +366,7 @@ fn word_paired(line: &str, marker: &str) -> bool {
     let mut opened = false;
     let mut i = 0;
     while i + width <= chars.len() {
-        if chars[i..i + width] != m[..] {
+        if chars[i .. i + width] != m[..] {
             i += 1;
             continue;
         }
@@ -441,7 +452,7 @@ fn fenced_lines(content: &str) -> Vec<bool> {
         .collect();
     let mut fenced = vec![false; content.lines().count()];
     for pair in markers.chunks_exact(2) {
-        for line in &mut fenced[pair[0]..=pair[1]] {
+        for line in &mut fenced[pair[0] ..= pair[1]] {
             *line = true;
         }
     }
@@ -452,14 +463,16 @@ fn count_exclamations_in_prose(content: &str) -> usize {
     let fenced = fenced_lines(content);
     let mut count = 0;
     for (index, line) in content.lines().enumerate() {
-        if fenced[index] { continue; }
+        if fenced[index] {
+            continue;
+        }
         // Skip inline code `...` spans roughly.
         let mut in_code = false;
         for ch in line.chars() {
             match ch {
                 '`' => in_code = !in_code,
                 '!' if !in_code => count += 1,
-                _ => {}
+                _ => {},
             }
         }
     }
@@ -476,19 +489,25 @@ fn opens_with_flat_bullet_list(lines: &[&str]) -> bool {
             if section_count == 1 {
                 scan_from = i + 1;
             }
-            if section_count > 3 { break; }
+            if section_count > 3 {
+                break;
+            }
         }
     }
     // Within those top sections, look at the first non-blank non-heading content.
     // If it's a flat bullet list (no sub-bullets, all `- something`), flag it.
     let mut bullets_at_top = 0;
     let mut first_content_seen = false;
-    for line in &lines[scan_from..lines.len().min(scan_from + 60)] {
+    for line in &lines[scan_from .. lines.len().min(scan_from + 60)] {
         let t = line.trim();
-        if t.is_empty() { continue; }
+        if t.is_empty() {
+            continue;
+        }
         if t.starts_with("#") {
             // New section; stop scanning the previous section's body.
-            if first_content_seen { break; }
+            if first_content_seen {
+                break;
+            }
             continue;
         }
         if t.starts_with("- ") || t.starts_with("* ") {
@@ -516,8 +535,8 @@ fn count_label_colon_bullets(lines: &[&str]) -> usize {
         // Pattern: `<label>: <one short line>` where the colon is in the first
         // half of the content and there are no nested bullets.
         if let Some(colon_pos) = rest.find(':') {
-            let before = &rest[..colon_pos];
-            let after = rest[colon_pos + 1..].trim();
+            let before = &rest[.. colon_pos];
+            let after = rest[colon_pos + 1 ..].trim();
             let is_short_label = before.len() < 40 && !before.contains(' ');
             let short_after = after.len() < 80 && !after.is_empty();
             if is_short_label && short_after {
@@ -560,14 +579,11 @@ fn comment_corpus(source: &str) -> (String, Vec<usize>) {
 /// map. The source's own length goes in with it, so a density is measured
 /// against the file rather than against however many of its lines happened to
 /// be comments.
-fn check_rust_comments(
-    rel_path: &str,
-    source: &str,
-    crate_name: &str,
-    out: &mut Vec<LintError>,
-) {
+fn check_rust_comments(rel_path: &str, source: &str, crate_name: &str, out: &mut Vec<LintError>) {
     let (corpus, map) = comment_corpus(source);
-    if corpus.trim().is_empty() { return; }
+    if corpus.trim().is_empty() {
+        return;
+    }
     let mut found = Vec::new();
     check_text(
         &corpus,
@@ -961,7 +977,9 @@ mod body_tests {
         assert_eq!(fenced_lines("a\n```\nb\n```\nc\n"), vec![
             false, true, true, true, false
         ]);
-        assert_eq!(fenced_lines("a\n```\nb\nc\n"), vec![false, false, false, false]);
+        assert_eq!(fenced_lines("a\n```\nb\nc\n"), vec![
+            false, false, false, false
+        ]);
         assert_eq!(fenced_lines(""), Vec::<bool>::new());
     }
 

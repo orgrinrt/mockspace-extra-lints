@@ -49,15 +49,11 @@
 use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 
 use crate::const_generic_parameters::without_const_generic_parameter_types;
-use crate::util::{categories, crate_introduces_category, err_in_file};
-use crate::util::line_lint_allowed;
+use crate::util::{categories, crate_introduces_category, err_in_file, line_lint_allowed};
 
 const BARE_PRIMITIVES: &[&str] = &[
-    "u8", "u16", "u32", "u64", "u128",
-    "i8", "i16", "i32", "i64", "i128",
-    "f32", "f64",
-    "usize", "isize",
-    "bool",
+    "u8", "u16", "u32", "u64", "u128", "i8", "i16", "i32", "i64", "i128", "f32", "f64", "usize",
+    "isize", "bool",
 ];
 
 pub struct ArvoTypesOnly;
@@ -70,14 +66,23 @@ impl Lint for ArvoTypesOnly {
         false
     }
 
-    fn name(&self) -> &'static str { "arvo-types-only" }
-    fn default_severity(&self) -> Severity { Severity::HARD_ERROR }
+    fn name(&self) -> &'static str {
+        "arvo-types-only"
+    }
+
+    fn default_severity(&self) -> Severity {
+        Severity::HARD_ERROR
+    }
 }
 
 impl CrateLint for ArvoTypesOnly {
     fn check(&self, ctx: &LintContext) -> Vec<LintError> {
-        if ctx.should_skip_proc_macro_source_lint() { return Vec::new(); }
-        if crate_introduces_category(ctx, categories::NUMERIC) { return Vec::new(); }
+        if ctx.should_skip_proc_macro_source_lint() {
+            return Vec::new();
+        }
+        if crate_introduces_category(ctx, categories::NUMERIC) {
+            return Vec::new();
+        }
         let mut out = Vec::new();
 
         // Scan every .rs file under src/. Module files (bits.rs,
@@ -99,8 +104,12 @@ impl CrateLint for ArvoTypesOnly {
             let excepted = without_const_generic_parameter_types(source);
             for (idx, (raw_line, kept)) in source.lines().zip(excepted.lines()).enumerate() {
                 let trimmed_start = raw_line.trim_start();
-                if trimmed_start.starts_with("//") { continue; }
-                if line_lint_allowed(raw_line, "arvo-types-only") { continue; }
+                if trimmed_start.starts_with("//") {
+                    continue;
+                }
+                if line_lint_allowed(raw_line, "arvo-types-only") {
+                    continue;
+                }
 
                 let scan = strip_string_and_char_literals(kept);
                 let scan = strip_line_comment(&scan);
@@ -183,7 +192,7 @@ fn strip_string_and_char_literals(line: &str) -> String {
 /// this runs AFTER `strip_string_and_char_literals`).
 fn strip_line_comment(line: &str) -> String {
     if let Some(idx) = line.find("//") {
-        line[..idx].to_string()
+        line[.. idx].to_string()
     } else {
         line.to_string()
     }
@@ -200,7 +209,7 @@ fn contains_bare_word(hay: &str, needle: &str) -> bool {
     }
     let mut i = 0;
     while i + n.len() <= bytes.len() {
-        if &bytes[i..i + n.len()] == n {
+        if &bytes[i .. i + n.len()] == n {
             let before_ok = i == 0 || !is_ident(bytes[i - 1]);
             let after_pos = i + n.len();
             let after_ok = after_pos >= bytes.len() || !is_ident(bytes[after_pos]);
@@ -213,4 +222,6 @@ fn contains_bare_word(hay: &str, needle: &str) -> bool {
     false
 }
 
-fn is_ident(b: u8) -> bool { b.is_ascii_alphanumeric() || b == b'_' }
+fn is_ident(b: u8) -> bool {
+    b.is_ascii_alphanumeric() || b == b'_'
+}

@@ -33,44 +33,53 @@ pub mod lints {
     //! with its sources, the workspace as a whole, or one commit message or
     //! forge body.
 
+    pub mod arvo_types_only;
     pub mod commit_style;
     pub mod forge_body;
+    pub mod lint_allow_requires_task_id;
     pub mod message_attribution;
     pub mod no_alloc;
-    pub mod no_std;
+    pub mod no_bare_numeric;
     pub mod no_bare_option;
     pub mod no_bare_result;
-    pub mod no_bare_numeric;
-    pub mod no_bare_string;
     pub mod no_bare_static_str;
+    pub mod no_bare_string;
     pub mod no_dyn_dispatch;
-    pub mod no_runtime_spawn;
-    pub mod no_runtime_registration;
     pub mod no_public_raw_field;
+    pub mod no_runtime_registration;
+    pub mod no_runtime_spawn;
+    pub mod no_std;
     pub mod no_vec_in_trait_sig;
     pub mod re_export_foreign_names;
-    pub mod strategy_marker_required;
     pub mod semantic_alias_nudge;
+    pub mod strategy_marker_required;
     pub mod trait_first_signatures;
-    pub mod arvo_types_only;
-    pub mod lint_allow_requires_task_id;
     pub mod writing_style;
 }
 
-use lints::{
-    arvo_types_only::ArvoTypesOnly,
-    commit_style::CommitStyle,
-    forge_body::ForgeBody,
-    message_attribution::MessageAttribution, lint_allow_requires_task_id::LintAllowRequiresTaskId,
-    no_alloc::NoAlloc, no_bare_numeric::NoBareNumeric, no_bare_option::NoBareOption,
-    no_bare_result::NoBareResult, no_bare_static_str::NoBareStaticStr,
-    no_bare_string::NoBareString, no_dyn_dispatch::NoDynDispatch,
-    no_public_raw_field::NoPublicRawField, no_runtime_registration::NoRuntimeRegistration,
-    no_runtime_spawn::NoRuntimeSpawn, no_std::NoStd, no_vec_in_trait_sig::NoVecInTraitSig,
-    re_export_foreign_names::ReExportForeignNames, semantic_alias_nudge::SemanticAliasNudge,
-    strategy_marker_required::StrategyMarkerRequired,
-    trait_first_signatures::TraitFirstSignatures, writing_style::WritingStyle,
-};
+use lints::arvo_types_only::ArvoTypesOnly;
+use lints::commit_style::CommitStyle;
+use lints::forge_body::ForgeBody;
+use lints::lint_allow_requires_task_id::LintAllowRequiresTaskId;
+use lints::message_attribution::MessageAttribution;
+use lints::no_alloc::NoAlloc;
+use lints::no_bare_numeric::NoBareNumeric;
+use lints::no_bare_option::NoBareOption;
+use lints::no_bare_result::NoBareResult;
+use lints::no_bare_static_str::NoBareStaticStr;
+use lints::no_bare_string::NoBareString;
+use lints::no_dyn_dispatch::NoDynDispatch;
+use lints::no_public_raw_field::NoPublicRawField;
+use lints::no_runtime_registration::NoRuntimeRegistration;
+use lints::no_runtime_spawn::NoRuntimeSpawn;
+use lints::no_std::NoStd;
+use lints::no_vec_in_trait_sig::NoVecInTraitSig;
+use lints::re_export_foreign_names::ReExportForeignNames;
+use lints::semantic_alias_nudge::SemanticAliasNudge;
+use lints::strategy_marker_required::StrategyMarkerRequired;
+use lints::trait_first_signatures::TraitFirstSignatures;
+use lints::writing_style::WritingStyle;
+
 use crate::tools::coverage::Coverage;
 use crate::tools::rulings_with_no_verbatim::RulingsWithNoVerbatim;
 
