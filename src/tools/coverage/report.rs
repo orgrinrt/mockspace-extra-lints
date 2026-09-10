@@ -27,6 +27,7 @@ use super::{
     struck,
     struck_demand,
     tally,
+    withdrawn_namers,
 };
 
 /// Whether any row anywhere carries the field naming this namespace.
@@ -114,7 +115,9 @@ impl Tool for Coverage {
          printed under each row the proposal it stamped names, and a struck \
          proposal's line names any live ruling still stamping it. A demand row \
          carrying `retired` itself is marked as owed nothing, and is still \
-         tallied at the tier its edges reach.\n\n\
+         tallied at the tier its edges reach. A retirement of kind `withdrawn` \
+         is a strike taken back, so it closes no route and is printed under the \
+         row it names, and a row naming it in `retired` is read as live.\n\n\
          Nothing here fails. An unanswered row is the state of unfinished work \
          rather than a defect, and gating on a count would invent a deadline \
          nobody set."
@@ -148,6 +151,7 @@ impl Tool for Coverage {
 fn all(reg: &RegistryView, demand: &str, _rows: &[String]) -> ToolReport {
     let reached = reach(reg, demand);
     let others = also_named_by(reg, demand);
+    let back = withdrawn_namers(reg, demand);
     let pre = preconditions(reg, demand);
     let gone = struck(reg, demand);
     let owed_nothing = struck_demand(reg, demand);
@@ -193,6 +197,11 @@ fn all(reg: &RegistryView, demand: &str, _rows: &[String]) -> ToolReport {
         for who in others.get(id).map(Vec::as_slice).unwrap_or(&[]) {
             s.push_str(&format!(
                 "                  {who}, from a namespace this cannot tier, so it sets no tier\n"
+            ));
+        }
+        for who in back.get(id).map(Vec::as_slice).unwrap_or(&[]) {
+            s.push_str(&format!(
+                "                  {who}, withdrawn, so it closes no route and sets no tier\n"
             ));
         }
         for edge in gone.get(id).map(Vec::as_slice).unwrap_or(&[]) {
@@ -293,6 +302,7 @@ fn one(reg: &RegistryView, demand: &str, _rows: &[String], wanted: &str) -> Tool
     };
     let pre = preconditions(reg, demand);
     let others = also_named_by(reg, demand);
+    let back = withdrawn_namers(reg, demand);
     let mut s = format!("{wanted}\n\n  tier: {}\n", tier.word());
     if let Some(r) = struck_demand(reg, demand).get(wanted) {
         s.push_str(&format!(
@@ -320,6 +330,12 @@ fn one(reg: &RegistryView, demand: &str, _rows: &[String], wanted: &str) -> Tool
                 s.push_str(&format!("    {who}\n"));
             }
         },
+    }
+    if let Some(on) = back.get(wanted).filter(|on| !on.is_empty()) {
+        s.push_str("\n  Also named by withdrawn retirements, which close no route:\n");
+        for who in on {
+            s.push_str(&format!("    {who}\n"));
+        }
     }
     if let Some(on) = others.get(wanted).filter(|on| !on.is_empty()) {
         s.push_str("\n  Also named from a namespace this cannot tier, so these set no tier:\n");
