@@ -79,11 +79,36 @@
 //! list of them. A fixed list is a fact about one corpus, and the field is its
 //! own evidence: a row carrying `precondition_for` is establishing one whatever
 //! namespace it sits in.
+//!
+//! A row carrying `retired` has been struck, and it is read the same way, from
+//! whatever namespace it sits in. A corpus that keeps a struck row whole, so the
+//! slugs citing it still land somewhere, would otherwise have the tool count
+//! what it withdrew: a struck proposal's edges read as live, and a stamp over
+//! one reads as met. So a struck row sets no tier, stamps nothing and
+//! establishes no precondition, and each edge it carried is printed under the
+//! row it names rather than dropped, because a row whose only namers were
+//! struck and a row nobody has looked at print the same `nothing`. A stamp does
+//! not revive a struck proposal, and the line for one names every live ruling
+//! still stamping it, since that stamp now points at a claim the corpus
+//! withdrew. A struck ruling's stamp is printed under each row the proposal it
+//! stamped names, which is where the tier it withdrew would have shown.
+//!
+//! A demand row carrying the field is struck itself and owed nothing. It is
+//! still walked and tallied, because what reaches it is a fact about the corpus
+//! either way, and the report marks it so it does not read as outstanding work.
+//! A corpus spelling the field differently has its struck rows counted as live,
+//! which is the flattering direction, so the field's name is a fact this states
+//! rather than one it searches for.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use mockspace_lint_rules::RegistryView;
-use mockspace_lint_rules::tool::{ArgSpec, NotALint, Outcome, Tool, ToolContext, ToolReport};
+
+mod report;
+mod struck;
+
+pub use report::{Coverage, anything_carries};
+pub use struck::{StruckEdge, Through, struck, struck_demand};
 
 /// The namespace carrying a rung and a stamp.
 ///
@@ -107,6 +132,9 @@ const RATIFIES: &str = "ratifies";
 
 /// The field a row establishing a precondition carries.
 const PRECONDITION_FOR: &str = "precondition_for";
+
+/// The field a struck row carries, naming the retirement that struck it.
+const RETIRED: &str = "retired";
 
 /// What is printed for a ruling carrying no readable rung.
 ///
@@ -236,6 +264,16 @@ fn list<'a>(reg: &'a RegistryView, q: &str, field: &str) -> Vec<&'a str> {
         .unwrap_or_default()
 }
 
+/// The retirement a row names as having struck it, where it names one.
+///
+/// A blank value is read as absent, since a field present and empty has named
+/// nothing and striking on it would withdraw a claim on no one's word.
+fn struck_by<'a>(reg: &'a RegistryView, q: &str) -> Option<&'a str> {
+    reg.field(q, RETIRED)
+        .map(str::trim)
+        .filter(|r| !r.is_empty())
+}
+
 /// A ruling's rung as written, or `(absent)`.
 fn rung<'a>(reg: &'a RegistryView, q: &str) -> &'a str {
     reg.field(q, "rung")
@@ -272,7 +310,7 @@ fn tier_of_rung(r: &str) -> Reach {
 pub fn stamps(reg: &RegistryView) -> BTreeMap<String, Vec<String>> {
     let mut out: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for q in reg.rows_in(RULING) {
-        if rung(reg, q) != RATIFIED {
+        if rung(reg, q) != RATIFIED || struck_by(reg, q).is_some() {
             continue;
         }
         for named in list(reg, q, RATIFIES) {
@@ -280,27 +318,6 @@ pub fn stamps(reg: &RegistryView) -> BTreeMap<String, Vec<String>> {
         }
     }
     out
-}
-
-/// Whether any row anywhere carries the field naming this namespace.
-///
-/// Reported rather than refused, and the difference is the whole of what this
-/// is for. A corpus recording the relation under another name and a corpus
-/// where nothing has answered anything yet produce the identical report, and
-/// the second is the ordinary early state of a canon being written, so refusing
-/// it would refuse the case the tool exists to serve.
-///
-/// The first draft here did refuse it, as an inconclusive verdict, on the
-/// reasoning that a clean report cannot tell the two apart. That reasoning is
-/// right and the remedy was wrong: the two are told apart by the schema, which
-/// a tool is handed no parsed copy of, so nothing the registry holds can decide
-/// it. What is left is to say so in the report and let a reader decide, which
-/// costs a line and claims nothing.
-#[must_use]
-pub fn anything_carries(reg: &RegistryView, field: &str) -> bool {
-    reg.namespaces()
-        .flat_map(|ns| reg.rows_in(ns))
-        .any(|q| reg.field(q, field).is_some_and(|v| !v.trim().is_empty()))
 }
 
 /// What each demand row has reached, and what got it there.
@@ -319,6 +336,9 @@ pub fn reach(reg: &RegistryView, demand: &str) -> BTreeMap<String, (Reach, Vec<S
 
     for (ns, edge) in EDGES {
         for q in reg.rows_in(ns) {
+            if struck_by(reg, q).is_some() {
+                continue; // `struck` names it instead
+            }
             let (tier, by) = match edge {
                 Edge::Ruling => {
                     let r = rung(reg, q);
@@ -371,6 +391,9 @@ pub fn also_named_by(reg: &RegistryView, demand: &str) -> BTreeMap<String, Vec<S
             continue;
         }
         for q in reg.rows_in(ns) {
+            if struck_by(reg, q).is_some() {
+                continue; // `struck` names it instead
+            }
             for named in list(reg, q, demand) {
                 if let Some(entry) = out.get_mut(named) {
                     entry.push(q.clone());
@@ -396,6 +419,9 @@ pub fn preconditions(reg: &RegistryView, demand: &str) -> BTreeMap<String, Vec<S
     let namespaces: Vec<&str> = reg.namespaces().collect();
     for ns in namespaces {
         for q in reg.rows_in(ns) {
+            if struck_by(reg, q).is_some() {
+                continue; // `struck` names it instead
+            }
             for named in list(reg, q, PRECONDITION_FOR) {
                 if let Some(entry) = out.get_mut(named) {
                     entry.push(q.clone());
@@ -417,240 +443,4 @@ pub fn tally(reg: &RegistryView, demand: &str) -> BTreeMap<&'static str, usize> 
         *out.entry(tier.word()).or_insert(0) += 1;
     }
     out
-}
-
-pub struct Coverage;
-
-impl Tool for Coverage {
-    fn name(&self) -> &'static str {
-        "coverage"
-    }
-
-    fn description(&self) -> &'static str {
-        "what reaches each row of a demand namespace, by the rung that reaches it"
-    }
-
-    fn not_a_lint(&self) -> NotALint {
-        NotALint::NoFailingCase
-    }
-
-    fn args(&self) -> &'static [ArgSpec] {
-        &[
-            ArgSpec {
-                name:        "namespace",
-                required:    true,
-                description: "the demand namespace to measure, whichever this corpus calls it",
-            },
-            ArgSpec {
-                name:        "slug",
-                required:    false,
-                description: "report one row of it in full rather than all of them",
-            },
-        ]
-    }
-
-    fn help(&self) -> &'static str {
-        "With a namespace: every row of it, by the tier the typed edges and the \
-         rung put it at, with the rows that got it there. With a slug after it: \
-         that row alone, in full.\n\n\
-         The tier is the authority of what reaches it, never the namespace the \
-         row sits in. `ratified` is the one tier that is met: a ruling at that \
-         rung governs, and so does a proposal such a ruling stamped through \
-         `ratifies`, which is what a stamp is for. `in_force` is enforced \
-         without having gone through convergence. `stated` is direction and an \
-         ack rather than a ruling. `proposed` is a proposal nobody has stamped, \
-         which is proposed rather than met. `unsettled` is a ruling at a rung \
-         that settles nothing, or one whose rung could not be read. \
-         `route-closed` means only a retirement names it: a way to it was tried \
-         and is known not to work, which is not the same as nobody having \
-         looked.\n\n\
-         A rung vocabulary belongs to the corpus, so a tier no rung here spells \
-         simply holds nobody, and a namespace this corpus does not declare \
-         contributes nothing. A ruling's rung is printed beside it and a stamped \
-         proposal names the ruling that stamped it, so a `ratified` line reached \
-         through the stamp can be checked rather than taken.\n\n\
-         A row named from a namespace whose authority cannot be read is printed \
-         under it and sets no tier, because tiering it would invent an authority \
-         nobody declared. Preconditions are reported beside the tiers and never \
-         folded into them: a precondition is a dependency somebody established, \
-         so it leaves a row further from met rather than nearer, and a row with \
-         four of them and no answer is the worst-placed one here rather than the \
-         best-attended.\n\n\
-         Nothing here fails. An unanswered row is the state of unfinished work \
-         rather than a defect, and gating on a count would invent a deadline \
-         nobody set."
-    }
-
-    fn run(&self, ctx: &ToolContext<'_>) -> ToolReport {
-        let Some(&demand) = ctx.args.first() else {
-            // Unreachable through the engine, which refuses a missing required
-            // argument before `run`. Answered anyway rather than indexed into,
-            // because a direct caller is a caller.
-            return ToolReport::inconclusive(
-                "no namespace was named, so this examined nothing. Name the namespace \
-                 holding the demand side.",
-            );
-        };
-        let rows = ctx.registry.rows_in(demand);
-        if rows.is_empty() {
-            return ToolReport::inconclusive(format!(
-                "no `{demand}` rows are declared, so there is no demand side to measure. \
-                 A namespace with no rows and a namespace nothing answers are the same \
-                 empty output and the opposite meaning."
-            ));
-        }
-        match ctx.args.get(1).copied() {
-            Some(key) => one(ctx.registry, demand, rows, key),
-            None => all(ctx.registry, demand, rows),
-        }
-    }
-}
-
-fn all(reg: &RegistryView, demand: &str, _rows: &[String]) -> ToolReport {
-    let reached = reach(reg, demand);
-    let others = also_named_by(reg, demand);
-    let pre = preconditions(reg, demand);
-    let counts = tally(reg, demand);
-    let total = reached.len();
-
-    let mut s = format!("{total} `{demand}` rows.\n\n");
-    for tier in TIERS {
-        s.push_str(&format!(
-            "  {:<13} {}\n",
-            tier.word(),
-            counts.get(tier.word()).copied().unwrap_or(0)
-        ));
-    }
-    s.push_str(
-        "\n`ratified` is the only tier that is met. The rest are degrees of not yet, \
-         ordered by\nhow far each has got, and a ruling's rung is printed beside it.\n",
-    );
-
-    // The tally above reads strongest first, as a ladder from met downward. The
-    // body reads the other way, so a reader looking for work finds it at the
-    // top. Both orders carry meaning and they are deliberately opposite, which
-    // is why the heading says which way round this one is.
-    s.push_str(&format!("\nBy {demand}, weakest first:\n\n"));
-    let mut ordered: Vec<(&String, &(Reach, Vec<String>))> = reached.iter().collect();
-    ordered.sort_by(|a, b| b.1.0.cmp(&a.1.0).then_with(|| a.0.cmp(b.0)));
-    for (id, (tier, by)) in ordered {
-        let deps = pre.get(id).map_or(0, Vec::len);
-        let mark = match deps {
-            0 => String::new(),
-            1 => "   (1 precondition against it)".to_string(),
-            n => format!("   ({n} preconditions against it)"),
-        };
-        s.push_str(&format!("  {:<13} {id}{mark}\n", tier.word()));
-        for who in by {
-            s.push_str(&format!("                  {who}\n"));
-        }
-        for who in others.get(id).map(Vec::as_slice).unwrap_or(&[]) {
-            s.push_str(&format!(
-                "                  {who}, from a namespace this cannot tier, so it sets none\n"
-            ));
-        }
-    }
-
-    let closed: Vec<&String> = reached
-        .iter()
-        .filter(|(_, (tier, _))| *tier == Reach::RouteClosed)
-        .map(|(id, _)| id)
-        .collect();
-    if !closed.is_empty() {
-        s.push_str(&format!(
-            "\n{} row(s) are named only by a retirement: {closed:?}. The row is open and \
-             one way to it is known not to work, which is not the same as nobody having \
-             looked, and reads identically on a flat list.\n",
-            closed.len()
-        ));
-    }
-
-    if !anything_carries(reg, demand) {
-        s.push_str(&format!(
-            "\nNo row in any namespace carries a `{demand}` field, so no edge was read at \
-             all. Either nothing has answered anything yet, which is an ordinary early \
-             state, or this corpus records the relation under another name, in which case \
-             every line above is about a relation this did not look for.\n"
-        ));
-    }
-
-    let stuck: Vec<&String> = reached
-        .iter()
-        .filter(|(_, (tier, _))| !tier.answered())
-        .filter(|(id, _)| pre.get(*id).is_some_and(|on| !on.is_empty()))
-        .map(|(id, _)| id)
-        .collect();
-    if !stuck.is_empty() {
-        s.push_str(&format!(
-            "\n{} row(s) are answered by nothing and carry an established precondition: \
-             {stuck:?}. Each is further from met than a row nobody has looked at, rather \
-             than nearer.\n",
-            stuck.len()
-        ));
-    }
-
-    ToolReport {
-        outcome: Outcome::Clean {
-            examined: total,
-        },
-        output:  s,
-    }
-}
-
-fn one(reg: &RegistryView, demand: &str, _rows: &[String], wanted: &str) -> ToolReport {
-    let reached = reach(reg, demand);
-    let Some((tier, by)) = reached.get(wanted) else {
-        return ToolReport::inconclusive(format!(
-            "no `{demand}` row matches `{wanted}`, so this is a statement about the \
-             spelling rather than about the corpus. `coverage {demand}` with no slug \
-             lists every one."
-        ));
-    };
-    let pre = preconditions(reg, demand);
-    let others = also_named_by(reg, demand);
-    let mut s = format!("{wanted}\n\n  tier: {}\n", tier.word());
-    let q = format!("{demand}::{wanted}");
-    // Written as a filter rather than a let-chain: this pack is edition 2021
-    // and the corpus it was ported from is 2024.
-    for field in ["what", "says", "why", "note"] {
-        if let Some(v) = reg
-            .field(&q, field)
-            .map(str::trim)
-            .filter(|v| !v.is_empty())
-        {
-            s.push_str(&format!("\n  {field}:\n    {v}\n"));
-        }
-    }
-    s.push('\n');
-    match by.len() {
-        0 => s.push_str("  Nothing names it.\n"),
-        _ => {
-            s.push_str("  Named by:\n");
-            for who in by {
-                s.push_str(&format!("    {who}\n"));
-            }
-        },
-    }
-    if let Some(on) = others.get(wanted).filter(|on| !on.is_empty()) {
-        s.push_str("\n  Also named from a namespace this cannot tier, so these set no tier:\n");
-        for who in on {
-            s.push_str(&format!("    {who} ({})\n", namespace_of(who)));
-        }
-    }
-    if let Some(on) = pre.get(wanted).filter(|on| !on.is_empty()) {
-        s.push_str(&format!(
-            "\n  {} established precondition(s), which leave it further from met \
-             rather than nearer:\n",
-            on.len()
-        ));
-        for who in on {
-            s.push_str(&format!("    {who}\n"));
-        }
-    }
-    ToolReport {
-        outcome: Outcome::Clean {
-            examined: 1,
-        },
-        output:  s,
-    }
 }

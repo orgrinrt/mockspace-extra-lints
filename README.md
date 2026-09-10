@@ -129,13 +129,21 @@ contributes nothing rather than needing an arm of its own. Nothing gates on it
 either: a row nothing reaches is unfinished work, not a defect, and gating on a
 count would invent a deadline nobody set.
 
-Two things it does not fold in, both on purpose. A row named from a namespace
+Three things it does not fold in, all on purpose. A row named from a namespace
 whose authority cannot be read is printed under it and sets no tier, since
 tiering it would invent an authority nobody declared and dropping it would say
 nothing names the row when something does. Preconditions are reported beside the
 tiers and never inside them, because a precondition is a dependency somebody
 established, so a row with four of them and no answer is the worst-placed one
-rather than the best-attended.
+rather than the best-attended. And a row carrying `retired` has been struck, in
+whichever namespace it sits, so it sets no tier, a stamp over it does not revive
+it and its preconditions are not counted, while each edge it carried is still
+printed under the row it names, since a corpus keeping a struck row whole is
+keeping it as the record and a row whose only namers were struck is not one
+nobody looked at. A struck ruling's stamp is printed where the tier it withdrew
+would have shown, a struck proposal names any live ruling still stamping it, and
+a demand row carrying `retired` itself is marked as owed nothing rather than
+listed as outstanding.
 
 What belongs here rather than in one repository is the same question a lint
 answers. A check only one repo will ever want stays in that repo. A check
