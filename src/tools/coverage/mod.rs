@@ -94,9 +94,10 @@
 //! stamped names, which is where the tier it withdrew would have shown.
 //!
 //! A retirement of kind `withdrawn` records a strike that was itself wrong, so
-//! the claim it names stands. It closes no route, and a row naming it in
-//! `retired` is read as live, since striking on it would withdraw a claim the
-//! corpus has put back.
+//! the claim it names stands. It closes no route and sets no tier, and it is
+//! still printed under each row it names, so the edge is not silently gone. A
+//! row naming it in `retired` is read as live, since striking on it would
+//! withdraw a claim the corpus has put back.
 //!
 //! A demand row carrying the field is struck itself and owed nothing. It is
 //! still walked and tallied, because what reaches it is a fact about the corpus
@@ -449,6 +450,32 @@ pub fn preconditions(reg: &RegistryView, demand: &str) -> BTreeMap<String, Vec<S
                 if let Some(entry) = out.get_mut(named) {
                     entry.push(q.clone());
                 }
+            }
+        }
+    }
+    out
+}
+
+/// Withdrawn retirements naming each demand row.
+///
+/// Never a tier. A withdrawn retirement's claim stands, so it closes no route,
+/// and it is printed rather than dropped because a report that says nothing
+/// names a row when something does is wrong in the direction a reader cannot
+/// see.
+#[must_use]
+pub fn withdrawn_namers(reg: &RegistryView, demand: &str) -> BTreeMap<String, Vec<String>> {
+    let mut out: BTreeMap<String, Vec<String>> = reg
+        .rows_in(demand)
+        .iter()
+        .map(|q| (slug(q).to_string(), Vec::new()))
+        .collect();
+    for q in reg.rows_in(RETIREMENT) {
+        if struck_by(reg, q).is_some() || !withdrawn(reg, q) {
+            continue;
+        }
+        for named in list(reg, q, demand) {
+            if let Some(entry) = out.get_mut(named) {
+                entry.push(q.clone());
             }
         }
     }

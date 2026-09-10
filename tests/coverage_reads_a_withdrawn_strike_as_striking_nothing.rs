@@ -13,7 +13,15 @@
 mod coverage_harness;
 
 use coverage_harness::{DEMAND, NS, run, tier, unstamped, view};
-use mockspace_extra_lints::tools::coverage::{Reach, struck, struck_demand, tally};
+use mockspace_extra_lints::tools::coverage::{
+    Reach,
+    also_named_by,
+    preconditions,
+    struck,
+    struck_demand,
+    tally,
+    withdrawn_namers,
+};
 use mockspace_lint_rules::RegistryView;
 
 /// The kinds a retirement strikes with.
@@ -86,17 +94,51 @@ fn the_tally_counts_a_row_named_only_by_a_withdrawn_strike_at_nothing() {
 }
 
 #[test]
-fn the_report_over_a_withdrawn_strike_is_the_report_over_one_naming_another_row() {
-    // The field is still carried, so the baseline carries it too: over a bare
-    // registry the report adds that no row carries the demand field at all.
-    let (_, bare) = run(
-        &view(&[DEMAND, ("retirement::a_dead_end", &[("obligation", "another_thing")])]),
-        &[NS],
+fn withdrawn_namers_lists_only_a_withdrawn_retirement() {
+    assert_eq!(
+        withdrawn_namers(&closed_by("withdrawn"), NS)["the_thing"],
+        vec!["retirement::a_dead_end".to_string()]
     );
+    for kind in KINDS_THAT_STRIKE.into_iter().chain(["Withdrawn", ""]) {
+        let v = closed_by(kind);
+        assert!(withdrawn_namers(&v, NS)["the_thing"].is_empty(), "{kind:?}");
+    }
+}
+
+#[test]
+fn the_report_prints_a_withdrawn_retirement_under_its_row_without_a_tier() {
+    // Silence would be wrong in the direction a reader cannot see: the edge
+    // exists, and a report that drops it names the row as named by nothing.
     let (_, out) = run(&closed_by("withdrawn"), &[NS]);
-    assert_eq!(out, bare);
+    assert!(out.contains("  nothing       the_thing\n"), "{out}");
+    assert!(
+        out.contains("retirement::a_dead_end, withdrawn, so it closes no route"),
+        "{out}"
+    );
+    assert!(!out.contains("named only by a retirement"), "{out}");
     let (_, out) = run(&closed_by("superseded"), &[NS]);
-    assert_ne!(out, bare, "the control");
+    assert!(
+        out.contains("  route-closed  the_thing\n"),
+        "the control: {out}"
+    );
+    assert!(!out.contains("closes no route"), "the control: {out}");
+}
+
+#[test]
+fn the_one_row_report_names_a_withdrawn_retirement_apart_from_what_tiers_it() {
+    let (_, out) = run(&closed_by("withdrawn"), &[NS, "the_thing"]);
+    assert!(out.contains("tier: nothing"), "{out}");
+    assert!(out.contains("No live row this can tier names it."), "{out}");
+    assert!(
+        out.contains(
+            "Also named by withdrawn retirements, which close no route:\n    \
+             retirement::a_dead_end\n"
+        ),
+        "{out}"
+    );
+    let (_, out) = run(&closed_by("superseded"), &[NS, "the_thing"]);
+    assert!(out.contains("tier: route-closed"), "the control: {out}");
+    assert!(!out.contains("withdrawn retirements"), "the control: {out}");
 }
 
 // ---------------------------------------------------------------------------
@@ -162,4 +204,80 @@ fn a_demand_row_naming_a_withdrawn_strike_is_not_marked_struck() {
     );
     let v = demand_retired_by("superseded");
     assert_eq!(struck_demand(&v, NS).len(), 1, "the control");
+}
+
+// ---------------------------------------------------------------------------
+// The other readers of `retired`, each through the same function
+// ---------------------------------------------------------------------------
+
+#[test]
+fn a_ruling_naming_a_withdrawn_strike_in_retired_still_stamps() {
+    let stamped_by_a_ruling_retired_by = |kind: &str| {
+        view(&[
+            DEMAND,
+            ("proposal::a_claim", &[("obligation", "the_thing")]),
+            ("ruling::the_stamp", &[
+                ("rung", "ratified"),
+                ("ratifies", "a_claim"),
+                ("retired", "the_strike"),
+            ]),
+            ("retirement::the_strike", &[
+                ("claim", "what it struck"),
+                ("kind", kind),
+            ]),
+        ])
+    };
+    assert_eq!(
+        tier(&stamped_by_a_ruling_retired_by("withdrawn")),
+        Reach::Ratified
+    );
+    assert_eq!(
+        tier(&stamped_by_a_ruling_retired_by("superseded")),
+        Reach::Proposed,
+        "the control"
+    );
+}
+
+#[test]
+fn a_row_from_a_namespace_this_cannot_tier_naming_a_withdrawn_strike_is_listed() {
+    let named_from_elsewhere_retired_by = |kind: &str| {
+        view(&[
+            DEMAND,
+            ("law::a_result", &[
+                ("obligation", "the_thing"),
+                ("retired", "the_strike"),
+            ]),
+            ("retirement::the_strike", &[
+                ("claim", "what it struck"),
+                ("kind", kind),
+            ]),
+        ])
+    };
+    assert_eq!(
+        also_named_by(&named_from_elsewhere_retired_by("withdrawn"), NS)["the_thing"],
+        vec!["law::a_result".to_string()]
+    );
+    let v = named_from_elsewhere_retired_by("superseded");
+    assert!(also_named_by(&v, NS)["the_thing"].is_empty(), "the control");
+}
+
+#[test]
+fn a_precondition_naming_a_withdrawn_strike_in_retired_is_still_established() {
+    let established_retired_by = |kind: &str| {
+        view(&[
+            DEMAND,
+            ("law::a_result", &[
+                ("precondition_for", "the_thing"),
+                ("retired", "the_strike"),
+            ]),
+            ("retirement::the_strike", &[
+                ("claim", "what it struck"),
+                ("kind", kind),
+            ]),
+        ])
+    };
+    let v = established_retired_by("withdrawn");
+    assert_eq!(preconditions(&v, NS)["the_thing"].len(), 1);
+    let v = established_retired_by("superseded");
+    assert!(preconditions(&v, NS)["the_thing"].is_empty(), "the control");
 }
