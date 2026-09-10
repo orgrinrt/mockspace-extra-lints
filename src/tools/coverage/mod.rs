@@ -93,6 +93,11 @@
 //! withdrew. A struck ruling's stamp is printed under each row the proposal it
 //! stamped names, which is where the tier it withdrew would have shown.
 //!
+//! A retirement of kind `withdrawn` records a strike that was itself wrong, so
+//! the claim it names stands. It closes no route, and a row naming it in
+//! `retired` is read as live, since striking on it would withdraw a claim the
+//! corpus has put back.
+//!
 //! A demand row carrying the field is struck itself and owed nothing. It is
 //! still walked and tallied, because what reaches it is a fact about the corpus
 //! either way, and the report marks it so it does not read as outstanding work.
@@ -135,6 +140,12 @@ const PRECONDITION_FOR: &str = "precondition_for";
 
 /// The field a struck row carries, naming the retirement that struck it.
 const RETIRED: &str = "retired";
+
+/// The field a retirement names its kind in.
+const KIND: &str = "kind";
+
+/// The retirement kind whose strike was itself wrong, so its claim stands.
+const WITHDRAWN: &str = "withdrawn";
 
 /// What is printed for a ruling carrying no readable rung.
 ///
@@ -267,11 +278,20 @@ fn list<'a>(reg: &'a RegistryView, q: &str, field: &str) -> Vec<&'a str> {
 /// The retirement a row names as having struck it, where it names one.
 ///
 /// A blank value is read as absent, since a field present and empty has named
-/// nothing and striking on it would withdraw a claim on no one's word.
+/// nothing and striking on it would withdraw a claim on no one's word. So is a
+/// retirement of kind `withdrawn`, whose strike was taken back. A name that
+/// resolves to no row carries no kind and still strikes; whether it resolves
+/// is the schema's report.
 fn struck_by<'a>(reg: &'a RegistryView, q: &str) -> Option<&'a str> {
     reg.field(q, RETIRED)
         .map(str::trim)
         .filter(|r| !r.is_empty())
+        .filter(|r| !withdrawn(reg, &format!("{RETIREMENT}::{r}")))
+}
+
+/// Whether a retirement row is of kind `withdrawn`.
+fn withdrawn(reg: &RegistryView, q: &str) -> bool {
+    reg.field(q, KIND).map(str::trim) == Some(WITHDRAWN)
 }
 
 /// A ruling's rung as written, or `(absent)`.
@@ -338,6 +358,9 @@ pub fn reach(reg: &RegistryView, demand: &str) -> BTreeMap<String, (Reach, Vec<S
         for q in reg.rows_in(ns) {
             if struck_by(reg, q).is_some() {
                 continue; // `struck` names it instead
+            }
+            if edge == Edge::Retirement && withdrawn(reg, q) {
+                continue; // its claim stands, so it closed no route
             }
             let (tier, by) = match edge {
                 Edge::Ruling => {
