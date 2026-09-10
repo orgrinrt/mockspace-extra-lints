@@ -85,23 +85,30 @@
 //! slugs citing it still land somewhere, would otherwise have the tool count
 //! what it withdrew: a struck proposal's edges read as live, and a stamp over
 //! one reads as met. So a struck row sets no tier, stamps nothing and
-//! establishes no precondition, and it is printed under each row it names
-//! rather than dropped, because a row whose only namers were struck and a row
-//! nobody has looked at print the same `nothing`. A stamp does not revive it.
-//! The retirement is the later word about that claim, and reading it as met
-//! would be claiming a row is covered by something the corpus has said must not
-//! be cited again, which is the strong direction and the one this never takes
-//! on a doubt. A corpus spelling the field differently has its struck rows
-//! counted as live, which is the flattering direction, so the field's name is a
-//! fact this states rather than one it searches for.
+//! establishes no precondition, and each edge it carried is printed under the
+//! row it names rather than dropped, because a row whose only namers were
+//! struck and a row nobody has looked at print the same `nothing`. A stamp does
+//! not revive a struck proposal, and the line for one names every live ruling
+//! still stamping it, since that stamp now points at a claim the corpus
+//! withdrew. A struck ruling's stamp is printed under each row the proposal it
+//! stamped names, which is where the tier it withdrew would have shown.
+//!
+//! A demand row carrying the field is struck itself and owed nothing. It is
+//! still walked and tallied, because what reaches it is a fact about the corpus
+//! either way, and the report marks it so it does not read as outstanding work.
+//! A corpus spelling the field differently has its struck rows counted as live,
+//! which is the flattering direction, so the field's name is a fact this states
+//! rather than one it searches for.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use mockspace_lint_rules::RegistryView;
 
 mod report;
+mod struck;
 
 pub use report::{Coverage, anything_carries};
+pub use struck::{StruckEdge, Through, struck, struck_demand};
 
 /// The namespace carrying a rung and a stamp.
 ///
@@ -418,46 +425,6 @@ pub fn preconditions(reg: &RegistryView, demand: &str) -> BTreeMap<String, Vec<S
             for named in list(reg, q, PRECONDITION_FOR) {
                 if let Some(entry) = out.get_mut(named) {
                     entry.push(q.clone());
-                }
-            }
-        }
-    }
-    out
-}
-
-/// Struck rows naming each demand row, and the retirement that struck each.
-///
-/// Never a tier, never a precondition, never counted as coverage. What this
-/// collects is exactly what `reach`, `also_named_by` and `preconditions` would
-/// have read off these rows had they not been struck, which is the demand field
-/// from any namespace but the demand's own and `precondition_for` from every
-/// namespace, so a struck edge lands here and nowhere else and none of them is
-/// dropped. Each line says which field carried the edge, since a struck
-/// precondition and a struck answer are different things withdrawn.
-#[must_use]
-pub fn struck(reg: &RegistryView, demand: &str) -> BTreeMap<String, Vec<String>> {
-    let mut out: BTreeMap<String, Vec<String>> = reg
-        .rows_in(demand)
-        .iter()
-        .map(|q| (slug(q).to_string(), Vec::new()))
-        .collect();
-    let namespaces: Vec<&str> = reg.namespaces().collect();
-    for ns in namespaces {
-        for q in reg.rows_in(ns) {
-            let Some(by) = struck_by(reg, q) else {
-                continue;
-            };
-            let answers = if ns == demand { Vec::new() } else { list(reg, q, demand) };
-            let edges = answers.into_iter().map(|named| (named, demand)).chain(
-                list(reg, q, PRECONDITION_FOR)
-                    .into_iter()
-                    .map(|named| (named, PRECONDITION_FOR)),
-            );
-            for (named, field) in edges {
-                if let Some(entry) = out.get_mut(named) {
-                    entry.push(format!(
-                        "{q}   (through `{field}`, struck by {RETIREMENT}::{by})"
-                    ));
                 }
             }
         }

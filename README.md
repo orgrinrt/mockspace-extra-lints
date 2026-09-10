@@ -137,9 +137,13 @@ tiers and never inside them, because a precondition is a dependency somebody
 established, so a row with four of them and no answer is the worst-placed one
 rather than the best-attended. And a row carrying `retired` has been struck, in
 whichever namespace it sits, so it sets no tier, a stamp over it does not revive
-it and its preconditions are not counted, while it is still printed under every
-row it names, since a corpus keeping a struck row whole is keeping it as the
-record and a row whose only namers were struck is not one nobody looked at.
+it and its preconditions are not counted, while each edge it carried is still
+printed under the row it names, since a corpus keeping a struck row whole is
+keeping it as the record and a row whose only namers were struck is not one
+nobody looked at. A struck ruling's stamp is printed where the tier it withdrew
+would have shown, a struck proposal names any live ruling still stamping it, and
+a demand row carrying `retired` itself is marked as owed nothing rather than
+listed as outstanding.
 
 What belongs here rather than in one repository is the same question a lint
 answers. A check only one repo will ever want stays in that repo. A check

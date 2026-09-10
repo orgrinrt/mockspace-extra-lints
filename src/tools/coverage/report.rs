@@ -5,14 +5,29 @@
 
 //! What the tool prints, over what the walk in the parent module found.
 //!
-//! The walk decides tiers and the report decides nothing, so it is kept apart:
-//! every line here reads a map the walk returned and none of them reads a row
-//! the walk did not.
+//! The walk decides tiers and the report decides nothing, so it is kept apart.
+//! Every tier and every edge printed here comes out of a map the walk returned.
+//! The report reads the registry itself for two things only: whether any row
+//! carries the demand field at all, and a row's own prose fields when that one
+//! row is printed in full.
 
 use mockspace_lint_rules::RegistryView;
 use mockspace_lint_rules::tool::{ArgSpec, NotALint, Outcome, Tool, ToolContext, ToolReport};
 
-use super::{Reach, TIERS, also_named_by, namespace_of, preconditions, reach, struck, tally};
+use super::{
+    RETIRED,
+    RETIREMENT,
+    Reach,
+    TIERS,
+    Through,
+    also_named_by,
+    namespace_of,
+    preconditions,
+    reach,
+    struck,
+    struck_demand,
+    tally,
+};
 
 /// Whether any row anywhere carries the field naming this namespace.
 ///
@@ -93,9 +108,13 @@ impl Tool for Coverage {
          four of them and no answer is the worst-placed one here rather than the \
          best-attended.\n\n\
          A row carrying `retired` has been struck. It sets no tier, stamps \
-         nothing and establishes no precondition, and it is printed under each \
-         row it names, so a row whose only namers were struck does not read as \
-         one nobody has looked at.\n\n\
+         nothing and establishes no precondition, and each edge it carried is \
+         printed under the row it names, so a row whose only namers were struck \
+         does not read as one nobody has looked at. A struck ruling's stamp is \
+         printed under each row the proposal it stamped names, and a struck \
+         proposal's line names any live ruling still stamping it. A demand row \
+         carrying `retired` itself is marked as owed nothing, and is still \
+         tallied at the tier its edges reach.\n\n\
          Nothing here fails. An unanswered row is the state of unfinished work \
          rather than a defect, and gating on a count would invent a deadline \
          nobody set."
@@ -131,6 +150,7 @@ fn all(reg: &RegistryView, demand: &str, _rows: &[String]) -> ToolReport {
     let others = also_named_by(reg, demand);
     let pre = preconditions(reg, demand);
     let gone = struck(reg, demand);
+    let owed_nothing = struck_demand(reg, demand);
     let counts = tally(reg, demand);
     let total = reached.len();
 
@@ -156,24 +176,27 @@ fn all(reg: &RegistryView, demand: &str, _rows: &[String]) -> ToolReport {
     ordered.sort_by(|a, b| b.1.0.cmp(&a.1.0).then_with(|| a.0.cmp(b.0)));
     for (id, (tier, by)) in ordered {
         let deps = pre.get(id).map_or(0, Vec::len);
-        let mark = match deps {
+        let mut mark = match deps {
             0 => String::new(),
             1 => "   (1 precondition against it)".to_string(),
             n => format!("   ({n} preconditions against it)"),
         };
+        if let Some(r) = owed_nothing.get(id) {
+            mark.push_str(&format!(
+                "   (struck by {RETIREMENT}::{r}, so it is owed nothing)"
+            ));
+        }
         s.push_str(&format!("  {:<13} {id}{mark}\n", tier.word()));
         for who in by {
             s.push_str(&format!("                  {who}\n"));
         }
         for who in others.get(id).map(Vec::as_slice).unwrap_or(&[]) {
             s.push_str(&format!(
-                "                  {who}, from a namespace this cannot tier, so it sets none\n"
+                "                  {who}, from a namespace this cannot tier, so it sets no tier\n"
             ));
         }
-        for who in gone.get(id).map(Vec::as_slice).unwrap_or(&[]) {
-            s.push_str(&format!(
-                "                  {who}, struck, so it sets none\n"
-            ));
+        for edge in gone.get(id).map(Vec::as_slice).unwrap_or(&[]) {
+            s.push_str(&format!("                  {}\n", edge.line(demand)));
         }
     }
 
@@ -191,18 +214,37 @@ fn all(reg: &RegistryView, demand: &str, _rows: &[String]) -> ToolReport {
         ));
     }
 
+    // An answer withdrawn, and never a precondition or a stamp: a struck
+    // precondition was a dependency rather than something that reached the row,
+    // and a withdrawn stamp leaves its proposal reaching the row still.
     let withdrawn: Vec<&String> = reached
         .iter()
         .filter(|(_, (tier, _))| *tier == Reach::Nothing)
-        .filter(|(id, _)| gone.get(*id).is_some_and(|on| !on.is_empty()))
+        .filter(|(id, _)| !owed_nothing.contains_key(*id))
+        .filter(|(id, _)| {
+            gone.get(*id).is_some_and(|on| {
+                on.iter()
+                    .any(|e| matches!(e.through, Through::Answer { .. }))
+            })
+        })
         .map(|(id, _)| id)
         .collect();
     if !withdrawn.is_empty() {
         s.push_str(&format!(
-            "\n{} row(s) reach nothing and were named by rows since struck: {withdrawn:?}. \
+            "\n{} row(s) reach nothing and were answered by rows since struck: {withdrawn:?}. \
              What reached each was withdrawn rather than never written, and a flat list \
              reads the two identically.\n",
             withdrawn.len()
+        ));
+    }
+
+    if !owed_nothing.is_empty() {
+        let rows: Vec<&String> = owed_nothing.keys().collect();
+        s.push_str(&format!(
+            "\n{} `{demand}` row(s) carry `{RETIRED}` themselves: {rows:?}. Each is struck \
+             and owed nothing, is marked so above, and is still tallied at the tier its \
+             edges reach, since what reaches a row is a fact about the corpus either way.\n",
+            rows.len()
         ));
     }
 
@@ -218,6 +260,7 @@ fn all(reg: &RegistryView, demand: &str, _rows: &[String]) -> ToolReport {
     let stuck: Vec<&String> = reached
         .iter()
         .filter(|(_, (tier, _))| !tier.answered())
+        .filter(|(id, _)| !owed_nothing.contains_key(*id))
         .filter(|(id, _)| pre.get(*id).is_some_and(|on| !on.is_empty()))
         .map(|(id, _)| id)
         .collect();
@@ -250,6 +293,11 @@ fn one(reg: &RegistryView, demand: &str, _rows: &[String], wanted: &str) -> Tool
     let pre = preconditions(reg, demand);
     let others = also_named_by(reg, demand);
     let mut s = format!("{wanted}\n\n  tier: {}\n", tier.word());
+    if let Some(r) = struck_demand(reg, demand).get(wanted) {
+        s.push_str(&format!(
+            "  struck by {RETIREMENT}::{r}, so it is owed nothing\n"
+        ));
+    }
     let q = format!("{demand}::{wanted}");
     // Written as a filter rather than a let-chain: this pack is edition 2021
     // and the corpus it was ported from is 2024.
@@ -264,7 +312,7 @@ fn one(reg: &RegistryView, demand: &str, _rows: &[String], wanted: &str) -> Tool
     }
     s.push('\n');
     match by.len() {
-        0 => s.push_str("  Nothing names it.\n"),
+        0 => s.push_str("  No live row this can tier names it.\n"),
         _ => {
             s.push_str("  Named by:\n");
             for who in by {
@@ -282,9 +330,9 @@ fn one(reg: &RegistryView, demand: &str, _rows: &[String], wanted: &str) -> Tool
         .remove(wanted)
         .filter(|on| !on.is_empty())
     {
-        s.push_str("\n  Also named by rows since struck, so these set no tier:\n");
-        for who in on {
-            s.push_str(&format!("    {who}\n"));
+        s.push_str("\n  Also named by rows since struck:\n");
+        for edge in on {
+            s.push_str(&format!("    {}\n", edge.line(demand)));
         }
     }
     if let Some(on) = pre.get(wanted).filter(|on| !on.is_empty()) {

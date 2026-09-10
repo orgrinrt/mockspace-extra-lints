@@ -22,8 +22,9 @@
 //! Both corpora are planted here rather than read off disk, so the arms say what
 //! the shapes are and do not move when either repository does.
 
-use std::collections::BTreeMap;
+mod coverage_harness;
 
+use coverage_harness::{DEMAND, NS, run, tier, unstamped, view};
 use mockspace_extra_lints::tools::coverage::{
     Coverage,
     Reach,
@@ -32,71 +33,14 @@ use mockspace_extra_lints::tools::coverage::{
     preconditions,
     reach,
     stamps,
-    struck,
     tally,
 };
 use mockspace_lint_rules::RegistryView;
-use mockspace_lint_rules::tool::{NotALint, Outcome, Tool, ToolContext};
+use mockspace_lint_rules::tool::{NotALint, Outcome, Tool};
 
 // ---------------------------------------------------------------------------
-// The harness
+// The fixtures this file plants beside the shared ones
 // ---------------------------------------------------------------------------
-
-/// A registry with the rows a test names.
-///
-/// The reverse edges are passed empty throughout, and deliberately: nothing here
-/// reads `referrers`. Every edge this tool walks is a forward one it reads off
-/// the row itself, which is what lets it tell an edge from a ruling apart from
-/// an edge from a retirement. The engine's reverse index knows a row is
-/// referenced and does not know through which field, and the field is the whole
-/// of what decides a tier.
-fn view(rows: &[(&str, &[(&str, &str)])]) -> RegistryView {
-    let mut r: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
-    for (q, fields) in rows {
-        r.insert(
-            (*q).to_string(),
-            fields
-                .iter()
-                .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
-                .collect(),
-        );
-    }
-    RegistryView::new(r, BTreeMap::new())
-}
-
-fn run(v: &RegistryView, args: &[&str]) -> (Outcome, String) {
-    let crates = Default::default();
-    let dirs: Vec<std::path::PathBuf> = Vec::new();
-    let ctx = ToolContext {
-        mock_dir: std::path::Path::new("."),
-        repo_root: std::path::Path::new("."),
-        all_crates: &crates,
-        src_dirs: &dirs,
-        args,
-        stdin: None,
-        registry: v,
-    };
-    let rep = Coverage.run(&ctx);
-    // An inconclusive verdict carries its reason on the outcome and leaves
-    // `output` empty, so a test reading `output` alone cannot tell a refusal
-    // from a silent pass.
-    let text = match &rep.outcome {
-        Outcome::Inconclusive {
-            reason,
-        } => reason.clone(),
-        _ => rep.output.clone(),
-    };
-    (rep.outcome, text)
-}
-
-/// The demand namespace the fixtures below use.
-///
-/// One of the two real spellings rather than an invented one, so the arms read
-/// against a shape that exists. The parallel arms further down plant the other.
-const NS: &str = "obligation";
-
-/// The one demand row every fixture below is about.
-const DEMAND: (&str, &[(&str, &str)]) = ("obligation::the_thing", &[("what", "a demand")]);
 
 /// That row and nothing reaching it.
 fn alone() -> RegistryView {
@@ -129,19 +73,9 @@ fn stamped_by(rung: &str) -> RegistryView {
     ])
 }
 
-/// A proposal naming the demand row with nothing stamping it.
-fn unstamped() -> RegistryView {
-    view(&[DEMAND, ("proposal::a_claim", &[("obligation", "the_thing")])])
-}
-
 /// A retirement naming the demand row and nothing else doing so.
 fn retired() -> RegistryView {
     view(&[DEMAND, ("retirement::a_dead_end", &[("obligation", "the_thing")])])
-}
-
-/// The tier the fixtures above put `the_thing` at.
-fn tier(v: &RegistryView) -> Reach {
-    reach(v, NS)["the_thing"].0
 }
 
 // ---------------------------------------------------------------------------
@@ -526,318 +460,6 @@ fn a_retirement_is_a_closed_route_and_not_an_answer() {
     assert_eq!(tier(&retired()), Reach::RouteClosed);
 }
 
-// ---------------------------------------------------------------------------
-// A struck row, kept whole as the record and bearing on nothing
-// ---------------------------------------------------------------------------
-
-/// A proposal naming the demand row, carrying `retired` with the value given.
-fn struck_proposal(by: &str) -> RegistryView {
-    view(&[
-        DEMAND,
-        ("proposal::a_claim", &[
-            ("obligation", "the_thing"),
-            ("retired", by),
-        ]),
-    ])
-}
-
-/// Every edge naming `the_thing` that the live side of the walk reads.
-///
-/// The three functions a struck row is kept out of, summed, which is what the
-/// struck side has to account for edge for edge.
-fn live_edges(v: &RegistryView) -> usize {
-    reach(v, NS)["the_thing"].1.len()
-        + also_named_by(v, NS)["the_thing"].len()
-        + preconditions(v, NS)["the_thing"].len()
-}
-
-#[test]
-fn a_struck_proposal_sets_no_tier() {
-    assert_eq!(tier(&struck_proposal("a_strike")), Reach::Nothing);
-    // The control: the same proposal without the field is where it was.
-    assert_eq!(tier(&unstamped()), Reach::Proposed);
-}
-
-#[test]
-fn a_struck_proposal_is_named_under_the_row_rather_than_dropped() {
-    let v = struck_proposal("a_strike");
-    let on = &struck(&v, NS)["the_thing"];
-    assert_eq!(on.len(), 1);
-    assert!(on[0].starts_with("proposal::a_claim"), "{on:?}");
-    assert!(on[0].contains("`obligation`"), "the field is named: {on:?}");
-    assert!(
-        on[0].contains("retirement::a_strike"),
-        "the retirement is named: {on:?}"
-    );
-    assert!(reach(&v, NS)["the_thing"].1.is_empty());
-}
-
-#[test]
-fn control_a_live_proposal_is_struck_by_nothing() {
-    assert!(struck(&unstamped(), NS)["the_thing"].is_empty());
-}
-
-#[test]
-fn a_retired_field_present_and_blank_strikes_nothing() {
-    for blank in ["", "   "] {
-        let v = struck_proposal(blank);
-        assert_eq!(tier(&v), Reach::Proposed, "`{blank}` read as a strike");
-        assert!(struck(&v, NS)["the_thing"].is_empty());
-    }
-}
-
-#[test]
-fn a_stamp_does_not_revive_a_struck_proposal() {
-    // The retirement is the later word about the claim. Reading it as met on
-    // the stamp's strength is the strong direction, taken on a doubt.
-    let stamped = |retired: &'static str| {
-        view(&[
-            DEMAND,
-            ("ruling::he_said_so", &[
-                ("rung", "ratified"),
-                ("ratifies", "a_claim"),
-            ]),
-            ("proposal::a_claim", &[
-                ("obligation", "the_thing"),
-                ("retired", retired),
-            ]),
-        ])
-    };
-    let v = stamped("a_strike");
-    assert_eq!(tier(&v), Reach::Nothing);
-    assert_eq!(struck(&v, NS)["the_thing"].len(), 1);
-    // The control: blank, the stamp governs as it always did.
-    assert_eq!(tier(&stamped("")), Reach::Ratified);
-}
-
-#[test]
-fn a_struck_ruling_stamps_nothing() {
-    let v = |retired: &'static str| {
-        view(&[
-            DEMAND,
-            ("ruling::he_said_so", &[
-                ("rung", "ratified"),
-                ("ratifies", "a_claim"),
-                ("retired", retired),
-            ]),
-            ("proposal::a_claim", &[("obligation", "the_thing")]),
-        ])
-    };
-    assert!(stamps(&v("a_strike")).is_empty());
-    assert_eq!(tier(&v("a_strike")), Reach::Proposed, "unstamped, not met");
-    assert_eq!(tier(&v("")), Reach::Ratified, "the control");
-}
-
-#[test]
-fn a_struck_rows_precondition_establishes_none() {
-    let v = |retired: &'static str| {
-        view(&[
-            DEMAND,
-            ("proposal::a_result", &[
-                ("precondition_for", "the_thing"),
-                ("retired", retired),
-            ]),
-        ])
-    };
-    let gone = v("a_strike");
-    assert!(preconditions(&gone, NS)["the_thing"].is_empty());
-    let on = &struck(&gone, NS)["the_thing"];
-    assert_eq!(on.len(), 1);
-    assert!(on[0].contains("`precondition_for`"), "{on:?}");
-    assert_eq!(
-        preconditions(&v(""), NS)["the_thing"].len(),
-        1,
-        "the control"
-    );
-}
-
-#[test]
-fn a_struck_precondition_does_not_put_a_row_on_the_stuck_list() {
-    let v = view(&[
-        DEMAND,
-        ("proposal::a_result", &[
-            ("precondition_for", "the_thing"),
-            ("retired", "a_strike"),
-        ]),
-    ]);
-    let (_, out) = run(&v, &[NS]);
-    assert!(
-        !out.contains("carry an established precondition"),
-        "a struck precondition read as established:\n{out}"
-    );
-}
-
-#[test]
-fn a_row_is_struck_whatever_namespace_it_sits_in() {
-    // Each case: the row, the tier it sets live, and whether it is named from a
-    // namespace this cannot tier. Struck, every one of them sets nothing and is
-    // named in exactly one place.
-    type Case = (
-        &'static str,
-        &'static [(&'static str, &'static str)],
-        Reach,
-        usize,
-    );
-    let cases: [Case; 3] = [
-        (
-            "ruling::he_said_so",
-            &[("rung", "ratified"), ("obligation", "the_thing")],
-            Reach::Ratified,
-            0,
-        ),
-        (
-            "retirement::a_dead_end",
-            &[("obligation", "the_thing")],
-            Reach::RouteClosed,
-            0,
-        ),
-        (
-            "law::a_result",
-            &[("obligation", "the_thing")],
-            Reach::Nothing,
-            1,
-        ),
-    ];
-    for (q, fields, live, others) in cases {
-        let live_v = view(&[DEMAND, (q, fields)]);
-        assert_eq!(tier(&live_v), live, "`{q}` live");
-        assert_eq!(also_named_by(&live_v, NS)["the_thing"].len(), others);
-
-        let mut with: Vec<(&str, &str)> = fields.to_vec();
-        with.push(("retired", "a_strike"));
-        let gone = view(&[DEMAND, (q, with.as_slice())]);
-        assert_eq!(tier(&gone), Reach::Nothing, "`{q}` struck still tiers");
-        assert!(also_named_by(&gone, NS)["the_thing"].is_empty(), "`{q}`");
-        assert_eq!(struck(&gone, NS)["the_thing"].len(), 1, "`{q}`");
-    }
-}
-
-#[test]
-fn a_struck_row_does_not_lower_what_a_live_one_reached() {
-    let v = view(&[
-        DEMAND,
-        ("ruling::he_said_so", &[
-            ("rung", "stated"),
-            ("obligation", "the_thing"),
-        ]),
-        ("proposal::a_claim", &[
-            ("obligation", "the_thing"),
-            ("retired", "a_strike"),
-        ]),
-    ]);
-    let r = reach(&v, NS);
-    assert_eq!(r["the_thing"].0, Reach::Stated);
-    assert_eq!(
-        r["the_thing"].1.len(),
-        1,
-        "only the live ruling got it there"
-    );
-    assert_eq!(struck(&v, NS)["the_thing"].len(), 1);
-}
-
-#[test]
-fn a_struck_row_naming_through_both_fields_is_listed_once_per_field() {
-    let v = view(&[
-        DEMAND,
-        ("proposal::a_claim", &[
-            ("obligation", "the_thing"),
-            ("precondition_for", "the_thing"),
-            ("retired", "a_strike"),
-        ]),
-    ]);
-    let on = &struck(&v, NS)["the_thing"];
-    assert_eq!(on.len(), 2, "{on:?}");
-    assert!(on.iter().any(|l| l.contains("`obligation`")), "{on:?}");
-    assert!(
-        on.iter().any(|l| l.contains("`precondition_for`")),
-        "{on:?}"
-    );
-}
-
-#[test]
-fn striking_moves_every_edge_the_live_walk_reads_and_no_other() {
-    // The accounting claim `struck` makes about itself: what it collects is
-    // exactly what the three live functions would have read. Planted over every
-    // shape of edge those read, including the two they deliberately do not: a
-    // demand row's own demand field, which nothing reads, and its
-    // `precondition_for`, which `preconditions` does.
-    let rows: [(&str, &[(&str, &str)]); 6] = [
-        ("ruling::he_said_so", &[
-            ("rung", "in_force"),
-            ("obligation", "the_thing"),
-        ]),
-        ("proposal::a_claim", &[
-            ("obligation", "the_thing"),
-            ("precondition_for", "the_thing"),
-        ]),
-        ("retirement::a_dead_end", &[("obligation", "the_thing")]),
-        ("law::a_result", &[
-            ("obligation", "the_thing"),
-            ("precondition_for", "the_thing"),
-        ]),
-        ("obligation::other", &[
-            ("obligation", "the_thing"),
-            ("precondition_for", "the_thing"),
-        ]),
-        ("probe::an_instrument", &[("what", "names nothing")]),
-    ];
-    for (q, fields) in rows {
-        let live_v = view(&[DEMAND, (q, fields)]);
-        let mut with: Vec<(&str, &str)> = fields.to_vec();
-        with.push(("retired", "a_strike"));
-        let gone = view(&[DEMAND, (q, with.as_slice())]);
-        assert_eq!(
-            struck(&gone, NS)["the_thing"].len(),
-            live_edges(&live_v),
-            "`{q}`: struck and live disagree on how many edges it carries"
-        );
-        assert_eq!(live_edges(&gone), 0, "`{q}` struck is still read as live");
-    }
-}
-
-#[test]
-fn the_report_names_a_struck_row_and_says_it_sets_none() {
-    let (_, out) = run(&struck_proposal("a_strike"), &[NS]);
-    assert!(out.contains("struck, so it sets none"), "{out}");
-    assert!(
-        out.contains("were named by rows since struck"),
-        "the withdrawn summary is missing:\n{out}"
-    );
-    let (_, one) = run(&struck_proposal("a_strike"), &[NS, "the_thing"]);
-    assert!(one.contains("Also named by rows since struck"), "{one}");
-    assert!(one.contains("retirement::a_strike"), "{one}");
-}
-
-#[test]
-fn control_the_report_over_a_live_proposal_mentions_no_strike() {
-    let (_, out) = run(&unstamped(), &[NS]);
-    assert!(!out.contains("struck"), "{out}");
-    let (_, one) = run(&unstamped(), &[NS, "the_thing"]);
-    assert!(!one.contains("struck"), "{one}");
-}
-
-#[test]
-fn a_row_named_by_a_struck_row_and_a_live_one_is_not_in_the_withdrawn_summary() {
-    let v = view(&[
-        DEMAND,
-        ("proposal::live", &[("obligation", "the_thing")]),
-        ("proposal::a_claim", &[
-            ("obligation", "the_thing"),
-            ("retired", "a_strike"),
-        ]),
-    ]);
-    let (_, out) = run(&v, &[NS]);
-    assert!(out.contains("struck, so it sets none"), "{out}");
-    assert!(!out.contains("were named by rows since struck"), "{out}");
-}
-
-#[test]
-fn the_tally_counts_a_row_named_only_by_a_struck_row_at_nothing() {
-    let t = tally(&struck_proposal("a_strike"), NS);
-    assert_eq!(t["nothing"], 1);
-    assert_eq!(t["proposed"], 0);
-}
-
 #[test]
 fn a_row_nothing_names_reaches_nothing() {
     let v = alone();
@@ -913,60 +535,6 @@ fn the_strongest_edge_decides_the_tier_whichever_order_the_walk_takes() {
             }
         }
     }
-}
-
-#[test]
-fn control_the_pairs_that_walk_the_stronger_row_first_are_the_ones_that_bite() {
-    // The arm above asserts over thirty views and only some of them can catch a
-    // last-edge implementation. This names which, so nobody reads the table as
-    // thirty load-bearing rows: a pair bites where the walk reaches the stronger
-    // edge first, and then a walk that overwrote would end on the weaker one.
-    //
-    // Fifteen pairs, each planted twice, and twenty-two of the thirty bite. Six
-    // pairs are ruling against ruling and bite in the one arrangement that sorts
-    // the stronger slug first. Nine reach across namespaces with the stronger
-    // one earlier in the edge table, so those bite in both arrangements and the
-    // swap buys nothing. The last three are a proposal against a ruling at a
-    // rung that settles nothing, where the weaker row walks first whatever it is
-    // called, so the pair asserts the right answer and catches nothing.
-    let mut bites = 0;
-    for (i, (_, strong_ns, strong_fields)) in LADDER.iter().enumerate() {
-        for (_, weak_ns, weak_fields) in LADDER.iter().skip(i + 1) {
-            for (strong_slug, weak_slug) in [("a_first", "b_second"), ("b_second", "a_first")] {
-                let s = format!("{strong_ns}::{strong_slug}");
-                let w = format!("{weak_ns}::{weak_slug}");
-                let v = view(&[DEMAND, (&s, strong_fields), (&w, weak_fields)]);
-                // What a walk that took the last edge would report, derived the
-                // same way the walk derives it: namespace order first, slug
-                // order inside one namespace.
-                let ns_rank = |ns: &str| {
-                    match ns {
-                        "ruling" => 0,
-                        "proposal" => 1,
-                        _ => 2,
-                    }
-                };
-                let strong_last = (ns_rank(strong_ns), strong_slug) > (ns_rank(weak_ns), weak_slug);
-                if !strong_last {
-                    bites += 1;
-                }
-                assert!(
-                    reach(&v, NS)["the_thing"].1.len() == 2,
-                    "the derivation above is about order and both rows are named either way"
-                );
-            }
-        }
-    }
-    assert!(
-        bites > 0,
-        "a table where no arrangement reaches the stronger edge first would assert nothing"
-    );
-    assert_eq!(
-        bites, 22,
-        "six ruling pairs bite once each, nine cross-namespace pairs bite twice, \
-         and the three where a ruling at a settling-nothing rung walks before a \
-         proposal never do"
-    );
 }
 
 #[test]
