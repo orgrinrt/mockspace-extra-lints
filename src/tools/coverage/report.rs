@@ -103,10 +103,10 @@ impl Tool for Coverage {
          A row named from a namespace whose authority cannot be read is printed \
          under it and sets no tier, because tiering it would invent an authority \
          nobody declared. Preconditions are reported beside the tiers and never \
-         folded into them: a precondition is a dependency somebody established, \
-         so it leaves a row further from met rather than nearer, and a row with \
-         four of them and no answer is the worst-placed one here rather than the \
-         best-attended.\n\n\
+         folded into them: a precondition names something a row cannot be met \
+         without, and the field does not say whether that is an obstacle still \
+         standing or a dependency already in place, so it moves no row nearer met \
+         and a row with four of them and no answer is still answered by nothing.\n\n\
          A row carrying `retired` has been struck. It sets no tier, stamps \
          nothing and establishes no precondition, and each edge it carried is \
          printed under the row it names, so a row whose only namers were struck \
@@ -267,8 +267,9 @@ fn all(reg: &RegistryView, demand: &str, _rows: &[String]) -> ToolReport {
     if !stuck.is_empty() {
         s.push_str(&format!(
             "\n{} row(s) are answered by nothing and carry an established precondition: \
-             {stuck:?}. Each is further from met than a row nobody has looked at, rather \
-             than nearer.\n",
+             {stuck:?}. Each has something established about what it cannot be met \
+             without and nothing that meets it, and the field does not say whether what \
+             it depends on is in place.\n",
             stuck.len()
         ));
     }
@@ -337,8 +338,8 @@ fn one(reg: &RegistryView, demand: &str, _rows: &[String], wanted: &str) -> Tool
     }
     if let Some(on) = pre.get(wanted).filter(|on| !on.is_empty()) {
         s.push_str(&format!(
-            "\n  {} established precondition(s), which leave it further from met \
-             rather than nearer:\n",
+            "\n  {} established precondition(s), which say what it cannot be met \
+             without and count nothing toward meeting it:\n",
             on.len()
         ));
         for who in on {
