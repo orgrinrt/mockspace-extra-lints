@@ -79,6 +79,21 @@
 //! list of them. A fixed list is a fact about one corpus, and the field is its
 //! own evidence: a row carrying `precondition_for` is establishing one whatever
 //! namespace it sits in.
+//!
+//! A row carrying `retired` has been struck, and it is read the same way, from
+//! whatever namespace it sits in. A corpus that keeps a struck row whole, so the
+//! slugs citing it still land somewhere, would otherwise have the tool count
+//! what it withdrew: a struck proposal's edges read as live, and a stamp over
+//! one reads as met. So a struck row sets no tier, stamps nothing and
+//! establishes no precondition, and it is printed under each row it names
+//! rather than dropped, because a row whose only namers were struck and a row
+//! nobody has looked at print the same `nothing`. A stamp does not revive it.
+//! The retirement is the later word about that claim, and reading it as met
+//! would be claiming a row is covered by something the corpus has said must not
+//! be cited again, which is the strong direction and the one this never takes
+//! on a doubt. A corpus spelling the field differently has its struck rows
+//! counted as live, which is the flattering direction, so the field's name is a
+//! fact this states rather than one it searches for.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -107,6 +122,9 @@ const RATIFIES: &str = "ratifies";
 
 /// The field a row establishing a precondition carries.
 const PRECONDITION_FOR: &str = "precondition_for";
+
+/// The field a struck row carries, naming the retirement that struck it.
+const RETIRED: &str = "retired";
 
 /// What is printed for a ruling carrying no readable rung.
 ///
@@ -236,6 +254,16 @@ fn list<'a>(reg: &'a RegistryView, q: &str, field: &str) -> Vec<&'a str> {
         .unwrap_or_default()
 }
 
+/// The retirement a row names as having struck it, where it names one.
+///
+/// A blank value is read as absent, since a field present and empty has named
+/// nothing and striking on it would withdraw a claim on no one's word.
+fn struck_by<'a>(reg: &'a RegistryView, q: &str) -> Option<&'a str> {
+    reg.field(q, RETIRED)
+        .map(str::trim)
+        .filter(|r| !r.is_empty())
+}
+
 /// A ruling's rung as written, or `(absent)`.
 fn rung<'a>(reg: &'a RegistryView, q: &str) -> &'a str {
     reg.field(q, "rung")
@@ -272,7 +300,7 @@ fn tier_of_rung(r: &str) -> Reach {
 pub fn stamps(reg: &RegistryView) -> BTreeMap<String, Vec<String>> {
     let mut out: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for q in reg.rows_in(RULING) {
-        if rung(reg, q) != RATIFIED {
+        if rung(reg, q) != RATIFIED || struck_by(reg, q).is_some() {
             continue;
         }
         for named in list(reg, q, RATIFIES) {
@@ -319,6 +347,9 @@ pub fn reach(reg: &RegistryView, demand: &str) -> BTreeMap<String, (Reach, Vec<S
 
     for (ns, edge) in EDGES {
         for q in reg.rows_in(ns) {
+            if struck_by(reg, q).is_some() {
+                continue; // `struck` names it instead
+            }
             let (tier, by) = match edge {
                 Edge::Ruling => {
                     let r = rung(reg, q);
@@ -371,6 +402,9 @@ pub fn also_named_by(reg: &RegistryView, demand: &str) -> BTreeMap<String, Vec<S
             continue;
         }
         for q in reg.rows_in(ns) {
+            if struck_by(reg, q).is_some() {
+                continue; // `struck` names it instead
+            }
             for named in list(reg, q, demand) {
                 if let Some(entry) = out.get_mut(named) {
                     entry.push(q.clone());
@@ -396,9 +430,52 @@ pub fn preconditions(reg: &RegistryView, demand: &str) -> BTreeMap<String, Vec<S
     let namespaces: Vec<&str> = reg.namespaces().collect();
     for ns in namespaces {
         for q in reg.rows_in(ns) {
+            if struck_by(reg, q).is_some() {
+                continue; // `struck` names it instead
+            }
             for named in list(reg, q, PRECONDITION_FOR) {
                 if let Some(entry) = out.get_mut(named) {
                     entry.push(q.clone());
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Struck rows naming each demand row, and the retirement that struck each.
+///
+/// Never a tier, never a precondition, never counted as coverage. What this
+/// collects is exactly what `reach`, `also_named_by` and `preconditions` would
+/// have read off these rows had they not been struck, which is the demand field
+/// from any namespace but the demand's own and `precondition_for` from every
+/// namespace, so a struck edge lands here and nowhere else and none of them is
+/// dropped. Each line says which field carried the edge, since a struck
+/// precondition and a struck answer are different things withdrawn.
+#[must_use]
+pub fn struck(reg: &RegistryView, demand: &str) -> BTreeMap<String, Vec<String>> {
+    let mut out: BTreeMap<String, Vec<String>> = reg
+        .rows_in(demand)
+        .iter()
+        .map(|q| (slug(q).to_string(), Vec::new()))
+        .collect();
+    let namespaces: Vec<&str> = reg.namespaces().collect();
+    for ns in namespaces {
+        for q in reg.rows_in(ns) {
+            let Some(by) = struck_by(reg, q) else {
+                continue;
+            };
+            let answers = if ns == demand { Vec::new() } else { list(reg, q, demand) };
+            let edges = answers.into_iter().map(|named| (named, demand)).chain(
+                list(reg, q, PRECONDITION_FOR)
+                    .into_iter()
+                    .map(|named| (named, PRECONDITION_FOR)),
+            );
+            for (named, field) in edges {
+                if let Some(entry) = out.get_mut(named) {
+                    entry.push(format!(
+                        "{q}   (through `{field}`, struck by {RETIREMENT}::{by})"
+                    ));
                 }
             }
         }
@@ -476,6 +553,10 @@ impl Tool for Coverage {
          so it leaves a row further from met rather than nearer, and a row with \
          four of them and no answer is the worst-placed one here rather than the \
          best-attended.\n\n\
+         A row carrying `retired` has been struck. It sets no tier, stamps \
+         nothing and establishes no precondition, and it is printed under each \
+         row it names, so a row whose only namers were struck does not read as \
+         one nobody has looked at.\n\n\
          Nothing here fails. An unanswered row is the state of unfinished work \
          rather than a defect, and gating on a count would invent a deadline \
          nobody set."
@@ -510,6 +591,7 @@ fn all(reg: &RegistryView, demand: &str, _rows: &[String]) -> ToolReport {
     let reached = reach(reg, demand);
     let others = also_named_by(reg, demand);
     let pre = preconditions(reg, demand);
+    let gone = struck(reg, demand);
     let counts = tally(reg, demand);
     let total = reached.len();
 
@@ -549,6 +631,11 @@ fn all(reg: &RegistryView, demand: &str, _rows: &[String]) -> ToolReport {
                 "                  {who}, from a namespace this cannot tier, so it sets none\n"
             ));
         }
+        for who in gone.get(id).map(Vec::as_slice).unwrap_or(&[]) {
+            s.push_str(&format!(
+                "                  {who}, struck, so it sets none\n"
+            ));
+        }
     }
 
     let closed: Vec<&String> = reached
@@ -562,6 +649,21 @@ fn all(reg: &RegistryView, demand: &str, _rows: &[String]) -> ToolReport {
              one way to it is known not to work, which is not the same as nobody having \
              looked, and reads identically on a flat list.\n",
             closed.len()
+        ));
+    }
+
+    let withdrawn: Vec<&String> = reached
+        .iter()
+        .filter(|(_, (tier, _))| *tier == Reach::Nothing)
+        .filter(|(id, _)| gone.get(*id).is_some_and(|on| !on.is_empty()))
+        .map(|(id, _)| id)
+        .collect();
+    if !withdrawn.is_empty() {
+        s.push_str(&format!(
+            "\n{} row(s) reach nothing and were named by rows since struck: {withdrawn:?}. \
+             What reached each was withdrawn rather than never written, and a flat list \
+             reads the two identically.\n",
+            withdrawn.len()
         ));
     }
 
@@ -635,6 +737,15 @@ fn one(reg: &RegistryView, demand: &str, _rows: &[String], wanted: &str) -> Tool
         s.push_str("\n  Also named from a namespace this cannot tier, so these set no tier:\n");
         for who in on {
             s.push_str(&format!("    {who} ({})\n", namespace_of(who)));
+        }
+    }
+    if let Some(on) = struck(reg, demand)
+        .remove(wanted)
+        .filter(|on| !on.is_empty())
+    {
+        s.push_str("\n  Also named by rows since struck, so these set no tier:\n");
+        for who in on {
+            s.push_str(&format!("    {who}\n"));
         }
     }
     if let Some(on) = pre.get(wanted).filter(|on| !on.is_empty()) {
