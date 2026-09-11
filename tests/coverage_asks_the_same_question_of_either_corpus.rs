@@ -379,8 +379,9 @@ fn the_tally_names_every_tier_even_where_none_sits_there() {
 
 #[test]
 fn a_precondition_is_never_a_tier_and_never_counted_as_coverage() {
-    // The arithmetic temptation, refused. A row with a precondition and nothing
-    // else is further from met than one with nothing at all.
+    // The arithmetic temptation, refused. A precondition names what the row
+    // cannot be met without and counts nothing toward meeting it, so a row with
+    // one and nothing else reaches nothing.
     let v = view(&[DEMAND, ("law::a_result", &[("precondition_for", "the_thing")])]);
     assert_eq!(reach(&v, NS)["the_thing"].0, Reach::Nothing);
     assert_eq!(preconditions(&v, NS)["the_thing"].len(), 1);
