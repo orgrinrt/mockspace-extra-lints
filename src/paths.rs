@@ -12,7 +12,11 @@ use tree_sitter::{Node, Parser, Tree};
 use crate::util::txt;
 
 /// The path roots that never name another crate.
-pub const RESERVED_ROOTS: &[&str] = &["crate", "self", "super", "core", "std", "alloc"];
+/// `Self` is here because a path rooted at it names an associated type of the
+/// item being declared, which is the one thing in a signature that cannot be a
+/// dependency; without it a trait's own `Self::Raw` read as a crate called
+/// `Self`, and reported against every crate with no dependencies at all.
+pub const RESERVED_ROOTS: &[&str] = &["crate", "self", "super", "Self", "core", "std", "alloc"];
 
 /// A crate name as a path root spells it: hyphens become underscores.
 pub fn as_root(name: &str) -> String {

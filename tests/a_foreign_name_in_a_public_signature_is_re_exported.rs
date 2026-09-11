@@ -251,6 +251,35 @@ fn a_public_method_in_an_inherent_impl_is_a_position() {
     assert_eq!(names(src), ["Face"]);
 }
 
+#[test]
+fn a_traits_own_associated_type_reached_through_self_is_not_foreign() {
+    // With dependencies declared this held before `Self` was reserved, since
+    // `Self` is not one of them; the arm keeps it holding. The case that was
+    // wrong is the next one.
+    let src = "pub trait Door: Sized { type Raw; fn into_raw(self) -> Self::Raw; fn from_raw(raw: Self::Raw) -> Self; }\n";
+    assert_eq!(names(src), Vec::<String>::new());
+    // The control: the same position with a path rooted at a crate is reported,
+    // so the silence above is the root and not the position being unread.
+    let control = "pub trait Door: Sized { fn into_raw(self) -> riimu_face::Raw; }\n";
+    assert_eq!(names(control), ["Raw"]);
+}
+
+#[test]
+fn a_self_rooted_path_is_not_foreign_in_a_crate_with_no_dependencies() {
+    // With no dependencies at all every unknown root reads as foreign, which is
+    // where `Self` was reported from: a leaf crate whose trait names its own
+    // associated type.
+    let src = "pub trait Door: Sized { type Raw; fn into_raw(self) -> Self::Raw; }\n";
+    let files: &'static [(&'static str, &'static str)] = Box::leak(Box::new([("src/lib.rs", src)]));
+    let ctx = ctx_over(files, &[], &[]);
+    assert_eq!(tier_one(&ctx), Vec::<String>::new());
+    let control = "pub trait Door: Sized { fn into_raw(self) -> somewhere::Raw; }\n";
+    let files: &'static [(&'static str, &'static str)] =
+        Box::leak(Box::new([("src/lib.rs", control)]));
+    let ctx = ctx_over(files, &[], &[]);
+    assert_eq!(tier_one(&ctx).len(), 1);
+}
+
 // --- what is not a position --------------------------------------------------
 
 #[test]
