@@ -12,10 +12,9 @@ use tree_sitter::{Node, Parser, Tree};
 use crate::util::txt;
 
 /// The path roots that never name another crate.
-/// `Self` is here because a path rooted at it names an associated type of the
-/// item being declared, which is the one thing in a signature that cannot be a
-/// dependency; without it a trait's own `Self::Raw` read as a crate called
-/// `Self`, and reported against every crate with no dependencies at all.
+/// `Self` is here because a path rooted at it names an associated item of the
+/// implementing type; without it a trait's own `Self::Raw` read as a crate
+/// called `Self`, and reported against every crate with no dependencies at all.
 pub const RESERVED_ROOTS: &[&str] = &["crate", "self", "super", "Self", "core", "std", "alloc"];
 
 /// A crate name as a path root spells it: hyphens become underscores.
@@ -269,10 +268,21 @@ pub fn type_names(node: Node, src: &str, out: &mut Vec<Named>) {
             })
         },
         "scoped_type_identifier" => {
-            let root = node
-                .child_by_field_name("path")
+            let path = node.child_by_field_name("path");
+            // `<X as Trait>::Name` roots at a bracket. The names a consumer has
+            // to write are the ones inside it, and `Name` is an associated
+            // item of whatever the bracket names, never a crate's own type.
+            if let Some(bracket) = path.filter(|p| p.kind() == "bracketed_type") {
+                type_names(bracket, src, out);
+                return;
+            }
+            // A root that is not an identifier names no crate either, whatever
+            // else the grammar let through; treated as bare rather than as a
+            // crate spelled with punctuation.
+            let root = path
                 .map(|p| segments(p, src))
-                .and_then(|s| s.first().cloned());
+                .and_then(|s| s.first().cloned())
+                .filter(|r| r.chars().all(|c| c.is_alphanumeric() || c == '_'));
             let name = node
                 .child_by_field_name("name")
                 .map(|n| txt(n, src).to_string())

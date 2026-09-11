@@ -283,6 +283,46 @@ fn a_self_rooted_path_is_not_foreign_in_a_crate_with_no_dependencies() {
 // --- what is not a position --------------------------------------------------
 
 #[test]
+fn a_bracketed_path_names_no_crate_however_it_is_rooted() {
+    // `<X as Trait>::Name` roots at a bracket. The bracket's text is not a
+    // crate name, and with no dependencies declared the lint once read it as
+    // one and told the author to `pub use` a path that is not Rust.
+    for src in [
+        "pub trait Door { type Raw; fn open(&self) -> Self::Raw; }\npub fn f<D: Door>(d: &D) -> <D as Door>::Raw { d.open() }\n",
+        "pub fn first<I: Iterator>(i: &mut I) -> <I as Iterator>::Item { todo!() }\n",
+        "pub trait Door { type Raw; }\nimpl Door for [u8] { type Raw = u8; }\npub fn raw() -> <[u8] as Door>::Raw { 0 }\n",
+        "pub trait Door { type Raw; }\npub struct Held;\nimpl Door for Held { type Raw = u8; }\npub fn raw(held: &<Held as Door>::Raw) {}\n",
+    ] {
+        let files: &'static [(&'static str, &'static str)] =
+            Box::leak(Box::new([("src/lib.rs", src)]));
+        let ctx = ctx_over(files, &[], &[]);
+        assert!(tier_one(&ctx).is_empty(), "{src}: {:?}", tier_one(&ctx));
+        assert!(findings(src).is_empty(), "{src}: {:?}", findings(src));
+    }
+}
+
+#[test]
+fn the_name_after_a_bracket_is_an_associated_item_and_not_an_import_it_shadows() {
+    // `Raw` is imported from a dependency and also declared by a local trait;
+    // `<D as Door>::Raw` is the trait's, and only the bare `Raw` in `g` is the
+    // import's.
+    let src = "use riimu_face::Raw;\npub trait Door { type Raw; }\npub fn f<D: Door>(d: &D) -> <D as Door>::Raw { todo!() }\npub fn g() -> Raw { todo!() }\n";
+    assert_eq!(names(src), vec!["Raw"]);
+}
+
+#[test]
+fn a_dependency_named_inside_a_bracketed_path_is_still_foreign() {
+    // The qualified spelling is the same consumer obligation as the bare one,
+    // and it was the one spelling the lint never looked inside.
+    let src = "pub trait Door { type Raw; }\npub fn f() -> <riimu_face::Face as Door>::Raw { todo!() }\n";
+    assert_eq!(names(src), vec!["Face"]);
+    let src = "use riimu_face::Face;\npub trait Door { type Raw; }\npub fn f() -> <Face as Door>::Raw { todo!() }\n";
+    assert_eq!(names(src), vec!["Face"]);
+    let src = "use riimu_face::{Face, Door};\npub fn f() -> <Face as Door>::Raw { todo!() }\n";
+    assert_eq!(names(src), vec!["Door", "Face"]);
+}
+
+#[test]
 fn a_private_function_is_not_a_position() {
     let src = "use riimu_face::Face;\nfn measure(face: &Face) {}\n";
     assert!(findings(src).is_empty());
@@ -302,8 +342,19 @@ fn a_private_method_in_an_inherent_impl_is_not_a_position() {
 
 #[test]
 fn a_trait_impl_method_is_the_traits_signature_and_not_this_crates() {
-    let src = "use riimu_face::Face;\npub struct Held;\nimpl core::fmt::Debug for Held { fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result { let _: Face; Ok(()) } }\n";
-    assert!(findings(src).is_empty());
+    // `Face` sits in the impl method's signature, not its body, so the
+    // silence is the impl exclusion and not the lint's blindness to bodies.
+    let src = "use riimu_face::Face;\npub struct Held;\nimpl From<Face> for Held { fn from(face: Face) -> Held { Held } }\n";
+    assert!(findings(src).is_empty(), "{:?}", findings(src));
+}
+
+#[test]
+fn a_local_traits_signature_is_reported_once_and_its_impl_not_again() {
+    // The trait declaration is the position; the impl repeating it adds
+    // nothing a consumer has to name that the trait did not already demand.
+    let src = "use riimu_face::Face;\npub trait Show { fn show(&self) -> Face; }\npub struct Held;\nimpl Show for Held { fn show(&self) -> Face { todo!() } }\n";
+    assert_eq!(names(src), vec!["Face"]);
+    assert!(findings(src)[0].contains("`show`"), "{:?}", findings(src));
 }
 
 #[test]
