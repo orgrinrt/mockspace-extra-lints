@@ -310,7 +310,9 @@ pub fn generic_names(node: Node, src: &str, into: &mut BTreeSet<String>) {
     // The grammar wraps every type parameter, bounded, defaulted or bare, in a
     // `type_parameter` whose `name` is the identifier. The kinds this matched
     // before, `constrained_type_parameter` and a bare `type_identifier`, are
-    // an older grammar's and never occur, so nothing was ever collected here.
+    // the grammar's up to 0.23.2, so nothing was ever collected here once the
+    // lockfile moved past it. The manifest's floor is 0.23.3 for that reason:
+    // under it this collects nothing again and nothing says so.
     let mut cursor = params.walk();
     for child in params.named_children(&mut cursor) {
         if child.kind() != "type_parameter" {

@@ -378,6 +378,41 @@ fn an_impl_generic_is_not_foreign_in_its_methods() {
     assert!(findings(src).is_empty(), "{:?}", findings(src));
 }
 
+/// A module of the foreign crate bound as `S`, so a path rooted at `S` is
+/// foreign unless a generic parameter named `S` shadows it.
+const S_IS_FOREIGN: &str = "use riimu_face::table as S;\npub trait Store { type Items: Holds; }\npub trait Holds { type Inner; }\n";
+
+#[test]
+fn a_path_rooted_at_a_generic_is_not_foreign_in_any_position() {
+    for body in [
+        "pub fn a<S: Store>(x: <S as Store>::Items) {}\n",
+        "pub fn b<S: Store>(f: impl Fn(S::Items)) {}\n",
+        "pub fn c<S: Store>(f: fn(S::Items)) {}\n",
+        "pub type D<S> = S::Items;\n",
+        "pub fn e<S: Store>(x: S::Items::Inner) {}\n",
+    ] {
+        let src = format!("{S_IS_FOREIGN}{body}");
+        let src: &'static str = Box::leak(src.into_boxed_str());
+        assert!(findings(src).is_empty(), "{body}: {:?}", findings(src));
+    }
+}
+
+#[test]
+fn the_same_paths_with_no_generic_to_shadow_the_root_are_foreign() {
+    // The control for the one above: each position, with the parameter gone,
+    // reaches the foreign module through the alias and is reported.
+    for (body, name) in [
+        ("pub fn b(f: impl Fn(S::Items)) {}\n", "Items"),
+        ("pub fn c(f: fn(S::Items)) {}\n", "Items"),
+        ("pub type D = S::Items;\n", "Items"),
+        ("pub fn e(x: S::Items::Inner) {}\n", "Inner"),
+    ] {
+        let src = format!("{S_IS_FOREIGN}{body}");
+        let src: &'static str = Box::leak(src.into_boxed_str());
+        assert_eq!(names(src), [name], "{body}");
+    }
+}
+
 #[test]
 fn the_import_a_generic_shadows_is_still_foreign_where_nothing_shadows_it() {
     // The control for the two above: the same import, in a signature with no

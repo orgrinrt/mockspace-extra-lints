@@ -143,7 +143,7 @@ fn the_crate_alias_is_still_foreign_where_no_parameter_shadows_it() {
 }
 
 #[test]
-#[ignore = "catalogue: an impl's associated type is not read as a position, so a foreign path there goes unreported"]
+#[ignore = "catalogue: an impl's associated type is not read as a position, so a foreign path there goes unreported; tracked agenda an-impl-associated-type-is-a-position"]
 fn a_foreign_path_in_an_impls_associated_type_is_reported() {
     for deps in MANIFESTS {
         let src = "pub trait Has { type X; }\npub struct Held;\nimpl Has for Held { type X = riimu_face::Items; }\n";
