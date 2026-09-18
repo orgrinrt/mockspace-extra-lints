@@ -216,6 +216,11 @@ fn own_signatures(
                 if named.name == "Self" || generics.contains(&named.name) {
                     continue;
                 }
+                // `S::Items` with `S` a parameter names an associated type of
+                // whatever `S` is, and its root is no crate.
+                if named.root.as_ref().is_some_and(|r| generics.contains(r)) {
+                    continue;
+                }
                 // Every crate the name could have come from. A qualified
                 // path's root is a crate or an alias of a module in one, and a
                 // bare name is whatever the file's `use` lines bound it to,
