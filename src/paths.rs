@@ -307,21 +307,19 @@ pub fn generic_names(node: Node, src: &str, into: &mut BTreeSet<String>) {
     let Some(params) = node.child_by_field_name("type_parameters") else {
         return;
     };
+    // The grammar wraps every type parameter, bounded, defaulted or bare, in a
+    // `type_parameter` whose `name` is the identifier. The kinds this matched
+    // before, `constrained_type_parameter` and a bare `type_identifier`, are
+    // the grammar's up to 0.23.2, so nothing was ever collected here once the
+    // lockfile moved past it. The manifest's floor is 0.23.3 for that reason:
+    // under it this collects nothing again and nothing says so.
     let mut cursor = params.walk();
     for child in params.named_children(&mut cursor) {
-        match child.kind() {
-            "type_identifier" => {
-                into.insert(txt(child, src).to_string());
-            },
-            "constrained_type_parameter" | "optional_type_parameter" => {
-                if let Some(left) = child.child_by_field_name("left") {
-                    into.insert(txt(left, src).to_string());
-                }
-                if let Some(name) = child.child_by_field_name("name") {
-                    into.insert(txt(name, src).to_string());
-                }
-            },
-            _ => {},
+        if child.kind() != "type_parameter" {
+            continue;
+        }
+        if let Some(name) = child.child_by_field_name("name") {
+            into.insert(txt(name, src).to_string());
         }
     }
 }
@@ -338,3 +336,7 @@ pub fn for_each_kind<'a, F: FnMut(Node<'a>)>(root: Node<'a>, kind: &str, visit: 
         }
     }
 }
+
+#[cfg(test)]
+#[path = "paths_tests.rs"]
+mod tests;

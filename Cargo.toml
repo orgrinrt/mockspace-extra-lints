@@ -21,7 +21,7 @@ publish = false
 # which covers this crate only once the two agree.
 mockspace-lint-rules = { git = "https://github.com/hiisi-digital/mockspace.git", branch = "dev" }
 tree-sitter = "0.24"
-tree-sitter-rust = "0.23"
+tree-sitter-rust = "0.23.3"
 # `re-export-foreign-names` reads the surface of a re-exported type out of the
 # dependency that declares it, and `cargo metadata` is what says where that
 # dependency's source is: a git revision, a path and a `[patch]` all end at a

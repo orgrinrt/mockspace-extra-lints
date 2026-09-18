@@ -248,12 +248,48 @@ fn a_name_two_crates_down_is_reported_against_the_crate_that_declares_it() {
 
 #[test]
 fn a_generic_of_the_impl_is_not_part_of_the_surface() {
-    let face =
-        "pub struct Sheet<K>(K);\nimpl<K> Sheet<K> { pub fn key(&self) -> &K { &self.0 } }\n";
+    // `face` also declares a `K`, so the parameter shadows a name the surface
+    // walk would otherwise report as the dependency's own.
+    let face = "pub struct K;\npub struct Sheet<K>(K);\nimpl<K> Sheet<K> { pub fn key(&self) -> &K { &self.0 } }\n";
     let kit = "pub use face::Sheet;\n";
     let ws = workspace(kit, face);
     let hits = check(ws.path(), face_kit(kit));
     assert!(hits.is_empty(), "{hits:?}");
+}
+
+#[test]
+fn a_generic_of_the_item_itself_is_not_part_of_its_surface() {
+    let face = "pub struct K;\npub struct Sheet<K> { pub key: K }\n";
+    let kit = "pub use face::Sheet;\n";
+    let ws = workspace(kit, face);
+    let hits = check(ws.path(), face_kit(kit));
+    assert!(hits.is_empty(), "{hits:?}");
+}
+
+#[test]
+fn a_generic_of_a_method_is_not_part_of_its_types_surface() {
+    let face = "pub struct K;\npub struct Sheet;\nimpl Sheet { pub fn put<K>(&self, k: K) {} }\n";
+    let kit = "pub use face::Sheet;\n";
+    let ws = workspace(kit, face);
+    let hits = check(ws.path(), face_kit(kit));
+    assert!(hits.is_empty(), "{hits:?}");
+}
+
+#[test]
+fn the_same_positions_naming_the_dependencys_own_k_carry_it() {
+    // The control for the three generic cases: with no parameter to shadow it,
+    // the field and the method argument both name the dependency's `K`.
+    for face in [
+        "pub struct K;\npub struct Sheet { pub key: K }\n",
+        "pub struct K;\npub struct Sheet;\nimpl Sheet { pub fn put(&self, k: K) {} }\n",
+        "pub struct K;\npub struct Sheet<T>(T);\nimpl<T> Sheet<T> { pub fn key(&self) -> K { K } }\n",
+    ] {
+        let kit = "pub use face::Sheet;\n";
+        let ws = workspace(kit, face);
+        let hits = check(ws.path(), face_kit(kit));
+        assert_eq!(hits.len(), 1, "{face}: {hits:?}");
+        assert!(hits[0].contains("`K`"), "{face}: {}", hits[0]);
+    }
 }
 
 #[test]
