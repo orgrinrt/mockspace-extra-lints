@@ -248,8 +248,9 @@ fn a_name_two_crates_down_is_reported_against_the_crate_that_declares_it() {
 
 #[test]
 fn a_generic_of_the_impl_is_not_part_of_the_surface() {
-    let face =
-        "pub struct Sheet<K>(K);\nimpl<K> Sheet<K> { pub fn key(&self) -> &K { &self.0 } }\n";
+    // `face` also declares a `K`, so the parameter shadows a name the surface
+    // walk would otherwise report as the dependency's own.
+    let face = "pub struct K;\npub struct Sheet<K>(K);\nimpl<K> Sheet<K> { pub fn key(&self) -> &K { &self.0 } }\n";
     let kit = "pub use face::Sheet;\n";
     let ws = workspace(kit, face);
     let hits = check(ws.path(), face_kit(kit));

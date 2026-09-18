@@ -111,3 +111,42 @@ fn a_parameter_of_one_item_does_not_excuse_the_same_name_in_another() {
                pub fn second(i: S::Items) {}\n";
     assert_eq!(findings(src, &[]).len(), 1, "{:?}", findings(src, &[]));
 }
+
+#[test]
+fn a_path_rooted_at_a_traits_own_parameter_is_not_foreign() {
+    for deps in MANIFESTS {
+        let src = "pub trait Store { type Items; }\npub trait Shelf<S: Store> { fn items(&self) -> S::Items; }\n";
+        assert_eq!(findings(src, deps), Vec::<String>::new(), "with {deps:?}");
+    }
+}
+
+#[test]
+fn a_path_rooted_at_a_trait_methods_parameter_is_not_foreign() {
+    for deps in MANIFESTS {
+        let src = "pub trait Store { type Items; }\npub trait Shelf { fn put<S: Store>(&self, items: S::Items); }\n";
+        assert_eq!(findings(src, deps), Vec::<String>::new(), "with {deps:?}");
+    }
+}
+
+#[test]
+fn a_parameter_shadowing_an_imported_crate_alias_is_the_parameter() {
+    // `S` is both a crate alias in scope and the function's parameter, and the
+    // parameter is the nearer binding.
+    let src = "use riimu_face as S;\npub trait Store { type Items; }\npub fn f<S: Store>(x: S::Items) {}\n";
+    assert_eq!(findings(src, &["riimu-face"]), Vec::<String>::new());
+}
+
+#[test]
+fn the_crate_alias_is_still_foreign_where_no_parameter_shadows_it() {
+    let src = "use riimu_face as S;\npub fn f(x: S::Items) {}\n";
+    assert_eq!(findings(src, &["riimu-face"]).len(), 1, "{:?}", findings(src, &["riimu-face"]));
+}
+
+#[test]
+#[ignore = "catalogue: an impl's associated type is not read as a position, so a foreign path there goes unreported"]
+fn a_foreign_path_in_an_impls_associated_type_is_reported() {
+    for deps in MANIFESTS {
+        let src = "pub trait Has { type X; }\npub struct Held;\nimpl Has for Held { type X = riimu_face::Items; }\n";
+        assert_eq!(findings(src, deps).len(), 1, "with {deps:?}: {:?}", findings(src, deps));
+    }
+}

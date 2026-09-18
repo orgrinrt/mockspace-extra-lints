@@ -365,14 +365,25 @@ fn a_test_module_is_not_a_position() {
 
 #[test]
 fn a_generic_parameter_is_not_foreign() {
-    let src = "pub fn id<T>(t: T) -> T { t }\npub struct Held<K> { pub key: K }\n";
-    assert!(findings(src).is_empty());
+    // Each parameter shares its name with an import from a foreign crate, so
+    // the silence is the parameter shadowing it. A parameter named nothing
+    // else would be silent anyway, being neither imported nor declared.
+    let src = "use riimu_face::T;\nuse riimu_face::K;\npub fn id<T>(t: T) -> T { t }\npub struct Held<K> { pub key: K }\n";
+    assert!(findings(src).is_empty(), "{:?}", findings(src));
 }
 
 #[test]
 fn an_impl_generic_is_not_foreign_in_its_methods() {
-    let src = "pub struct Held<K>(K);\nimpl<K> Held<K> { pub fn key(&self) -> &K { &self.0 } }\n";
-    assert!(findings(src).is_empty());
+    let src = "use riimu_face::K;\npub struct Held<K>(K);\nimpl<K> Held<K> { pub fn key(&self) -> &K { &self.0 } }\n";
+    assert!(findings(src).is_empty(), "{:?}", findings(src));
+}
+
+#[test]
+fn the_import_a_generic_shadows_is_still_foreign_where_nothing_shadows_it() {
+    // The control for the two above: the same import, in a signature with no
+    // parameter of that name, is reported.
+    let src = "use riimu_face::K;\npub fn key() -> K { todo!() }\n";
+    assert_eq!(names(src), vec!["K"]);
 }
 
 #[test]
