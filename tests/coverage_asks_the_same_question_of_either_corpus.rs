@@ -36,7 +36,7 @@ use mockspace_extra_lints::tools::coverage::{
     tally,
 };
 use mockspace_lint_rules::RegistryView;
-use mockspace_lint_rules::tool::{NotALint, Outcome, Tool};
+use mockspace_lint_rules::tool::{NotALint, Outcome, Purpose, Tool};
 
 // ---------------------------------------------------------------------------
 // The fixtures this file plants beside the shared ones
@@ -88,7 +88,10 @@ fn it_declares_itself_as_the_shape_it_is_and_no_run_returns_a_blocking_finding()
     // return a finding that blocks a gate. Driven over the registries below
     // rather than asserted about the declaration alone, because the declaration
     // is what the tool says and the outcome is what it does.
-    assert!(matches!(Coverage.not_a_lint(), NotALint::NoFailingCase));
+    assert!(matches!(
+        Coverage.purpose(),
+        Purpose::Check(NotALint::NoFailingCase)
+    ));
     for v in [
         view(&[]),
         alone(),

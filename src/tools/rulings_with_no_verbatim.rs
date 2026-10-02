@@ -46,7 +46,15 @@
 //! there are no words but the panel's and `says` holds them, so reading that
 //! namespace would report the namespace rather than a hole.
 
-use mockspace_lint_rules::tool::{ArgSpec, NotALint, Outcome, Tool, ToolContext, ToolReport};
+use mockspace_lint_rules::tool::{
+    ArgSpec,
+    NotALint,
+    Outcome,
+    Purpose,
+    Tool,
+    ToolContext,
+    ToolReport,
+};
 
 /// The namespace whose rows claim a human's authority.
 ///
@@ -72,8 +80,8 @@ impl Tool for RulingsWithNoVerbatim {
         "rulings resting on somebody's restatement rather than on the words themselves"
     }
 
-    fn not_a_lint(&self) -> NotALint {
-        NotALint::NoFailingCase
+    fn purpose(&self) -> Purpose {
+        Purpose::Check(NotALint::NoFailingCase)
     }
 
     fn args(&self) -> &'static [ArgSpec] {
