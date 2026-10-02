@@ -19,7 +19,7 @@ use std::collections::BTreeMap;
 
 use mockspace_extra_lints::tools::rulings_with_no_verbatim::RulingsWithNoVerbatim;
 use mockspace_lint_rules::RegistryView;
-use mockspace_lint_rules::tool::{NotALint, Outcome, Tool, ToolContext};
+use mockspace_lint_rules::tool::{NotALint, Outcome, Purpose, Tool, ToolContext};
 
 fn row(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
     pairs
@@ -63,7 +63,7 @@ fn examined(outcome: &Outcome) -> usize {
 /// What the tool declares about itself, which the port dropped.
 ///
 /// **Both of these were catalogued in the corpus this came from and neither
-/// survived.** `not_a_lint` decides how the contract reads the result, and
+/// survived.** `purpose` decides how the contract reads the result, and
 /// `name` is the subcommand a person types, the string that collided with the
 /// local copy, and the reason a repository had to delete one. Give either any
 /// other value and, without this, everything still passes: a declaration
@@ -71,7 +71,10 @@ fn examined(outcome: &Outcome) -> usize {
 #[test]
 fn the_tool_declares_the_kind_and_the_name_the_contract_reads() {
     assert!(
-        matches!(RulingsWithNoVerbatim.not_a_lint(), NotALint::NoFailingCase),
+        matches!(
+            RulingsWithNoVerbatim.purpose(),
+            Purpose::Check(NotALint::NoFailingCase)
+        ),
         "an inventory with no pass line, which is what makes it a tool rather than a lint"
     );
     assert_eq!(

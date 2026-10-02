@@ -12,7 +12,15 @@
 //! row is printed in full.
 
 use mockspace_lint_rules::RegistryView;
-use mockspace_lint_rules::tool::{ArgSpec, NotALint, Outcome, Tool, ToolContext, ToolReport};
+use mockspace_lint_rules::tool::{
+    ArgSpec,
+    NotALint,
+    Outcome,
+    Purpose,
+    Tool,
+    ToolContext,
+    ToolReport,
+};
 
 use super::{
     RETIRED,
@@ -62,8 +70,8 @@ impl Tool for Coverage {
         "what reaches each row of a demand namespace, by the rung that reaches it"
     }
 
-    fn not_a_lint(&self) -> NotALint {
-        NotALint::NoFailingCase
+    fn purpose(&self) -> Purpose {
+        Purpose::Check(NotALint::NoFailingCase)
     }
 
     fn args(&self) -> &'static [ArgSpec] {
