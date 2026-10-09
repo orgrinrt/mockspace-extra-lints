@@ -114,25 +114,59 @@ field and is not judged for them. The fields are `MessageContext::author` and
 against one that does.
 
 What names an agent is what only an agent carries, and never a word inside a
-person's name. Three things do: a marker such as `[bot]`, anywhere in the name or
-the mailbox; a mailbox an agent commits from, matched whole; and a tool's own
-name, which counts only as the whole of a name, behind a vendor word if it likes
-and followed by nothing but the words that ride along with a tool and versions.
-`Claude Opus 4.1`, `GitHub Copilot` and `Gemini Code Assist` are the tools, and
-`Claude Monet`, `Max Claude` and `Devin Smith` are people. A vendor's domain is
-not a mailbox, so a person writing from one is a person. A tool that is also
-somebody's given name, such as `Claude` or `Devin`, counts only with a second
-signal, a vendor word before it, a companion or a version after it, or an agent's
-mailbox, so a person whose whole name is `Claude` is a person.
+person's name. Five things do, tried in this order: a marker such as `[bot]`,
+anywhere in the name or the mailbox; a mailbox an agent commits from, matched
+whole; a tag a tool writes into a name, such as aider's `(aider)`; a name the
+project lists in `agent_names`; and a name that starts with a tool's own, behind a
+vendor word if it likes. A vendor's domain is not a mailbox, so a person writing
+from one is a person.
 
-Three keys on the lint carry the list, and they take a comma-separated value:
+A group in parentheses is read for a tag and for nothing else. `Paul Gauthier
+(aider)` is the tool, and a group holding anything else, an employer or a tool's
+name, is left out of the name, so `Jane Doe (OpenAI)` and `Alex (Droid)` are
+people.
+
+A tool that is not somebody's given name, such as `Copilot` or `Cursor`, makes an
+agent of whatever follows it, so `Copilot Chat` and `Cursor Bugbot` are the tools.
+That reads a person whose name starts with one as the tool, and `not_agents` is
+how a project says otherwise. A tool's name inside a name, as in `Smith Copilot`,
+is none.
+
+A tool that is also somebody's given name, such as `Claude`, `Devin` or `Gemini`,
+is read more carefully. It is an agent when a word that rides along with a tool
+comes anywhere after it (`Claude Code Action`, `Claude Agent SDK`, `Claude Code on
+the web`), when nothing but versions follow it (`Claude 3.5`), or when nothing
+follows it and either a vendor word stands before it (`Google Gemini`) or the
+mailbox is the tool's. The mailbox is the tool's when its local part is the tool's
+word, which for a GitHub noreply address is the login after the number, or when
+its domain is a domain the tool commits from, matched whole. `Claude
+<claude@localhost>`, `Claude <12345+claude@users.noreply.github.com>`, `Claude
+<claude@anthropic.com>`, `Devin <devin@cognition.ai>`, `Gemini <gemini@google.com>`
+and `Amp <noreply@ampcode.com>` are the tools. Any other word after the name is
+somebody's, so `Claude Monet` and `Claude Max` are people.
+
+What the default lets through is a bare given name behind a mailbox that is
+neither the tool's nor on the list, `claude <root@buildhost.local>` being the one
+that was found. It reads as a person until the project lists the name in
+`agent_names`.
+
+Four keys on the lint carry the list, and they take a comma-separated value:
 
 - `agent_identities` replaces the whole list. Whatever it does not name is no
   longer an agent, the shipped mailboxes and markers included.
 - `extra_agent_identities` adds to the list and disarms none of it. This is the
   key for naming one more tool.
-- `not_agents` names people who are never to be read as agents, each as a name, a
-  mailbox, or `Name <mailbox>`, and it wins over the rest.
+- `agent_names` names whole names that are agents whatever the mailbox.
+  `agent_names = "Claude, Devin"` makes `claude <root@buildhost.local>` an agent
+  and leaves `Claude Monet` a person. This is the key for a build host whose
+  mailbox nobody could have listed.
+- `not_agents` names people who are never to be read as agents, and it is read
+  before the rest. Write each as `Name <mailbox>`, which excuses exactly that
+  identity. A bare name or a bare mailbox excuses everything it matches, except at
+  a mailbox an agent commits from, one on the list, at a given-name tool's own
+  domain or carrying a marker, where it excuses nothing:
+  `not_agents = "Claude"` leaves `Claude <noreply@anthropic.com>` an agent, and
+  `not_agents = "Claude <noreply@anthropic.com>"` excuses it.
 
 An entry in either list is told apart by its shape. One holding `@` is a mailbox,
 a glob over the whole mailbox where `*` stands for any run of characters. One
@@ -145,8 +179,10 @@ address no longer does, and the check is to read its value against the three
 shapes.
 
 The lists and the verdicts are held to a conformance table that ships with
-`mockspace-lint-rules`, which a second implementation of the recogniser, in shell,
-is held to as well.
+`mockspace-lint-rules`. Anything else that names an agent from an author, a
+committer or a `Co-Authored-By`, a review sweep over a repository's history
+among them, is held to the same table, so an identity is an agent to all of them
+or to none.
 
 ### Tools
 
