@@ -119,37 +119,38 @@ anywhere in the name or the mailbox; a mailbox an agent commits from, matched
 whole; a tag a tool writes into a name, such as aider's `(aider)`; a name the
 project lists in `agent_names`; and a name that starts with a tool's own, behind a
 vendor word if it likes. A vendor's domain is not a mailbox, so a person writing
-from one is a person.
+from one is a person, except that a given-name tool at its own vendor domain,
+`Claude <claude@anthropic.com>` or `Devin <devin@cognition.ai>`, is the tool.
 
 A group in parentheses is read for a tag and for nothing else. `Paul Gauthier
 (aider)` is the tool, and a group holding anything else, an employer or a tool's
 name, is left out of the name, so `Jane Doe (OpenAI)` and `Alex (Droid)` are
 people.
 
-A tool that is not somebody's given name, such as `Copilot` or `Cursor`, makes an
-agent of whatever follows it, so `Copilot Chat` and `Cursor Bugbot` are the tools.
-That reads a person whose name starts with one as the tool, and `not_agents` is
-how a project says otherwise. A tool's name inside a name, as in `Smith Copilot`,
-is none.
+A tool's name makes an agent when nothing follows it but the words that ride along
+with a tool and versions, so `Copilot Chat`, `Cursor Bugbot`, `Claude Code Action`,
+`Claude Agent SDK`, `Claude Code on the web` and `GPT 4o` are the tools. Any other
+word after it is somebody's, so `Copilot Smith`, `Cline, John`, `Aider Aliyev`,
+`Sonnet Lee` and `Claude Monet` are people, and so are `Claude Marie Via` and
+`Devin Van Web`, where a companion word comes later but a name stands before it.
+A tool's name inside a name, as in `Smith Copilot`, is none. A person whose whole
+name is a tool's name with only such words after it reads as the tool, and
+`not_agents` is how a project says otherwise.
 
-A tool that is also somebody's given name, such as `Claude`, `Devin` or `Gemini`,
-is read more carefully. It is an agent when a word that rides along with a tool
-comes anywhere after it (`Claude Code Action`, `Claude Agent SDK`, `Claude Code on
-the web`), when nothing but versions follow it (`Claude 3.5`), or when nothing
-follows it and either a vendor word stands before it (`Google Gemini`) or the
-mailbox is the tool's. The mailbox is the tool's when its domain is a domain the
-tool commits from, matched whole, or when its local part is the tool's word at a
-mailbox that is a machine's: a domain that is `localhost`, one label with no dot,
-or one ending in `.local`, `.localdomain`, `.lan`, `.internal` or `.home.arpa`, or
-a GitHub noreply address whose login after the number is the tool's word. `Claude
+A tool alone is an agent, except where its name is also somebody's given name,
+such as `Claude`, `Devin` or `Gemini`. Those want a second signal when nothing
+follows them: a vendor word before them (`Google Gemini`), or a mailbox that is the
+tool's. The mailbox is the tool's when its domain is a domain the tool commits
+from, matched whole, or when its local part is the tool's word at a mailbox that is
+a machine's: a domain that is `localhost`, one label with no dot, or one ending in
+`.local`, `.localdomain`, `.lan`, `.internal` or `.home.arpa`. `Claude
 <claude@localhost>`, `claude <claude@buildbox>`, `Claude <claude@ci.local>`,
-`Claude <12345+claude@users.noreply.github.com>`, `Claude <claude@anthropic.com>`,
-`Devin <devin@cognition.ai>`, `Gemini <gemini@google.com>` and `Amp
-<noreply@ampcode.com>` are the tools. The same local part at any other domain is a
-person called that, so `Devin <devin@acme.com>`, `Cody <cody@gmail.com>` and `Claude
-<claude@example.org>` are people, and so is a GitHub login without its number. Any
-other word after the name is somebody's, so `Claude Monet` and `Claude Max` are
-people.
+`Claude <claude@anthropic.com>`, `Devin <devin@cognition.ai>`, `Gemini
+<gemini@google.com>` and `Amp <noreply@ampcode.com>` are the tools. The same local
+part at any other domain is a person called that, so `Devin <devin@acme.com>`,
+`Cody <cody@gmail.com>` and `Claude <claude@example.org>` are people. So is GitHub's
+private address, `Devin <12345+devin@users.noreply.github.com>`, which every
+account has and which says nothing about who is behind it.
 
 What the default lets through is a bare given name behind a mailbox that is
 neither the tool's nor on the list. `claude <root@buildhost.local>` is the one
