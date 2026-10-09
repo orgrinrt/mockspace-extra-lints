@@ -103,6 +103,23 @@ reasoning that a consumer names a kit's crates and nothing under them.
 `writing-style`, `commit-style`, `forge-body`, `message-attribution`,
 `lint-allow-requires-task-id`.
 
+`message-attribution` judges more than the trailers in a message. When the gate
+hands it a commit's author and committer, an identity that names an agent is
+refused under the same per-mode glob an agent `Co-Authored-By` answers to, at
+the commit and again at the push. A project permitting no byline therefore
+permits no agent identity either, and an agent committing under its own name no
+longer clears the hook for want of a trailer. What names an agent is the
+`agent_identities` list, one list for the trailer and the identity alike, and
+it names what only an agent carries: a tool's own name, which counts only as the
+whole of a name (`Claude Opus 4.1` and `GitHub Copilot` are the tools, `Claude
+Monet` and `Devin Smith` are people), a mailbox an agent commits from, or a
+`[bot]` marker. A word inside a person's name never counts, and neither does a
+vendor's domain. The one edge left is a person whose whole `user.name` is a
+tool's name, who reads as the tool until the project redefines the list. A
+pull-request body has neither field and is not judged for them. The fields are
+`MessageContext::author` and `committer`, which a mockspace carrying them hands
+over, and the pack builds against one that does.
+
 ### Tools
 
 A tool rides the same cdylib a lint does, so depending on this pack gives you

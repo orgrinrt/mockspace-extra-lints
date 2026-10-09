@@ -3,6 +3,8 @@ name = "message-attribution"
 primitive = "message-attribution"
 description = "attribution policy for a project whose headless runs are Copilot: permits the Copilot provenance byline under autonomous mode, still no adverts"
 
+# The autonomous glob also decides which Copilot bot identity may be the author
+# or committer of a commit under autonomous mode.
 [config]
 assistant = ""
 autonomous = "*copilot*[bot]*"
