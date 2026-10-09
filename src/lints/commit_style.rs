@@ -448,6 +448,8 @@ mod tests {
             origin:     "COMMIT_EDITMSG",
             repo_root:  std::path::Path::new("/tmp"),
             invocation: None,
+            author:     None,
+            committer:  None,
         };
         l.check_message(&ctx)
             .into_iter()
@@ -472,6 +474,8 @@ mod tests {
                 command:   Some(command),
                 tool_name: Some("Bash"),
             }),
+            author:     None,
+            committer:  None,
         };
         l.check_message(&ctx)
             .into_iter()
@@ -550,6 +554,8 @@ mod tests {
                 command:   Some(""),
                 tool_name: Some("mcp__git__commit"),
             }),
+            author:     None,
+            committer:  None,
         };
         let found: Vec<String> = l
             .check_message(&ctx)

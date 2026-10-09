@@ -215,6 +215,8 @@ mod tests {
             origin: "pr-body",
             repo_root: std::path::Path::new("/tmp"),
             invocation: None,
+            author: None,
+            committer: None,
         };
         l.check_message(&ctx)
             .into_iter()
@@ -239,6 +241,8 @@ mod tests {
                 command:   Some(command),
                 tool_name: Some("Bash"),
             }),
+            author:     None,
+            committer:  None,
         };
         l.check_message(&ctx)
             .into_iter()
@@ -394,6 +398,8 @@ mod tests {
                     command:   Some("   "),
                     tool_name: Some("Bash"),
                 }),
+                author: None,
+                committer: None,
             };
             l.check_message(&ctx)
                 .into_iter()
@@ -490,6 +496,8 @@ mod tests {
             origin:     "pr-body",
             repo_root:  std::path::Path::new("/tmp"),
             invocation: None,
+            author:     None,
+            committer:  None,
         };
         let errs = l.check_message(&ctx);
         assert_eq!(errs.len(), 1);
