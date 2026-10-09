@@ -108,17 +108,45 @@ hands it a commit's author and committer, an identity that names an agent is
 refused under the same per-mode glob an agent `Co-Authored-By` answers to, at
 the commit and again at the push. A project permitting no byline therefore
 permits no agent identity either, and an agent committing under its own name no
-longer clears the hook for want of a trailer. What names an agent is the
-`agent_identities` list, one list for the trailer and the identity alike, and
-it names what only an agent carries: a tool's own name, which counts only as the
-whole of a name (`Claude Opus 4.1` and `GitHub Copilot` are the tools, `Claude
-Monet` and `Devin Smith` are people), a mailbox an agent commits from, or a
-`[bot]` marker. A word inside a person's name never counts, and neither does a
-vendor's domain. The one edge left is a person whose whole `user.name` is a
-tool's name, who reads as the tool until the project redefines the list. A
-pull-request body has neither field and is not judged for them. The fields are
-`MessageContext::author` and `committer`, which a mockspace carrying them hands
-over, and the pack builds against one that does.
+longer clears the hook for want of a trailer. A pull-request body has neither
+field and is not judged for them. The fields are `MessageContext::author` and
+`committer`, which a mockspace carrying them hands over, and the pack builds
+against one that does.
+
+What names an agent is what only an agent carries, and never a word inside a
+person's name. Three things do: a marker such as `[bot]`, anywhere in the name or
+the mailbox; a mailbox an agent commits from, matched whole; and a tool's own
+name, which counts only as the whole of a name, behind a vendor word if it likes
+and followed by nothing but the words that ride along with a tool and versions.
+`Claude Opus 4.1`, `GitHub Copilot` and `Gemini Code Assist` are the tools, and
+`Claude Monet`, `Max Claude` and `Devin Smith` are people. A vendor's domain is
+not a mailbox, so a person writing from one is a person. A tool that is also
+somebody's given name, such as `Claude` or `Devin`, counts only with a second
+signal, a vendor word before it, a companion or a version after it, or an agent's
+mailbox, so a person whose whole name is `Claude` is a person.
+
+Three keys on the lint carry the list, and they take a comma-separated value:
+
+- `agent_identities` replaces the whole list. Whatever it does not name is no
+  longer an agent, the shipped mailboxes and markers included.
+- `extra_agent_identities` adds to the list and disarms none of it. This is the
+  key for naming one more tool.
+- `not_agents` names people who are never to be read as agents, each as a name, a
+  mailbox, or `Name <mailbox>`, and it wins over the rest.
+
+An entry in either list is told apart by its shape. One holding `@` is a mailbox,
+a glob over the whole mailbox where `*` stands for any run of characters. One
+opening with `[` is a marker. Anything else is a tool's name, its words as
+spelled: `robotron` makes `Robotron` and `Robotron CLI` agents and leaves `Robert
+Robotron-Smith` a person. A project that wrote `agent_identities` when it meant a
+substring of an address gets something else now: the same value is read as tool
+names, mailboxes and markers, so a word that used to match inside a name or an
+address no longer does, and the check is to read its value against the three
+shapes.
+
+The lists and the verdicts are held to a conformance table that ships with
+`mockspace-lint-rules`, which a second implementation of the recogniser, in shell,
+is held to as well.
 
 ### Tools
 
