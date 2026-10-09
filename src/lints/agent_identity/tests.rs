@@ -11,8 +11,8 @@ use std::collections::BTreeSet;
 
 use mockspace_lint_rules::agent_identity_conformance::{AgentIdentityConformance, table};
 
-use super::{
-    AgentIdentities,
+use super::AgentIdentities;
+use super::lists::{
     COMPANION_WORDS,
     DEFAULT_GIVEN_NAMES,
     DEFAULT_MAILBOXES,
@@ -64,6 +64,7 @@ fn the_table_is_read_and_has_rows_in_every_list() {
         ("tools", t.tools.len()),
         ("given", t.given.len()),
         ("vendors", t.vendors.len()),
+        ("machines", t.machines.len()),
         ("heads", t.heads.len()),
         ("companions", t.companions.len()),
         ("keyed", t.keyed.len()),
@@ -90,23 +91,37 @@ fn the_lists_are_exactly_the_tables_lists() {
         t.vendors.iter().cloned().collect::<BTreeSet<_>>(),
         "vendor domains"
     );
+    assert_eq!(set(MACHINE_SUFFIXES), rows(&t.machines), "machine endings");
     assert_eq!(set(HEAD_WORDS), rows(&t.heads), "head words");
     assert_eq!(set(COMPANION_WORDS), rows(&t.companions), "companion words");
 }
 
 #[test]
 fn each_tool_is_the_start_of_a_name_and_nothing_inside_one() {
-    for tool in &t().tools {
+    let t = t();
+    for tool in &t.tools {
+        // alone, and in capitals, and behind a mailbox of nobody's
         assert!(agent(&format!("{tool} <x@example.com>")), "{tool}");
         assert!(agent(&tool.to_uppercase()), "{tool} in capitals");
-        // any words after it, a surface or a product or somebody's name
+        // followed by nothing but companions and versions, a surface or a model
         assert!(
             agent(&format!("{tool} Chat <x@example.com>")),
             "{tool} Chat"
         );
+        assert!(agent(&format!("{tool} 4.1")), "{tool} 4.1");
+        assert!(agent(&format!("{tool} v2 Chat")), "{tool} v2 Chat");
+        // followed by a word of somebody's name, with or without a comma, it is theirs
         assert!(
-            agent(&format!("{tool} Smith <x@example.com>")),
+            !agent(&format!("{tool} Smith <x@example.com>")),
             "{tool} Smith"
+        );
+        assert!(!agent(&format!("{tool}, Smith")), "{tool}, Smith");
+        // and one companion among such words does not turn them into the tool's
+        assert!(!agent(&format!("{tool} Chat Smith")), "{tool} Chat Smith");
+        assert!(!agent(&format!("{tool} Smith Chat")), "{tool} Smith Chat");
+        assert!(
+            !agent(&format!("{tool} Zed Chat Smith")),
+            "{tool} Zed Chat Smith"
         );
         // a word of somebody's name in front of it makes it a name inside theirs
         assert!(
@@ -114,199 +129,58 @@ fn each_tool_is_the_start_of_a_name_and_nothing_inside_one() {
             "Smith {tool}"
         );
     }
+    for c in &t.companions {
+        assert!(agent(&format!("Copilot {c}")), "Copilot {c}");
+        assert!(!agent(&format!("Copilot Smith {c}")), "Copilot Smith {c}");
+    }
 }
 
 #[test]
 fn each_given_name_tool_wants_a_second_signal() {
     let t = t();
     for g in &t.given {
+        // alone it is a person's name
         assert!(!agent(&format!("{g} <x@example.com>")), "{g} alone");
         assert!(!agent(g), "{g} bare");
-        // a version after it, a companion anywhere after it, a vendor word before
-        // it, a mailbox on the list
-        assert!(agent(&format!("{g} 4.1 <x@example.com>")), "{g} 4.1");
-        assert!(agent(&format!("{g} v2")), "{g} v2");
-        for c in &t.companions {
-            assert!(agent(&format!("{g} {c} <x@example.com>")), "{g} {c}");
-            // one companion among other words is enough
-            assert!(
-                agent(&format!("{g} Zed {c} <x@example.com>")),
-                "{g} Zed {c}"
-            );
-            assert!(
-                agent(&format!("{g} {c} Zed <x@example.com>")),
-                "{g} {c} Zed"
-            );
-        }
+        // with a vendor word before it, or a mailbox on the list, it is the tool
         for h in &t.heads {
             assert!(agent(&format!("{h} {g} <x@example.com>")), "{h} {g}");
         }
         for m in &t.mailboxes {
             assert!(agent(&format!("{g} <{}>", instance(m))), "{g} at {m}");
         }
-        // and a word that is none of those is a person's, and a version does not
-        // change that
+        // followed by nothing but companions and versions it is the tool, as any
+        // tool is
+        assert!(agent(&format!("{g} 4.1 <x@example.com>")), "{g} 4.1");
+        assert!(agent(&format!("{g} v2")), "{g} v2");
+        assert!(
+            agent(&format!("{g} 4.1 {}", t.companions[0])),
+            "{g} 4.1 {}",
+            t.companions[0]
+        );
+        for c in &t.companions {
+            assert!(agent(&format!("{g} {c} <x@example.com>")), "{g} {c}");
+            assert!(agent(&format!("{g} {c} 4.1")), "{g} {c} 4.1");
+            // a word of somebody's name anywhere among them makes it a person's
+            assert!(
+                !agent(&format!("{g} Zed {c} <x@example.com>")),
+                "{g} Zed {c}"
+            );
+            assert!(
+                !agent(&format!("{g} {c} Zed <x@example.com>")),
+                "{g} {c} Zed"
+            );
+            assert!(!agent(&format!("{g} {c} Zed {c}")), "{g} {c} Zed {c}");
+        }
+        // and a word that is none of those is a person's, a version included
         assert!(!agent(&format!("{g} Monet <x@example.com>")), "{g} Monet");
         assert!(
             !agent(&format!("{g} 4.1 Monet <x@example.com>")),
             "{g} 4.1 Monet"
         );
+        assert!(!agent(&format!("{g} Monet 4.1")), "{g} Monet 4.1");
         assert!(!agent(&format!("Max {g} <x@example.com>")), "Max {g}");
     }
-}
-
-#[test]
-fn a_given_name_is_read_behind_a_mailbox_that_is_the_tools() {
-    let t = t();
-    for g in &t.given {
-        let up = g.to_uppercase();
-        // the local part is the tool's word, whole, at a mailbox that is a
-        // machine's: localhost, a domain of one label, a name only a private
-        // network uses, or GitHub's noreply form with the login after the number
-        for at in ["localhost", "buildbox"] {
-            assert!(agent(&format!("{g} <{g}@{at}>")), "{g} at {at}");
-        }
-        assert!(agent(&format!("{up} <{up}@BUILDBOX>")), "{g} in capitals");
-        for suffix in MACHINE_SUFFIXES {
-            assert!(agent(&format!("{g} <{g}@ci{suffix}>")), "{g} at ci{suffix}");
-            assert!(
-                agent(&format!("{up} <{up}@CI{}>", suffix.to_uppercase())),
-                "{g} at CI{suffix} in capitals"
-            );
-        }
-        assert!(
-            agent(&format!("{g} <12345+{g}@users.noreply.github.com>")),
-            "{g} behind a number"
-        );
-        assert!(
-            agent(&format!("{up} <12345+{up}@USERS.NOREPLY.GITHUB.COM>")),
-            "{g} behind a number in capitals"
-        );
-        // the same local part at an ordinary domain is a person called that
-        for at in ["example.com", "acme.com", "gmail.com"] {
-            assert!(!agent(&format!("{g} <{g}@{at}>")), "{g} at {at}");
-        }
-        assert!(
-            !agent(&format!("{up} <{up}@EXAMPLE.COM>")),
-            "{g} at EXAMPLE.COM"
-        );
-        // and so is the login without its number, and the number off GitHub
-        assert!(
-            !agent(&format!("{g} <{g}@users.noreply.github.com>")),
-            "{g} without a number"
-        );
-        assert!(
-            !agent(&format!("{g} <12345+{g}@example.com>")),
-            "{g} behind a number off GitHub"
-        );
-        assert!(
-            !agent(&format!("{g} <12345+{g}@ci.local>")),
-            "{g} behind a number at a machine"
-        );
-        // a name only a private network uses has to end the domain
-        for at in [
-            "ci.local.example.com",
-            "local.example.com",
-            "lan.example.com",
-            "x.home.arpa.example",
-        ] {
-            assert!(!agent(&format!("{g} <{g}@{at}>")), "{g} at {at}");
-        }
-        // the local part is the tool's word whole
-        for who in [
-            format!("{g} <x{g}@localhost>"),
-            format!("{g} <{g}.x@localhost>"),
-            format!("{g} <x{g}@ci.local>"),
-            format!("{g} <12345+x{g}@users.noreply.github.com>"),
-        ] {
-            assert!(!agent(&who), "{who}");
-        }
-        // the mailbox is the whole of the signal, so it needs the whole of the name
-        assert!(
-            !agent(&format!("{g} Monet <{g}@localhost>")),
-            "{g} Monet at localhost"
-        );
-        assert!(
-            !agent(&format!("{g} Monet <{g}@ci.local>")),
-            "{g} Monet at ci.local"
-        );
-        // a bare mailbox has no name, a name with no mailbox has no domain, and a
-        // mailbox with no domain is nobody's
-        assert!(!agent(&format!("{g}@localhost")), "{g}@localhost bare");
-        assert!(!agent(g), "{g} bare");
-        assert!(!agent(&format!("{g} <{g}@>")), "{g} at nothing");
-    }
-    // a vendor's domain, matched whole, and only the vendor of that tool
-    for (tool, domain) in &t.vendors {
-        assert!(agent(&format!("{tool} <x@{domain}>")), "{tool} at {domain}");
-        assert!(
-            agent(&format!(
-                "{} <x@{}>",
-                tool.to_uppercase(),
-                domain.to_uppercase()
-            )),
-            "{tool} at {domain} in capitals"
-        );
-        assert!(!agent(&format!("{tool} <x@not{domain}>")), "not{domain}");
-        assert!(
-            !agent(&format!("{tool} <x@mail.{domain}>")),
-            "mail.{domain}"
-        );
-        assert!(
-            !agent(&format!("{tool} <x@{domain}.example>")),
-            "{domain}.example"
-        );
-        assert!(
-            !agent(&format!("{tool} Monet <x@{domain}>")),
-            "{tool} Monet at {domain}"
-        );
-    }
-    for g in &t.given {
-        for (tool, domain) in &t.vendors {
-            // a domain that is another tool's vendor, and not this one's
-            if tool != g && !t.vendors.contains(&(g.clone(), domain.clone())) {
-                assert!(!agent(&format!("{g} <x@{domain}>")), "{g} at {domain}");
-            }
-        }
-    }
-}
-
-#[test]
-fn a_name_the_project_lists_is_read_whatever_the_mailbox() {
-    let t = t();
-    for (key, identity) in &t.keyed {
-        // the default lets the row through, and the name is what stops it
-        assert!(!agent(identity), "{identity} by default");
-        assert!(!named(identity, &[]), "{identity} with no names");
-        assert!(named(identity, &[key]), "{identity} named {key}");
-    }
-    for g in &t.given {
-        let who = format!("{g} <root@buildhost.local>");
-        assert!(!agent(&who), "{who} by default");
-        assert!(named(&who, &[g]), "{who} named {g}");
-        assert!(
-            named(&who, &[&g.to_uppercase()]),
-            "{who} named {g} in capitals"
-        );
-        assert!(named(&who, &["Zed", g]), "{who} among names");
-        // another name names another identity
-        assert!(!named(&who, &["Zed"]), "{who} named Zed");
-        assert!(!named(&who, &[""]), "{who} named nothing");
-        // the whole name, not its start, and a group in parentheses is no part of it
-        assert!(
-            !named(&format!("{g} Monet <root@buildhost.local>"), &[g]),
-            "{g} Monet named {g}"
-        );
-        assert!(
-            named(&format!("{g} (she/her) <root@buildhost.local>"), &[g]),
-            "{g} (she/her) named {g}"
-        );
-    }
-    // a name the project lists is any name, and the other nets still hold
-    assert!(named("Build Host <root@buildhost.local>", &["Build Host"]));
-    assert!(!named("Build Host <root@buildhost.local>", &["Build"]));
-    assert!(named("Copilot <x@example.com>", &["Zed"]));
-    assert!(!named("Jane Smith <jane@example.com>", &["Zed"]));
 }
 
 #[test]
@@ -425,18 +299,4 @@ fn each_agent_row_is_an_agent_in_every_form_it_arrives_in() {
         assert!(agent(a), "{a}");
         assert!(agent(&format!("{a} 1791567502 +0000")), "{a} with a date");
     }
-}
-
-#[test]
-fn the_machine_suffixes_are_exactly_the_names_only_a_private_network_uses() {
-    // The loop above walks the constant, so a suffix taken out of it would only
-    // make that loop shorter. The list is pinned here, and the shell recogniser's
-    // suite spells the same five out.
-    assert_eq!(MACHINE_SUFFIXES, &[
-        ".local",
-        ".localdomain",
-        ".lan",
-        ".internal",
-        ".home.arpa"
-    ]);
 }

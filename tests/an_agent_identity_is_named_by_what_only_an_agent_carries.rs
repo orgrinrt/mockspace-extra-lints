@@ -105,6 +105,8 @@ fn a_given_name_tool_is_an_agent_with_a_second_signal_and_a_person_without() {
         "Cody <cody@gmail.com>",
         "Claude <claude@example.org>",
         "Claude <claude@users.noreply.github.com>",
+        "Claude <12345+claude@users.noreply.github.com>",
+        "Devin <12345+devin@users.noreply.github.com>",
     ] {
         let found = judged(&[], AgentMode::Assistant, CLEAN, Some(who), Some(who));
         assert!(found.is_empty(), "{who}: {found:?}");
@@ -115,7 +117,6 @@ fn a_given_name_tool_is_an_agent_with_a_second_signal_and_a_person_without() {
         "Claude <claude@localhost>",
         "claude <claude@buildbox>",
         "Claude <claude@ci.local>",
-        "Claude <12345+claude@users.noreply.github.com>",
         "Claude <claude@anthropic.com>",
         "Devin <devin@cognition.ai>",
         "Gemini <gemini@google.com>",
@@ -127,20 +128,41 @@ fn a_given_name_tool_is_an_agent_with_a_second_signal_and_a_person_without() {
 }
 
 #[test]
-fn a_tool_that_is_no_given_name_is_an_agent_with_any_words_after_it() {
-    for who in ["Copilot Chat", "Copilot Workspace", "Cursor Bugbot", "Cursor"] {
+fn a_tool_is_an_agent_alone_or_with_companions_and_a_person_with_a_name_after_it() {
+    for who in [
+        "Copilot Chat",
+        "Copilot Workspace",
+        "Cursor Bugbot",
+        "Cursor",
+        "Cline",
+        "Claude Code Action",
+        "Claude Agent SDK",
+        "Claude Code on the web",
+    ] {
         let found = judged(&[], AgentMode::Assistant, CLEAN, Some(who), None);
         assert_eq!(kinds(&found), vec!["identity"], "{who}: {found:?}");
     }
-    // and a tool's name inside somebody's is none
-    let found = judged(
-        &[],
-        AgentMode::Assistant,
-        CLEAN,
-        Some("Smith Copilot <smith@example.com>"),
-        None,
-    );
-    assert!(found.is_empty(), "{found:?}");
+    // a word of somebody's name after a tool is theirs, and so is a tool's name
+    // inside somebody's
+    for who in [
+        "Cline, John",
+        "Cline Smith",
+        "Aider Aliyev",
+        "Llama Jones",
+        "Copilot Smith",
+        "Cursor Smith",
+        "Sonnet Lee",
+        "Anthropic Lee",
+        "Claude Ide Smith",
+        "Devin Ai Nguyen",
+        "Claude Marie Via",
+        "Claude Monet Lite",
+        "Devin Van Web",
+        "Smith Copilot <smith@example.com>",
+    ] {
+        let found = judged(&[], AgentMode::Assistant, CLEAN, Some(who), Some(who));
+        assert!(found.is_empty(), "{who}: {found:?}");
+    }
 }
 
 #[test]
