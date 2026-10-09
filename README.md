@@ -98,6 +98,15 @@ source through `cargo metadata` to find them. It stops at the dependency's own
 declarations, and crates of the same workspace are not foreign, on the
 reasoning that a consumer names a kit's crates and nothing under them.
 
+### Canon discipline
+
+`no-superseded-citation`. A repo lint for a project whose canon is typed rows that
+carry `superseded_by`: a design, a source file or a content file that names a
+superseded row as a whole word is a hard failure at commit, push and build, and
+the finding names the row that binds now. A sentence that says the row is
+superseded may still name it. The canon files, the design rounds and research
+notes, generated files and build output are not read.
+
 ### Prose and process
 
 `writing-style`, `commit-style`, `forge-body`, `message-attribution`,
