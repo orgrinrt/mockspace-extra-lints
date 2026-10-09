@@ -6,6 +6,10 @@ description = "attribution policy for a project whose headless runs are Claude: 
 # Import this INSTEAD of message-attribution when headless runs should record
 # provenance. The advert axis stays denied: provenance is warranted when nobody
 # was watching, an advert is unwarranted regardless of who was.
+#
+# The autonomous glob permits the identity Claude Code commits as, `Claude
+# <noreply@anthropic.com>`, in the author and committer fields as well as in the
+# trailer, and only under autonomous mode.
 [config]
 assistant = ""
 autonomous = "Claude *<noreply@anthropic.com>"

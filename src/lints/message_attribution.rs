@@ -20,6 +20,28 @@
 //! The axes are separate because the reasoning differs. Provenance is warranted
 //! exactly when nobody was watching; an advert is unwarranted regardless.
 //!
+//! # Who made the commit
+//!
+//! A commit authored or committed as an agent makes the provenance claim in a
+//! field no message edit reaches, and it carries no trailer to find: a container
+//! whose global git identity is an agent signs every commit it makes as one, and a
+//! check that reads only the message passes all of them. So the commit's author and
+//! committer, when the gate hands them over, are judged on the provenance axis,
+//! by the same recogniser and against the same glob as a `Co-Authored-By`. An
+//! identity the glob permits for the active mode is left alone, and so is one that
+//! names no agent. A pull-request body has no author or committer, and is handed
+//! none.
+//!
+//! What names an agent is [`agent_identity`](super::agent_identity): what only an
+//! agent carries, a marker, a mailbox it commits from, a tag a tool writes into a
+//! name, or a name that starts with a tool's own, and never a word that happens to
+//! sit inside somebody's name. Four keys carry it: `agent_identities` replaces the
+//! whole list, `extra_agent_identities` adds to it, `agent_names` names whole names
+//! that are agents whatever the mailbox, and `not_agents` names people who are never
+//! to be read as agents. Its lists and verdicts are held to the conformance table
+//! that ships with `mockspace-lint-rules`, the one every recogniser of an agent
+//! identity is held to.
+//!
 //! # Patterns are configuration
 //!
 //! The built-in pattern sets are defaults loaded from configuration, not
@@ -30,6 +52,9 @@
 use std::collections::HashMap;
 
 use mockspace_lint_rules::{AgentMode, Lint, LintError, MessageContext, MessageLint, Severity};
+
+use super::agent_identity::AgentIdentities;
+use crate::util::glob_matches;
 
 const LINT_NAME: &str = "message-attribution";
 
@@ -52,56 +77,34 @@ const DEFAULT_ADVERT_PATTERNS: &[&str] = &[
     "🤖",
 ];
 
-/// The default agent identities that make a `Co-Authored-By` provenance rather
-/// than a human co-author.
-const DEFAULT_AGENT_IDENTITIES: &[&str] = &[
-    "claude",
-    "anthropic",
-    "opus",
-    "sonnet",
-    "haiku",
-    "copilot",
-    "gpt-",
-    "codex",
-    "gemini",
-    "swe-agent",
-    "devin",
-    "cursor",
-    "aider",
-    "[bot]",
-];
-
 pub struct MessageAttribution {
     /// Glob a byline must match under [`AgentMode::Assistant`]. Empty permits
     /// none, which is the correct default: the work is the human's.
-    assistant_glob:   String,
+    assistant_glob:  String,
     /// Glob a byline must match under [`AgentMode::Autonomous`].
-    autonomous_glob:  String,
+    autonomous_glob: String,
     /// Glob an advert must match to be permitted. Empty permits none.
-    advert_glob:      String,
+    advert_glob:     String,
     /// Advert patterns replacing the shipped defaults.
-    advert_patterns:  Vec<String>,
+    advert_patterns: Vec<String>,
     /// Advert patterns added to whatever set is active.
-    extra_patterns:   Vec<String>,
-    /// Agent identities replacing the shipped defaults.
-    agent_identities: Vec<String>,
+    extra_patterns:  Vec<String>,
+    /// What names an agent, from the shipped defaults and the four keys.
+    identities:      AgentIdentities,
 }
 
 impl Default for MessageAttribution {
     fn default() -> Self {
         Self {
-            assistant_glob:   String::new(),
-            autonomous_glob:  String::new(),
-            advert_glob:      String::new(),
-            advert_patterns:  DEFAULT_ADVERT_PATTERNS
+            assistant_glob:  String::new(),
+            autonomous_glob: String::new(),
+            advert_glob:     String::new(),
+            advert_patterns: DEFAULT_ADVERT_PATTERNS
                 .iter()
                 .map(|s| (*s).to_string())
                 .collect(),
-            extra_patterns:   Vec::new(),
-            agent_identities: DEFAULT_AGENT_IDENTITIES
-                .iter()
-                .map(|s| (*s).to_string())
-                .collect(),
+            extra_patterns:  Vec::new(),
+            identities:      AgentIdentities::default(),
         }
     }
 }
@@ -112,7 +115,7 @@ impl Lint for MessageAttribution {
     }
 
     fn description(&self) -> &'static str {
-        "authorship trailers match the policy for the active mode, and no tool adverts"
+        "authorship trailers and the commit's author and committer match the policy for the active mode, and no tool adverts"
     }
 
     fn source_only(&self) -> bool {
@@ -124,7 +127,7 @@ impl Lint for MessageAttribution {
     }
 
     fn finding_kinds(&self) -> &[&str] {
-        &["advert", "byline", "missing-byline"]
+        &["advert", "byline", "identity", "missing-byline"]
     }
 
     fn config_keys(&self) -> &[&str] {
@@ -135,6 +138,9 @@ impl Lint for MessageAttribution {
             "advert_patterns",
             "extra_patterns",
             "agent_identities",
+            "extra_agent_identities",
+            "agent_names",
+            "not_agents",
         ]
     }
 
@@ -155,7 +161,16 @@ impl Lint for MessageAttribution {
             self.extra_patterns = split_list(v);
         }
         if let Some(v) = params.get("agent_identities") {
-            self.agent_identities = split_list(v);
+            self.identities.replace(split_list(v));
+        }
+        if let Some(v) = params.get("extra_agent_identities") {
+            self.identities.extend(split_list(v));
+        }
+        if let Some(v) = params.get("agent_names") {
+            self.identities.name_agents(split_list(v));
+        }
+        if let Some(v) = params.get("not_agents") {
+            self.identities.exclude(split_list(v));
         }
     }
 }
@@ -195,7 +210,7 @@ impl MessageLint for MessageAttribution {
 
             // Provenance: only a Co-Authored-By naming an agent is in scope.
             let Some(value) = coauthor_value(line) else { continue };
-            if !self.names_an_agent(&value) {
+            if !self.identities.names_an_agent(&value) {
                 continue; // a real person; never this lint's business
             }
             if glob_matches(permitted, value.trim()) {
@@ -222,6 +237,10 @@ impl MessageLint for MessageAttribution {
             }
         }
 
+        // Before the requirement below, whose `out.is_empty()` is the point of
+        // asking: a refused identity is the more specific thing to fix first.
+        self.judge_identity(ctx, permitted, &mut out);
+
         // Under a mode that configures a required byline, its absence is the
         // violation: headless work with no provenance has no record of author.
         if ctx.mode == AgentMode::Autonomous
@@ -245,6 +264,79 @@ impl MessageLint for MessageAttribution {
 }
 
 impl MessageAttribution {
+    /// Judge the commit's author and committer on the provenance axis.
+    ///
+    /// An identity that names an agent is checked against the glob the active
+    /// mode permits, exactly as a `Co-Authored-By` value is, and refused where
+    /// that does not match. One naming no agent is left alone, and so is a field
+    /// the gate did not hand over: absent is not an agent. It does not count as
+    /// the byline a headless mode requires, because that requirement is about
+    /// the message and the identity is a second record of who made the commit.
+    ///
+    /// The same identity in both fields is one finding naming both roles, since
+    /// a container whose global identity is an agent fills both and two lines
+    /// for one fact would double the noise on a push of dozens.
+    fn judge_identity(&self, ctx: &MessageContext, permitted: &str, out: &mut Vec<LintError>) {
+        let author = ctx.author.map(str::trim).filter(|a| !a.is_empty());
+        let committer = ctx.committer.map(str::trim).filter(|c| !c.is_empty());
+
+        // Who is judged, how a finding refers to them, and the verb that agrees.
+        let judged: Vec<(&str, &str, &str)> = match (author, committer) {
+            (Some(a), Some(c)) if a == c => vec![("the author and committer", "are", a)],
+            (a, c) => {
+                [("the author", a), ("the committer", c)]
+                    .into_iter()
+                    .filter_map(|(subject, who)| who.map(|w| (subject, "is", w)))
+                    .collect()
+            },
+        };
+
+        for (subject, verb, who) in judged {
+            if !self.identities.names_an_agent(who) || glob_matches(permitted, who) {
+                continue;
+            }
+            let why = if permitted.is_empty() {
+                format!("permitted in no form under mode `{}`", ctx.mode.as_token())
+            } else {
+                format!(
+                    "it does not match the `{}` pattern `{permitted}`",
+                    ctx.mode.as_token()
+                )
+            };
+            let remake = "git rebase --exec 'git commit --amend --allow-empty --no-edit \
+                          --reset-author' <upstream>";
+            let advice = match (ctx.mode, permitted.is_empty()) {
+                (AgentMode::Assistant, _) => {
+                    format!(
+                        "A commit made with a human in the loop is the human's: set `user.name` \
+                         and `user.email` to them, then remake every commit in the range with \
+                         `{remake}`, since `--reset-author` on its own repairs only the tip."
+                    )
+                },
+                (AgentMode::Autonomous, true) => {
+                    format!(
+                        "This mode permits no agent identity: set `user.name` and `user.email` to \
+                         a person, then remake every commit in the range with `{remake}`, since \
+                         `--reset-author` on its own repairs only the tip."
+                    )
+                },
+                (AgentMode::Autonomous, false) => {
+                    format!(
+                        "Set `user.name` and `user.email` to an identity matching the pattern, \
+                         then remake every commit in the range with `{remake}`, since \
+                         `--reset-author` on its own repairs only the tip."
+                    )
+                },
+            };
+            out.push(finding(
+                ctx,
+                1,
+                "identity",
+                &format!("{subject} {verb} an agent identity, {why}: {who}. {advice}"),
+            ));
+        }
+    }
+
     /// The active advert pattern set: the configured or default base, plus any
     /// extras, all lowercased for case-insensitive matching.
     fn advert_patterns_active(&self) -> impl Iterator<Item = String> + '_ {
@@ -252,13 +344,6 @@ impl MessageAttribution {
             .iter()
             .chain(self.extra_patterns.iter())
             .map(|p| p.to_ascii_lowercase())
-    }
-
-    fn names_an_agent(&self, value: &str) -> bool {
-        let lower = value.to_ascii_lowercase();
-        self.agent_identities
-            .iter()
-            .any(|id| lower.contains(&id.to_ascii_lowercase()))
     }
 }
 
@@ -286,30 +371,6 @@ fn coauthor_value(line: &str) -> Option<String> {
     Some(line[at + "co-authored-by:".len() ..].to_string())
 }
 
-/// Whether `value` matches `pattern`, a glob supporting `*` and `?`.
-///
-/// An empty pattern matches nothing, which is what makes "configure nothing" mean
-/// "permit nothing" rather than "permit everything".
-fn glob_matches(pattern: &str, value: &str) -> bool {
-    if pattern.is_empty() {
-        return false;
-    }
-    glob_rec(pattern.as_bytes(), value.as_bytes())
-}
-
-fn glob_rec(p: &[u8], v: &[u8]) -> bool {
-    match (p.first(), v.first()) {
-        (None, None) => true,
-        (Some(b'*'), _) => {
-            // match zero characters, or one more then retry
-            glob_rec(&p[1 ..], v) || (!v.is_empty() && glob_rec(p, &v[1 ..]))
-        },
-        (Some(b'?'), Some(_)) => glob_rec(&p[1 ..], &v[1 ..]),
-        (Some(a), Some(b)) if a.eq_ignore_ascii_case(b) => glob_rec(&p[1 ..], &v[1 ..]),
-        _ => false,
-    }
-}
-
 fn split_list(v: &str) -> Vec<String> {
     v.split(',')
         .map(|s| s.trim().to_string())
@@ -329,333 +390,5 @@ fn finding(ctx: &MessageContext, line: usize, kind: &'static str, message: &str)
 }
 
 #[cfg(test)]
-mod tests {
-    use mockspace_lint_rules::MessageDomain;
-
-    use super::*;
-
-    fn check(l: &MessageAttribution, mode: AgentMode, msg: &str) -> Vec<String> {
-        let ctx = MessageContext {
-            domain: MessageDomain::CommitMessage,
-            mode,
-            message: msg,
-            origin: "COMMIT_EDITMSG",
-            repo_root: std::path::Path::new("/tmp"),
-            invocation: None,
-        };
-        l.check_message(&ctx)
-            .into_iter()
-            .map(|e| e.finding_kind.unwrap_or("none").to_string())
-            .collect()
-    }
-
-    fn with(pairs: &[(&str, &str)]) -> MessageAttribution {
-        let mut l = MessageAttribution::default();
-        let mut p = HashMap::new();
-        for (k, v) in pairs {
-            p.insert((*k).to_string(), (*v).to_string());
-        }
-        l.configure(&p);
-        l
-    }
-
-    // --- the deny path, which is the default ---
-
-    #[test]
-    fn an_agent_byline_is_denied_when_a_human_was_in_the_loop() {
-        let l = MessageAttribution::default();
-        assert_eq!(
-            check(
-                &l,
-                AgentMode::Assistant,
-                "feat: x\n\nCo-Authored-By: Claude <noreply@anthropic.com>"
-            ),
-            vec!["byline"]
-        );
-    }
-
-    #[test]
-    fn adverts_are_denied_in_both_modes() {
-        let l = MessageAttribution::default();
-        for mode in [AgentMode::Assistant, AgentMode::Autonomous] {
-            assert_eq!(
-                check(
-                    &l,
-                    mode,
-                    "feat: x\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)"
-                ),
-                vec!["advert"],
-                "adverts must be denied under {mode:?}"
-            );
-        }
-    }
-
-    #[test]
-    fn a_session_trailer_is_an_advert() {
-        let l = MessageAttribution::default();
-        assert_eq!(
-            check(
-                &l,
-                AgentMode::Assistant,
-                "feat: x\n\nClaude-Session: https://claude.ai/code/session_abc"
-            ),
-            vec!["advert"]
-        );
-    }
-
-    #[test]
-    fn a_human_co_author_is_never_touched() {
-        // The rule is about agent provenance, so a real person's co-authorship
-        // must pass in every mode and under every configuration.
-        let l = MessageAttribution::default();
-        for mode in [AgentMode::Assistant, AgentMode::Autonomous] {
-            assert!(
-                check(
-                    &l,
-                    mode,
-                    "feat: x\n\nCo-Authored-By: Jane Smith <jane@example.com>"
-                )
-                .is_empty()
-            );
-        }
-    }
-
-    #[test]
-    fn a_github_noreply_human_is_not_an_agent() {
-        // `12345+user@users.noreply.github.com` is a real person hiding their
-        // address, and matching on `noreply@` would have caught them.
-        let l = MessageAttribution::default();
-        assert!(
-            check(
-                &l,
-                AgentMode::Assistant,
-                "feat: x\n\nCo-Authored-By: Some One <12345+someone@users.noreply.github.com>"
-            )
-            .is_empty()
-        );
-    }
-
-    // --- the PERMIT path, which the default config never exercises ---
-
-    #[test]
-    fn a_configured_byline_is_permitted_under_headless_mode() {
-        // The permit path. Without a test here, a matcher that always denied
-        // would pass every other test in this file.
-        let l = with(&[("autonomous", "Claude *<noreply@anthropic.com>")]);
-        assert!(
-            check(
-                &l,
-                AgentMode::Autonomous,
-                "feat: x\n\nCo-Authored-By: Claude Opus <noreply@anthropic.com>"
-            )
-            .is_empty(),
-            "a byline matching the configured glob must be permitted"
-        );
-    }
-
-    #[test]
-    fn the_same_byline_is_still_denied_with_a_human_in_the_loop() {
-        // The two modes must genuinely differ, or the predicate is decoration.
-        let l = with(&[("autonomous", "Claude *<noreply@anthropic.com>")]);
-        assert_eq!(
-            check(
-                &l,
-                AgentMode::Assistant,
-                "feat: x\n\nCo-Authored-By: Claude Opus <noreply@anthropic.com>"
-            ),
-            vec!["byline"]
-        );
-    }
-
-    #[test]
-    fn a_non_matching_byline_is_denied_even_under_headless_mode() {
-        // A recognised agent identity that fails the configured glob. Headless
-        // mode permits one specific byline, not any byline.
-        let l = with(&[("autonomous", "Claude *<noreply@anthropic.com>")]);
-        assert_eq!(
-            check(
-                &l,
-                AgentMode::Autonomous,
-                "feat: x\n\nCo-Authored-By: Copilot <x@github.test>"
-            ),
-            vec!["byline"]
-        );
-    }
-
-    #[test]
-    fn an_unrecognised_bot_reads_as_a_human_until_the_list_names_it() {
-        // Inherent to matching on identity: a bot nobody has listed is
-        // indistinguishable from a person. This is why `agent_identities` is
-        // configuration rather than a fixed rule, and the behaviour is asserted
-        // so it is a known boundary rather than a surprise.
-        let l = MessageAttribution::default();
-        assert!(
-            check(
-                &l,
-                AgentMode::Assistant,
-                "feat: x\n\nCo-Authored-By: Somebot <x@evil.test>"
-            )
-            .is_empty()
-        );
-        let named = with(&[("agent_identities", "claude,somebot")]);
-        assert_eq!(
-            check(
-                &named,
-                AgentMode::Assistant,
-                "feat: x\n\nCo-Authored-By: Somebot <x@evil.test>"
-            ),
-            vec!["byline"]
-        );
-    }
-
-    #[test]
-    fn headless_mode_requires_the_byline_it_configures() {
-        // Provenance is the point of the mode: work with nobody watching and no
-        // byline has no record of who produced it.
-        let l = with(&[("autonomous", "Claude *")]);
-        assert_eq!(check(&l, AgentMode::Autonomous, "feat: x"), vec![
-            "missing-byline"
-        ]);
-        // and it is not required when the mode does not configure one
-        let bare = MessageAttribution::default();
-        assert!(check(&bare, AgentMode::Autonomous, "feat: x").is_empty());
-    }
-
-    #[test]
-    fn a_permitted_advert_glob_lets_one_through() {
-        // The advert permit path, so "deny by default" is proven to be a default
-        // rather than a hardcoded rule.
-        let l = with(&[("adverts", "*Generated with [OurTool]*")]);
-        assert!(
-            check(
-                &l,
-                AgentMode::Assistant,
-                "feat: x\n\nGenerated with [OurTool](https://x.test)"
-            )
-            .is_empty()
-        );
-    }
-
-    // --- configurability ---
-
-    #[test]
-    fn a_project_can_add_its_own_advert_pattern() {
-        let l = with(&[("extra_patterns", "powered by robotron")]);
-        assert_eq!(
-            check(&l, AgentMode::Assistant, "feat: x\n\nPowered By Robotron"),
-            vec!["advert"]
-        );
-        // and the shipped defaults still apply alongside it
-        assert_eq!(check(&l, AgentMode::Assistant, "feat: x\n\n🤖"), vec![
-            "advert"
-        ]);
-    }
-
-    #[test]
-    fn a_project_can_replace_the_default_advert_set_entirely() {
-        let l = with(&[("advert_patterns", "only-this")]);
-        assert!(check(&l, AgentMode::Assistant, "feat: x\n\n🤖").is_empty());
-        assert_eq!(
-            check(&l, AgentMode::Assistant, "feat: x\n\nonly-this"),
-            vec!["advert"]
-        );
-    }
-
-    #[test]
-    fn a_project_can_redefine_what_counts_as_an_agent() {
-        let l = with(&[("agent_identities", "robotron")]);
-        // Claude is no longer an agent identity here, so it reads as a human
-        assert!(
-            check(
-                &l,
-                AgentMode::Assistant,
-                "feat: x\n\nCo-Authored-By: Claude <a@b.test>"
-            )
-            .is_empty()
-        );
-        assert_eq!(
-            check(
-                &l,
-                AgentMode::Assistant,
-                "feat: x\n\nCo-Authored-By: Robotron <a@b.test>"
-            ),
-            vec!["byline"]
-        );
-    }
-
-    // --- robustness ---
-
-    #[test]
-    fn commented_lines_and_the_diff_are_not_authored() {
-        let l = MessageAttribution::default();
-        let msg = "feat: x\n\n# Co-Authored-By: Claude <a@b.test>\n\
-                   # ------------------------ >8 ------------------------\n\
-                   +Co-Authored-By: Claude <a@b.test>";
-        assert!(check(&l, AgentMode::Assistant, msg).is_empty());
-    }
-
-    #[test]
-    fn the_trailer_key_is_matched_case_insensitively() {
-        let l = MessageAttribution::default();
-        for form in ["Co-Authored-By:", "co-authored-by:", "CO-AUTHORED-BY:"] {
-            assert_eq!(
-                check(
-                    &l,
-                    AgentMode::Assistant,
-                    &format!("feat: x\n\n{form} Claude <a@b.test>")
-                ),
-                vec!["byline"],
-                "{form} should be recognised"
-            );
-        }
-    }
-
-    #[test]
-    fn an_advert_that_looks_like_a_byline_is_reported_once_as_an_advert() {
-        // `Co-Authored-By: Claude Code` names a tool, not a person, so it is an
-        // advert. Reporting it twice would be noise.
-        let l = MessageAttribution::default();
-        assert_eq!(
-            check(
-                &l,
-                AgentMode::Assistant,
-                "feat: x\n\nCo-Authored-By: Claude Code <noreply@anthropic.com>"
-            ),
-            vec!["advert"]
-        );
-    }
-
-    #[test]
-    fn the_glob_supports_star_and_question_mark() {
-        assert!(glob_matches("Claude *", "Claude Opus <x@y>"));
-        assert!(glob_matches(
-            "*<noreply@anthropic.com>",
-            "Claude <noreply@anthropic.com>"
-        ));
-        assert!(glob_matches("a?c", "abc"));
-        assert!(!glob_matches("a?c", "ac"));
-        assert!(!glob_matches("Claude *", "Somebot <x@y>"));
-        // an empty pattern permits nothing, so unconfigured means denied
-        assert!(!glob_matches("", "anything"));
-    }
-
-    #[test]
-    fn every_finding_kind_the_lint_emits_is_declared() {
-        let l = with(&[("autonomous", "Claude *")]);
-        let declared = l.finding_kinds();
-        let mut emitted = Vec::new();
-        emitted.extend(check(
-            &l,
-            AgentMode::Assistant,
-            "x\n\nCo-Authored-By: Claude <a@b>",
-        ));
-        emitted.extend(check(&l, AgentMode::Assistant, "x\n\n🤖"));
-        emitted.extend(check(&l, AgentMode::Autonomous, "x"));
-        for kind in emitted {
-            assert!(
-                declared.contains(&kind.as_str()),
-                "`{kind}` is not declared"
-            );
-        }
-    }
-}
+#[path = "message_attribution_tests.rs"]
+mod tests;

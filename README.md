@@ -103,6 +103,96 @@ reasoning that a consumer names a kit's crates and nothing under them.
 `writing-style`, `commit-style`, `forge-body`, `message-attribution`,
 `lint-allow-requires-task-id`.
 
+`message-attribution` judges more than the trailers in a message. When the gate
+hands it a commit's author and committer, an identity that names an agent is
+refused under the same per-mode glob an agent `Co-Authored-By` answers to, at
+the commit and again at the push. A project permitting no byline therefore
+permits no agent identity either, and an agent committing under its own name no
+longer clears the hook for want of a trailer. A pull-request body has neither
+field and is not judged for them. The fields are `MessageContext::author` and
+`committer`, which a mockspace carrying them hands over, and the pack builds
+against one that does.
+
+What names an agent is what only an agent carries, and never a word inside a
+person's name. Five things do, tried in this order: a marker such as `[bot]`,
+anywhere in the name or the mailbox; a mailbox an agent commits from, matched
+whole; a tag a tool writes into a name, such as aider's `(aider)`; a name the
+project lists in `agent_names`; and a name that starts with a tool's own, behind a
+vendor word if it likes. A vendor's domain is not a mailbox, so a person writing
+from one is a person, except that a given-name tool at its own vendor domain,
+`Claude <claude@anthropic.com>` or `Devin <devin@cognition.ai>`, is the tool.
+
+A group in parentheses is read for a tag and for nothing else. `Paul Gauthier
+(aider)` is the tool, and a group holding anything else, an employer or a tool's
+name, is left out of the name, so `Jane Doe (OpenAI)` and `Alex (Droid)` are
+people.
+
+A tool's name makes an agent when nothing follows it but the words that ride along
+with a tool and versions, so `Copilot Chat`, `Cursor Bugbot`, `Claude Code Action`,
+`Claude Agent SDK`, `Claude Code on the web` and `GPT 4o` are the tools. Any other
+word after it is somebody's, so `Copilot Smith`, `Cline, John`, `Aider Aliyev`,
+`Sonnet Lee` and `Claude Monet` are people, and so are `Claude Marie Via` and
+`Devin Van Web`, where a companion word comes later but a name stands before it.
+A tool's name inside a name, as in `Smith Copilot`, is none. A person whose whole
+name is a tool's name with only such words after it reads as the tool, and
+`not_agents` is how a project says otherwise.
+
+A tool alone is an agent, except where its name is also somebody's given name,
+such as `Claude`, `Devin` or `Gemini`. Those want a second signal when nothing
+follows them: a vendor word before them (`Google Gemini`), or a mailbox that is the
+tool's. The mailbox is the tool's when its domain is a domain the tool commits
+from, matched whole, or when its local part is the tool's word at a mailbox that is
+a machine's: a domain that is `localhost`, one label with no dot, or one ending in
+`.local`, `.localdomain`, `.lan`, `.internal` or `.home.arpa`. `Claude
+<claude@localhost>`, `claude <claude@buildbox>`, `Claude <claude@ci.local>`,
+`Claude <claude@anthropic.com>`, `Devin <devin@cognition.ai>`, `Gemini
+<gemini@google.com>` and `Amp <noreply@ampcode.com>` are the tools. The same local
+part at any other domain is a person called that, so `Devin <devin@acme.com>`,
+`Cody <cody@gmail.com>` and `Claude <claude@example.org>` are people. So is GitHub's
+private address, `Devin <12345+devin@users.noreply.github.com>`, which every
+account has and which says nothing about who is behind it.
+
+What the default lets through is a bare given name behind a mailbox that is
+neither the tool's nor on the list. `claude <root@buildhost.local>` is the one
+that was found, a machine's mailbox whose local part is not the tool's word, and
+`Devin <devin@acme.com>` is the one that has to stay a person. Both read as a
+person until the project lists the name in `agent_names`, and listing `Devin` reads
+every bare `Devin` as the tool, whatever the mailbox.
+
+Four keys on the lint carry the list, and they take a comma-separated value:
+
+- `agent_identities` replaces the whole list. Whatever it does not name is no
+  longer an agent, the shipped mailboxes and markers included.
+- `extra_agent_identities` adds to the list and disarms none of it. This is the
+  key for naming one more tool.
+- `agent_names` names whole names that are agents whatever the mailbox.
+  `agent_names = "Claude, Devin"` makes `claude <root@buildhost.local>` an agent
+  and leaves `Claude Monet` a person. This is the key for a build host whose
+  mailbox nobody could have listed.
+- `not_agents` names people who are never to be read as agents, and it is read
+  before the rest. Write each as `Name <mailbox>`, which excuses exactly that
+  identity. A bare name or a bare mailbox excuses everything it matches, except at
+  a mailbox an agent commits from, one on the list, at a given-name tool's own
+  domain or carrying a marker, where it excuses nothing:
+  `not_agents = "Claude"` leaves `Claude <noreply@anthropic.com>` an agent, and
+  `not_agents = "Claude <noreply@anthropic.com>"` excuses it.
+
+An entry in either list is told apart by its shape. One holding `@` is a mailbox,
+a glob over the whole mailbox where `*` stands for any run of characters. One
+opening with `[` is a marker. Anything else is a tool's name, its words as
+spelled: `robotron` makes `Robotron` and `Robotron CLI` agents and leaves `Robert
+Robotron-Smith` a person. A project that wrote `agent_identities` when it meant a
+substring of an address gets something else now: the same value is read as tool
+names, mailboxes and markers, so a word that used to match inside a name or an
+address no longer does, and the check is to read its value against the three
+shapes.
+
+The lists and the verdicts are held to a conformance table that ships with
+`mockspace-lint-rules`. Anything else that names an agent from an author, a
+committer or a `Co-Authored-By`, a review sweep over a repository's history
+among them, is held to the same table, so an identity is an agent to all of them
+or to none.
+
 ### Tools
 
 A tool rides the same cdylib a lint does, so depending on this pack gives you
