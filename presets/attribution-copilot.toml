@@ -3,11 +3,15 @@ name = "message-attribution"
 primitive = "message-attribution"
 description = "attribution policy for a project whose headless runs are Copilot: permits the Copilot provenance byline under autonomous mode, still no adverts"
 
-# The autonomous glob also decides which Copilot bot identity may be the author
-# or committer of a commit under autonomous mode.
+# The autonomous glob also decides which Copilot identity may be the author or
+# committer of a commit under autonomous mode. It matches any identity that
+# names Copilot, because the two forms a Copilot agent commits as share only that:
+# the bot account is `copilot-swe-agent[bot]`, and the coding agent's author is
+# `Copilot <198982749+Copilot@users.noreply.github.com>`, with no `[bot]` in it.
+# It judges only identities the recogniser already reads as an agent's.
 [config]
 assistant = ""
-autonomous = "*copilot*[bot]*"
+autonomous = "*copilot*"
 adverts = ""
 extra_patterns = "generated with [copilot"
 

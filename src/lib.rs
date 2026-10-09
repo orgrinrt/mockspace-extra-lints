@@ -34,6 +34,7 @@ pub mod lints {
     //! forge body.
 
     pub mod arvo_types_only;
+    pub(crate) mod agent_identity;
     pub(crate) mod authored_message;
     pub mod commit_style;
     pub mod forge_body;

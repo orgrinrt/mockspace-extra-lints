@@ -441,16 +441,13 @@ mod tests {
     }
 
     fn check(l: &CommitStyle, msg: &str) -> Vec<String> {
-        let ctx = MessageContext {
-            domain:     MessageDomain::CommitMessage,
-            mode:       mockspace_lint_rules::AgentMode::Assistant,
-            message:    msg,
-            origin:     "COMMIT_EDITMSG",
-            repo_root:  std::path::Path::new("/tmp"),
-            invocation: None,
-            author:     None,
-            committer:  None,
-        };
+        let ctx = MessageContext::new(
+            MessageDomain::CommitMessage,
+            mockspace_lint_rules::AgentMode::Assistant,
+            msg,
+            "COMMIT_EDITMSG",
+            std::path::Path::new("/tmp"),
+        );
         l.check_message(&ctx)
             .into_iter()
             .map(|e| e.finding_kind.unwrap_or("none").to_string())
@@ -464,19 +461,17 @@ mod tests {
             "{{\"command\":\"{}\",\"description\":\"commit the change\"}}",
             command.replace('"', "\\\"")
         );
-        let ctx = MessageContext {
-            domain:     MessageDomain::CommitMessage,
-            mode:       mockspace_lint_rules::AgentMode::Assistant,
-            message:    &serialised,
-            origin:     "<stdin>",
-            repo_root:  std::path::Path::new("/tmp"),
-            invocation: Some(mockspace_lint_rules::Invocation {
-                command:   Some(command),
-                tool_name: Some("Bash"),
-            }),
-            author:     None,
-            committer:  None,
-        };
+        let ctx = MessageContext::new(
+            MessageDomain::CommitMessage,
+            mockspace_lint_rules::AgentMode::Assistant,
+            &serialised,
+            "<stdin>",
+            std::path::Path::new("/tmp"),
+        )
+        .with_invocation(Some(mockspace_lint_rules::Invocation {
+            command:   Some(command),
+            tool_name: Some("Bash"),
+        }));
         l.check_message(&ctx)
             .into_iter()
             .map(|e| e.finding_kind.unwrap_or("none").to_string())
@@ -544,19 +539,17 @@ mod tests {
         // lint's.
         let l = hiisi();
         let serialised = "{\"message\":\"Added Some Things.\",\"repo\":\"muisti\"}";
-        let ctx = MessageContext {
-            domain:     MessageDomain::CommitMessage,
-            mode:       mockspace_lint_rules::AgentMode::Assistant,
-            message:    serialised,
-            origin:     "<stdin>",
-            repo_root:  std::path::Path::new("/tmp"),
-            invocation: Some(mockspace_lint_rules::Invocation {
-                command:   Some(""),
-                tool_name: Some("mcp__git__commit"),
-            }),
-            author:     None,
-            committer:  None,
-        };
+        let ctx = MessageContext::new(
+            MessageDomain::CommitMessage,
+            mockspace_lint_rules::AgentMode::Assistant,
+            serialised,
+            "<stdin>",
+            std::path::Path::new("/tmp"),
+        )
+        .with_invocation(Some(mockspace_lint_rules::Invocation {
+            command:   Some(""),
+            tool_name: Some("mcp__git__commit"),
+        }));
         let found: Vec<String> = l
             .check_message(&ctx)
             .into_iter()

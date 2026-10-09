@@ -1,11 +1,9 @@
 //! A commit whose author or committer is an agent is judged by
 //! `message-attribution` under the policy that judges an agent `Co-Authored-By`.
 //!
-//! On 9 October 221 commits on one repository's remote branches, and 16 on a
-//! pull request, were found with an agent as author and committer, because the
-//! containers' global git identity was set to that. Their messages carried no
-//! trailer and no advert, so every message check passed them, and the only thing
-//! that read the two fields was a scan run at review time.
+//! An agent committing under its own name leaves no trailer and no advert in the
+//! message, so a check that reads only the message passes it, and the author and
+//! committer are where the claim is made.
 //!
 //! Every case here goes through the pack as the engine drives it: collected,
 //! configured from a `LintConfig`, and run by `check_message_with_extra`. A lint
@@ -55,16 +53,14 @@ fn judged(
     committer: Option<&str>,
 ) -> Vec<(String, String)> {
     let (p, cfg) = configured(params);
-    let ctx = MessageContext {
-        domain: MessageDomain::CommitMessage,
+    let ctx = MessageContext::new(
+        MessageDomain::CommitMessage,
         mode,
         message,
-        origin: "abc1234 feat: a subject",
-        repo_root: Path::new("/tmp"),
-        invocation: None,
-        author,
-        committer,
-    };
+        "abc1234 feat: a subject",
+        Path::new("/tmp"),
+    )
+    .with_identity(author, committer);
     check_message_with_extra(&ctx, Some(&cfg), &p.message_lints)
         .into_iter()
         .filter(|f| f.lint_name == "message-attribution")
@@ -116,9 +112,8 @@ fn an_agent_committer_is_refused_when_a_human_was_in_the_loop() {
 
 #[test]
 fn one_agent_identity_in_both_fields_is_one_finding_naming_both() {
-    // What a container whose global identity was set to the agent produces, and
-    // what the 237 commits were. Two findings for one identity would double the
-    // noise on a push of dozens.
+    // What a container whose global identity was set to the agent produces. Two
+    // findings for one identity would double the noise on a push of dozens.
     let found = judged(&[], AgentMode::Assistant, CLEAN, Some(AGENT), Some(AGENT));
     assert_eq!(kinds(&found), vec!["identity"], "got: {found:?}");
     assert!(
@@ -226,16 +221,26 @@ fn a_permitted_identity_does_not_stand_in_for_the_byline_headless_work_requires(
     assert_eq!(kinds(&found), vec!["missing-byline"], "got: {found:?}");
 }
 
-#[test]
-fn the_shipped_presets_permit_their_own_tools_identity_and_nothing_else() {
-    // The globs are copied from the presets and the presets are read here, so
-    // the two cannot drift apart without this failing.
-    let claude = include_str!("../presets/attribution-claude.toml");
-    let copilot = include_str!("../presets/attribution-copilot.toml");
-    assert!(claude.contains(&format!("autonomous = \"{CLAUDE_GLOB}\"")));
-    assert!(copilot.contains("autonomous = \"*copilot*[bot]*\""));
+/// The value of `autonomous` in a preset, as shipped.
+fn autonomous_glob_of(preset: &str) -> String {
+    preset
+        .lines()
+        .find_map(|l| l.strip_prefix("autonomous = \""))
+        .and_then(|rest| rest.strip_suffix('"'))
+        .unwrap_or_else(|| panic!("the preset sets no autonomous glob:\n{preset}"))
+        .to_string()
+}
 
-    let copilot_bot = "copilot-swe-agent[bot] <198982749+Copilot@users.noreply.github.com>";
+#[test]
+fn a_shipped_preset_permits_the_identities_its_tool_really_commits_as() {
+    // The globs are read out of the presets, so a preset that stops matching what
+    // its tool commits as fails here and is not copied into a test that still
+    // passes. The Copilot cases are the two forms a Copilot agent commit takes:
+    // the bot account, and the author the coding agent writes, which is named
+    // `Copilot` and carries no `[bot]` at all.
+    let claude = autonomous_glob_of(include_str!("../presets/attribution-claude.toml"));
+    let copilot = autonomous_glob_of(include_str!("../presets/attribution-copilot.toml"));
+
     let by = |glob: &str, who: &str| {
         judged(
             &[("autonomous", glob)],
@@ -246,58 +251,52 @@ fn the_shipped_presets_permit_their_own_tools_identity_and_nothing_else() {
             Some(who),
         )
     };
-    assert!(by(CLAUDE_GLOB, AGENT).is_empty());
-    assert!(by("*copilot*[bot]*", copilot_bot).is_empty());
+    for who in [
+        "Copilot <198982749+Copilot@users.noreply.github.com>",
+        "copilot-swe-agent[bot] <198982749+Copilot@users.noreply.github.com>",
+        "GitHub Copilot <copilot@github.com>",
+    ] {
+        let found = by(&copilot, who);
+        assert!(
+            found.is_empty(),
+            "{who} under the Copilot preset: {found:?}"
+        );
+    }
+    for who in [AGENT, "Claude Opus 4.5 <noreply@anthropic.com>"] {
+        let found = by(&claude, who);
+        assert!(found.is_empty(), "{who} under the Claude preset: {found:?}");
+    }
     // and each is refused under the other's preset
-    assert_eq!(kinds(&by(CLAUDE_GLOB, copilot_bot)), vec![
-        "byline", "identity"
-    ]);
-    assert_eq!(kinds(&by("*copilot*[bot]*", AGENT)), vec![
-        "byline", "identity"
-    ]);
+    assert_eq!(
+        kinds(&by(
+            &claude,
+            "Copilot <198982749+Copilot@users.noreply.github.com>"
+        )),
+        vec!["byline", "identity"]
+    );
+    assert_eq!(kinds(&by(&copilot, AGENT)), vec!["byline", "identity"]);
 }
 
-// --- what counts as an agent: what only an agent carries -----------------------------------
+// --- what counts as an agent: the shared conformance table --------------------------------
 //
-// Recognised by the mailbox an agent commits from, a `[bot]` marker, or a name that
-// is wholly a tool's own name (with the model and product words that ride along
-// with one), and never by a word appearing inside somebody's name. A substring
-// match refused Devin Smith, Hubbard Jones (bard), Haider Ali (aider), Cody Brown,
-// Claude Monet, Anders Android (droid), Jules Verne, Mistral Winds and Ada Lombard
-// in a probe of the review scanner's matcher, and at a commit gate that is a
-// person blocked on every commit they make.
+// The rows are the table that ships with `mockspace-lint-rules`, the one a second
+// implementation of the recogniser, in shell, is held to as well. Every row is run
+// through the pack as the engine drives it, as an author, as a committer and as the
+// value of a `Co-Authored-By`, so what the recogniser decides and what the lint does
+// with it are tested together and neither can regress behind the other.
 
-/// Real people, including every name the substring matcher refused in the probe,
-/// the owner's own, and some ordinary ones. None of them is an agent.
-const PEOPLE: &[&str] = &[
-    "Devin Smith <devin.smith@example.com>",
-    "Hubbard Jones <hubbard@example.com>",
-    "Haider Ali <haider@example.com>",
-    "Cody Brown <cody@example.com>",
-    "Claude Monet <claude.monet@example.org>",
-    "Anders Android <anders@example.com>",
-    "Jules Verne <jules@example.com>",
-    "Mistral Winds <mistral@example.com>",
-    "Ada Lombard <ada@example.com>",
-    "O. R. Toimela <ort@hiisi.digital>",
-    "Jane Smith <jane@example.com>",
-    "Matti Meikalainen <matti@example.fi>",
-    "Maria Garcia Lopez <maria@example.es>",
-    "Li Wei <li.wei@example.cn>",
-    "Some One <12345+someone@users.noreply.github.com>",
-    "GitHub <noreply@github.com>",
-    // a person at a vendor, writing from the vendor's own domain: the domain is
-    // not what only an agent carries
-    "Jane Roe <jane.roe@anthropic.com>",
-    "Bob Poe <bob@openai.com>",
-    // a parenthesis that is not a tool's name
-    "Jane Smith (she/her) <jane@example.com>",
-];
+use mockspace_lint_rules::agent_identity_conformance::table;
 
 #[test]
-fn no_person_is_refused_as_an_author_or_a_committer_under_either_mode() {
+fn the_shared_table_is_read_and_has_both_verdicts() {
+    let t = table();
+    assert!(!t.people.is_empty() && !t.agents.is_empty());
+}
+
+#[test]
+fn no_person_row_is_refused_as_an_author_or_a_committer_under_either_mode() {
     for mode in [AgentMode::Assistant, AgentMode::Autonomous] {
-        for who in PEOPLE {
+        for who in &table().people {
             let found = judged(&[], mode, CLEAN, Some(who), Some(who));
             assert!(
                 found.is_empty(),
@@ -308,11 +307,11 @@ fn no_person_is_refused_as_an_author_or_a_committer_under_either_mode() {
 }
 
 #[test]
-fn no_person_is_refused_as_a_co_author_either() {
-    // The trailer path asks the same question of the same list, so it had the
-    // same false positives, and a co-author who is a real person is the case the
-    // lint has always said it never touches.
-    for who in PEOPLE {
+fn no_person_row_is_refused_as_a_co_author() {
+    // The trailer path asks the same question of the same list, so it had the same
+    // false positives, and a co-author who is a real person is the case the lint
+    // has always said it never touches.
+    for who in &table().people {
         let message = format!("feat: a subject\n\nCo-Authored-By: {who}\n");
         let found = judged(&[], AgentMode::Assistant, &message, None, None);
         assert!(
@@ -323,98 +322,110 @@ fn no_person_is_refused_as_a_co_author_either() {
 }
 
 #[test]
-fn an_agent_is_recognised_by_what_only_an_agent_carries() {
-    let agents = [
-        // the identity of the 237 commits, and the names Claude Code goes by
-        "Claude <noreply@anthropic.com>",
-        "Claude Code <noreply@anthropic.com>",
-        "Claude Opus 4.1 <noreply@anthropic.com>",
-        "Claude Sonnet 5.5 <claude@example.com>",
-        "claude-code[bot] <claude-code@users.noreply.github.com>",
-        // a tool's own name, wholly
-        "Copilot <198982749+Copilot@users.noreply.github.com>",
-        "GitHub Copilot <copilot@example.com>",
-        "Codex <codex@example.com>",
-        "ChatGPT <chatgpt@example.com>",
-        "GPT-4o <gpt@example.com>",
-        "Gemini CLI <gemini@example.com>",
-        "Cursor Agent <cursoragent@cursor.com>",
-        "Devin AI <devin@cognition-labs.com>",
-        "aider <aider@aider.chat>",
-        "SWE-agent <swe@example.com>",
-        // a bot marker, on the name or on the mailbox
-        "dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
-        "A Name <1234+thing[bot]@users.noreply.github.com>",
-        "copilot-swe-agent[bot] <198982749+Copilot@users.noreply.github.com>",
-        // an agent's own mailbox under a name that says nothing
-        "Dev Container <noreply@anthropic.com>",
-        "Dev Container <copilot@github.com>",
-        // the tag aider appends to a person's name
-        "Jane Smith (aider) <jane@example.com>",
-    ];
-    for who in agents {
-        let found = judged(&[], AgentMode::Assistant, CLEAN, Some(who), Some(PERSON));
+fn every_agent_row_is_refused_as_an_author_and_as_a_committer() {
+    for who in &table().agents {
+        let as_author = judged(&[], AgentMode::Assistant, CLEAN, Some(who), Some(PERSON));
         assert_eq!(
-            kinds(&found),
+            kinds(&as_author),
             vec!["identity"],
-            "{who} was not refused: {found:?}"
+            "{who} as the author: {as_author:?}"
+        );
+        let as_committer = judged(&[], AgentMode::Assistant, CLEAN, Some(PERSON), Some(who));
+        assert_eq!(
+            kinds(&as_committer),
+            vec!["identity"],
+            "{who} as the committer: {as_committer:?}"
         );
     }
 }
 
 #[test]
-fn a_co_author_naming_an_agent_by_what_only_an_agent_carries_is_a_byline() {
-    for who in ["Claude Opus 4.1 <noreply@anthropic.com>", "dependabot[bot] <a@b.test>"] {
+fn every_agent_row_is_refused_as_a_co_author() {
+    // Either as a byline or, where the whole line is one a tool advertises with,
+    // as an advert: both are a refusal, and a row the trailer path passes is the
+    // regression this guards.
+    for who in &table().agents {
         let message = format!("feat: a subject\n\nCo-Authored-By: {who}\n");
         let found = judged(&[], AgentMode::Assistant, &message, None, None);
-        assert_eq!(kinds(&found), vec!["byline"], "{who}: {found:?}");
+        assert!(
+            !found.is_empty() && found.iter().all(|(k, _)| k == "byline" || k == "advert"),
+            "{who} as a co-author: {found:?}"
+        );
     }
 }
 
 #[test]
-fn a_person_who_commits_under_a_tools_bare_name_reads_as_that_tool() {
-    // The one edge that is left, written down so it is a known one. A name that
-    // is wholly a tool's own name is the tool's, and somebody whose whole
-    // `user.name` is `Devin` is refused until the project says what an agent is.
-    let devin = "Devin <devin@patel.example>";
-    let found = judged(&[], AgentMode::Assistant, CLEAN, Some(devin), Some(devin));
-    assert_eq!(kinds(&found), vec!["identity"], "got: {found:?}");
-
-    let found = judged(
-        &[("agent_identities", "claude,copilot")],
-        AgentMode::Assistant,
-        CLEAN,
-        Some(devin),
-        Some(devin),
-    );
-    assert!(found.is_empty(), "got: {found:?}");
-}
-
-#[test]
-fn a_project_that_redefines_what_an_agent_is_redefines_it_for_identities_too() {
-    let found = judged(
-        &[("agent_identities", "robotron")],
-        AgentMode::Assistant,
-        CLEAN,
-        Some(AGENT),
-        Some("Robotron <r@robotron.test>"),
-    );
-    // Claude reads as a person under this list, and Robotron as an agent.
-    assert_eq!(kinds(&found), vec!["identity"], "got: {found:?}");
-    assert!(
-        found[0].1.contains("the committer is"),
-        "got: {}",
-        found[0].1
-    );
-}
-
-#[test]
-fn a_project_can_name_an_agents_mailbox_and_a_marker_as_well_as_its_name() {
-    let params = [("agent_identities", "robotron,robot@robotron.test,[auto]")];
+fn a_person_whose_whole_name_is_a_given_name_tool_is_not_refused() {
+    // The edge the second signal exists for. `Claude` and `Devin` on their own are
+    // somebody's name, and `Claude Code` or a mailbox the tool commits from is the
+    // tool. They are rows of the table as well; this names the reason.
     for who in [
-        "Robotron Pro <x@example.com>",
+        "Claude <claude@example.com>",
+        "Devin <devin@patel.example>",
+        "Claude Max <c@example.com>",
+    ] {
+        let found = judged(&[], AgentMode::Assistant, CLEAN, Some(who), Some(who));
+        assert!(found.is_empty(), "{who}: {found:?}");
+    }
+    let found = judged(
+        &[],
+        AgentMode::Assistant,
+        CLEAN,
+        Some("Claude Code <c@example.com>"),
+        None,
+    );
+    assert_eq!(kinds(&found), vec!["identity"], "got: {found:?}");
+}
+
+// --- the three keys -----------------------------------------------------------------------
+
+#[test]
+fn agent_identities_replaces_the_whole_list_and_says_so() {
+    // The existing key, kept as the full replacement. What it costs is written down
+    // here so it is a known cost: a list naming only a tool disarms every default
+    // mailbox and marker with it, which is why the additive key exists.
+    let params = [("agent_identities", "robotron")];
+    let found = judged(
+        &params,
+        AgentMode::Assistant,
+        CLEAN,
+        Some("Robotron <r@robotron.test>"),
+        Some(PERSON),
+    );
+    assert_eq!(kinds(&found), vec!["identity"], "{found:?}");
+    for who in [
+        "Copilot <x@example.com>",
+        "dependabot[bot] <x@example.com>",
+        "Dev Container <noreply@anthropic.com>",
+    ] {
+        let found = judged(
+            &params,
+            AgentMode::Assistant,
+            CLEAN,
+            Some(who),
+            Some(PERSON),
+        );
+        assert!(
+            found.is_empty(),
+            "{who} should be disarmed by a full replacement: {found:?}"
+        );
+    }
+}
+
+#[test]
+fn extra_agent_identities_adds_to_the_defaults_and_disarms_none_of_them() {
+    let params = [(
+        "extra_agent_identities",
+        "robotron,robot@robotron.test,[auto]",
+    )];
+    for who in [
+        "Robotron CLI <x@example.com>",
         "Build <robot@robotron.test>",
         "ci[auto] <x@example.com>",
+        // every default arm still holds
+        "Copilot <x@example.com>",
+        "dependabot[bot] <x@example.com>",
+        "Dev Container <noreply@anthropic.com>",
     ] {
         let found = judged(
             &params,
@@ -430,7 +441,7 @@ fn a_project_can_name_an_agents_mailbox_and_a_marker_as_well_as_its_name() {
         AgentMode::Assistant,
         CLEAN,
         Some("Robert Robotron-Smith <rob@example.com>"),
-        Some(PERSON),
+        Some("Claude Monet <monet@example.org>"),
     );
     assert!(
         found.is_empty(),
@@ -439,32 +450,103 @@ fn a_project_can_name_an_agents_mailbox_and_a_marker_as_well_as_its_name() {
 }
 
 #[test]
-fn every_identity_the_review_scanner_names_is_refused_here_too() {
-    // The scanner in `mockspace/lib/attribution.sh` is the reference for what
-    // names an agent, and these are the vendors its own suite
-    // (`it_names_the_vendors_across_families`) holds it to, written as the
-    // identities a commit would carry. A vendor it knows and this lint does not
-    // is a commit that clears the hook and fails the review.
-    let named = [
-        "Claude Opus 5 <noreply@anthropic.com>",
-        "Copilot <copilot@github.com>",
-        "ChatGPT <noreply@openai.com>",
-        "Cursor Agent <agent@cursor.com>",
-        "google-labs-jules[bot] <jules@google.com>",
-        "Devin AI <devin@cognition-labs.com>",
-        "aider <aider@aider.chat>",
-        "Amp <amp@ampcode.com>",
-        "Grok <grok@x.ai>",
-        "dependabot[bot] <support@github.com>",
-    ];
-    for who in named {
-        let found = judged(&[], AgentMode::Assistant, CLEAN, Some(who), Some(PERSON));
-        assert_eq!(
-            kinds(&found),
-            vec!["identity"],
-            "{who} was not refused: {found:?}"
+fn not_agents_names_the_people_who_are_never_read_as_agents() {
+    let identity = "Cody Agent <cody@example.com>";
+    let found = judged(
+        &[],
+        AgentMode::Assistant,
+        CLEAN,
+        Some(identity),
+        Some(identity),
+    );
+    assert_eq!(
+        kinds(&found),
+        vec!["identity"],
+        "without the key: {found:?}"
+    );
+
+    for entry in ["Cody Agent", "cody@example.com", "Cody Agent <cody@example.com>"] {
+        let found = judged(
+            &[("not_agents", entry)],
+            AgentMode::Assistant,
+            CLEAN,
+            Some(identity),
+            Some(identity),
+        );
+        assert!(found.is_empty(), "`{entry}`: {found:?}");
+    }
+    // and as a co-author too
+    let message = format!("feat: x\n\nCo-Authored-By: {identity}\n");
+    let found = judged(
+        &[("not_agents", "Cody Agent")],
+        AgentMode::Assistant,
+        &message,
+        None,
+        None,
+    );
+    assert!(found.is_empty(), "{found:?}");
+}
+
+#[test]
+fn the_three_keys_are_declared_so_a_project_can_set_them() {
+    let (p, _) = configured(&[]);
+    let lint = p
+        .message_lints
+        .iter()
+        .find(|l| l.name() == "message-attribution")
+        .expect("the pack ships message-attribution");
+    for key in ["agent_identities", "extra_agent_identities", "not_agents"] {
+        assert!(
+            lint.config_keys().contains(&key),
+            "`{key}` is not declared: {:?}",
+            lint.config_keys()
         );
     }
+}
+
+// --- what the finding tells the person who reads it ----------------------------------------
+
+#[test]
+fn the_advice_under_a_human_in_the_loop_remakes_every_commit_in_the_range() {
+    // `--reset-author` repairs only the tip, and the push gate sees a range, so
+    // the advice that stops at it leaves the push refused on the next commit down.
+    let found = judged(&[], AgentMode::Assistant, CLEAN, Some(AGENT), Some(AGENT));
+    let text = &found[0].1;
+    assert!(text.contains("human in the loop"), "got: {text}");
+    assert!(
+        text.contains("user.name") && text.contains("user.email"),
+        "got: {text}"
+    );
+    assert!(
+        text.contains("git rebase --exec"),
+        "how to remake each commit. got: {text}"
+    );
+    assert!(text.contains("--reset-author"), "got: {text}");
+    assert!(
+        text.contains("only the tip"),
+        "says why a bare amend is not enough. got: {text}"
+    );
+}
+
+#[test]
+fn the_advice_under_autonomous_mode_does_not_say_a_human_was_in_the_loop() {
+    // Headless work has no human in the loop, so telling it the commit is the
+    // human's is wrong, and the way out is an identity the mode permits.
+    let found = judged(
+        &[("autonomous", CLAUDE_GLOB)],
+        AgentMode::Autonomous,
+        WITH_BYLINE,
+        Some("Copilot <copilot@github.com>"),
+        Some("Copilot <copilot@github.com>"),
+    );
+    assert_eq!(kinds(&found), vec!["identity"], "{found:?}");
+    let text = &found[0].1;
+    assert!(!text.contains("human in the loop"), "got: {text}");
+    assert!(text.contains(CLAUDE_GLOB), "names the pattern. got: {text}");
+    assert!(
+        text.contains("git rebase --exec"),
+        "how to remake each commit. got: {text}"
+    );
 }
 
 // --- the finding is declared ---------------------------------------------------------------

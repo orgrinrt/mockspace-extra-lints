@@ -23,24 +23,22 @@
 //! # Who made the commit
 //!
 //! A commit authored or committed as an agent makes the provenance claim in a
-//! field no message edit reaches, and it carries no trailer to find: commits made
-//! under a container's global identity passed every message check for that
-//! reason. So the commit's author and committer, when the gate hands them over,
-//! are judged on the provenance axis, by the same list of agent identities and
-//! against the same glob as a `Co-Authored-By`. An identity the glob permits for
-//! the active mode is left alone, and so is one that names no agent on the list.
-//! A pull-request body has no author or committer, and is handed none.
+//! field no message edit reaches, and it carries no trailer to find: a container
+//! whose global git identity is an agent signs every commit it makes as one, and a
+//! check that reads only the message passes all of them. So the commit's author and
+//! committer, when the gate hands them over, are judged on the provenance axis,
+//! by the same recogniser and against the same glob as a `Co-Authored-By`. An
+//! identity the glob permits for the active mode is left alone, and so is one that
+//! names no agent. A pull-request body has no author or committer, and is handed
+//! none.
 //!
-//! What an identity is recognised by is one list for the trailer and the
-//! identity alike, and it is what only an agent carries: a mailbox an agent
-//! commits from, a `[bot]` marker, or a name that is wholly a tool's own name.
-//! Never a word that happens to sit inside somebody's name, since a substring
-//! match refuses `Devin Smith`, `Claude Monet` and `Haider Ali` on every commit
-//! they make, and a vendor's domain is no marker either, so a person writing from
-//! one is a person. The one edge left is a person whose whole `user.name` is a
-//! tool's name, and `agent_identities` is the remedy, redefined per project.
-//! Mockspace's `lib/attribution.sh`, which the review scanner reads, holds the same
-//! three kinds of entry, kept in step with this list by hand.
+//! What names an agent is [`agent_identity`](super::agent_identity): what only an
+//! agent carries, a marker, a mailbox it commits from, or a name that is wholly a
+//! tool's own, and never a word that happens to sit inside somebody's name. Three
+//! keys carry it: `agent_identities` replaces the whole list, `extra_agent_identities`
+//! adds to it, and `not_agents` names people who are never to be read as agents.
+//! Its lists and verdicts are held to the conformance table that ships with
+//! `mockspace-lint-rules`, which a shell recogniser is held to as well.
 //!
 //! # Patterns are configuration
 //!
@@ -52,6 +50,9 @@
 use std::collections::HashMap;
 
 use mockspace_lint_rules::{AgentMode, Lint, LintError, MessageContext, MessageLint, Severity};
+
+use super::agent_identity::AgentIdentities;
+use crate::util::glob_matches;
 
 const LINT_NAME: &str = "message-attribution";
 
@@ -74,85 +75,34 @@ const DEFAULT_ADVERT_PATTERNS: &[&str] = &[
     "🤖",
 ];
 
-/// The default agent identities that make a `Co-Authored-By`, or the author or
-/// committer of a commit, provenance rather than a person.
-///
-/// Three kinds of entry, told apart by their shape (see `names_an_agent`): a
-/// tool's own name, matched against the whole of a name; a mailbox an agent
-/// commits from, matched whole; and a marker only a bot carries, matched anywhere
-/// in the name or the mailbox.
-///
-/// The tools the review scanner in mockspace's `lib/attribution.sh` names, held to
-/// the same test: what only an agent carries. The two lists are kept in step by
-/// hand, and the person matrix is in both suites. A word that is also an ordinary
-/// name (`jules`, `cody`, `bard`, `kiro`) stays out of the first kind, and one that
-/// is in it counts only as the whole of a name, so `Devin AI` is the tool and
-/// `Devin Smith` is a person.
-const DEFAULT_AGENT_IDENTITIES: &[&str] = &[
-    "claude",
-    "copilot",
-    "chatgpt",
-    "gpt",
-    "codex",
-    "gemini",
-    "devin",
-    "cursor",
-    "aider",
-    "amp",
-    "grok",
-    "windsurf",
-    "codeium",
-    "tabnine",
-    "supermaven",
-    "codewhisperer",
-    "antigravity",
-    "opencode",
-    "replit",
-    "ghostwriter",
-    "phind",
-    "deepseek",
-    "qwen",
-    "ollama",
-    "swe-agent",
-    "noreply@anthropic.com",
-    "noreply@openai.com",
-    "copilot@github.com",
-    "cursoragent@cursor.com",
-    "agent@cursor.com",
-    "[bot]",
-];
-
 pub struct MessageAttribution {
     /// Glob a byline must match under [`AgentMode::Assistant`]. Empty permits
     /// none, which is the correct default: the work is the human's.
-    assistant_glob:   String,
+    assistant_glob:  String,
     /// Glob a byline must match under [`AgentMode::Autonomous`].
-    autonomous_glob:  String,
+    autonomous_glob: String,
     /// Glob an advert must match to be permitted. Empty permits none.
-    advert_glob:      String,
+    advert_glob:     String,
     /// Advert patterns replacing the shipped defaults.
-    advert_patterns:  Vec<String>,
+    advert_patterns: Vec<String>,
     /// Advert patterns added to whatever set is active.
-    extra_patterns:   Vec<String>,
-    /// Agent identities replacing the shipped defaults.
-    agent_identities: Vec<String>,
+    extra_patterns:  Vec<String>,
+    /// What names an agent, from the shipped defaults and the three keys.
+    identities:      AgentIdentities,
 }
 
 impl Default for MessageAttribution {
     fn default() -> Self {
         Self {
-            assistant_glob:   String::new(),
-            autonomous_glob:  String::new(),
-            advert_glob:      String::new(),
-            advert_patterns:  DEFAULT_ADVERT_PATTERNS
+            assistant_glob:  String::new(),
+            autonomous_glob: String::new(),
+            advert_glob:     String::new(),
+            advert_patterns: DEFAULT_ADVERT_PATTERNS
                 .iter()
                 .map(|s| (*s).to_string())
                 .collect(),
-            extra_patterns:   Vec::new(),
-            agent_identities: DEFAULT_AGENT_IDENTITIES
-                .iter()
-                .map(|s| (*s).to_string())
-                .collect(),
+            extra_patterns:  Vec::new(),
+            identities:      AgentIdentities::default(),
         }
     }
 }
@@ -186,6 +136,8 @@ impl Lint for MessageAttribution {
             "advert_patterns",
             "extra_patterns",
             "agent_identities",
+            "extra_agent_identities",
+            "not_agents",
         ]
     }
 
@@ -206,7 +158,13 @@ impl Lint for MessageAttribution {
             self.extra_patterns = split_list(v);
         }
         if let Some(v) = params.get("agent_identities") {
-            self.agent_identities = split_list(v);
+            self.identities.replace(split_list(v));
+        }
+        if let Some(v) = params.get("extra_agent_identities") {
+            self.identities.extend(split_list(v));
+        }
+        if let Some(v) = params.get("not_agents") {
+            self.identities.exclude(split_list(v));
         }
     }
 }
@@ -246,7 +204,7 @@ impl MessageLint for MessageAttribution {
 
             // Provenance: only a Co-Authored-By naming an agent is in scope.
             let Some(value) = coauthor_value(line) else { continue };
-            if !self.names_an_agent(&value) {
+            if !self.identities.names_an_agent(&value) {
                 continue; // a real person; never this lint's business
             }
             if glob_matches(permitted, value.trim()) {
@@ -328,7 +286,7 @@ impl MessageAttribution {
         };
 
         for (subject, verb, who) in judged {
-            if !self.names_an_agent(who) || glob_matches(permitted, who) {
+            if !self.identities.names_an_agent(who) || glob_matches(permitted, who) {
                 continue;
             }
             let why = if permitted.is_empty() {
@@ -339,15 +297,36 @@ impl MessageAttribution {
                     ctx.mode.as_token()
                 )
             };
+            let remake = "git rebase --exec 'git commit --amend --allow-empty --no-edit \
+                          --reset-author' <upstream>";
+            let advice = match (ctx.mode, permitted.is_empty()) {
+                (AgentMode::Assistant, _) => {
+                    format!(
+                        "A commit made with a human in the loop is the human's: set `user.name` \
+                         and `user.email` to them, then remake every commit in the range with \
+                         `{remake}`, since `--reset-author` on its own repairs only the tip."
+                    )
+                },
+                (AgentMode::Autonomous, true) => {
+                    format!(
+                        "This mode permits no agent identity: set `user.name` and `user.email` to \
+                         a person, then remake every commit in the range with `{remake}`, since \
+                         `--reset-author` on its own repairs only the tip."
+                    )
+                },
+                (AgentMode::Autonomous, false) => {
+                    format!(
+                        "Set `user.name` and `user.email` to an identity matching the pattern, \
+                         then remake every commit in the range with `{remake}`, since \
+                         `--reset-author` on its own repairs only the tip."
+                    )
+                },
+            };
             out.push(finding(
                 ctx,
                 1,
                 "identity",
-                &format!(
-                    "{subject} {verb} an agent identity, {why}: {who}. A commit made with a human in \
-                     the loop is the human's: set `user.name` and `user.email` to them and make \
-                     the commit again with `--reset-author`."
-                ),
+                &format!("{subject} {verb} an agent identity, {why}: {who}. {advice}"),
             ));
         }
     }
@@ -360,129 +339,6 @@ impl MessageAttribution {
             .chain(self.extra_patterns.iter())
             .map(|p| p.to_ascii_lowercase())
     }
-
-    /// Whether `value`, a `Name <mailbox>` or a bare name or mailbox, is an agent.
-    ///
-    /// By what only an agent carries, and never by a word that happens to sit
-    /// inside somebody's name. Three kinds of entry in `agent_identities`, told
-    /// apart by their shape:
-    ///
-    /// - one holding `@` is a mailbox, matched against the whole of the mailbox;
-    /// - one opening with `[` is a marker, matched anywhere in the name or the
-    ///   mailbox, since `[bot]` is not something a person writes into either;
-    /// - anything else is a tool's own name, which makes the identity an agent's
-    ///   only when it is the whole of the name, apart from the words that ride
-    ///   along with one: `Claude Opus 4.1`, `GitHub Copilot` and `Devin AI` are
-    ///   the tool's, and `Claude Monet` and `Devin Smith` are people.
-    ///
-    /// A name ending in a parenthesis is read inside it as well, because aider
-    /// tags a person's name that way: `Jane Smith (aider)`.
-    fn names_an_agent(&self, value: &str) -> bool {
-        let (name, mailbox) = split_identity(value);
-        let name_lower = name.to_lowercase();
-        let mailbox_lower = mailbox.to_lowercase();
-
-        let mut tools: Vec<Vec<String>> = Vec::new();
-        for entry in &self.agent_identities {
-            let entry = entry.trim().to_lowercase();
-            if entry.is_empty() {
-                continue;
-            }
-            if entry.starts_with('[') {
-                if name_lower.contains(&entry) || mailbox_lower.contains(&entry) {
-                    return true;
-                }
-            } else if entry.contains('@') {
-                if mailbox_lower == entry {
-                    return true;
-                }
-            } else {
-                tools.push(core_words(&entry));
-            }
-        }
-
-        let is_a_tool = |text: &str| {
-            let core = core_words(text);
-            !core.is_empty() && tools.contains(&core)
-        };
-        if is_a_tool(&name_lower) {
-            return true;
-        }
-        parenthetical(&name_lower).is_some_and(is_a_tool)
-    }
-}
-
-/// Words that ride along with a tool's name without being a different name: the
-/// model and product words (`Claude Opus`, `Gemini CLI`, `Cursor Agent`) and the
-/// vendor (`GitHub Copilot`, `OpenAI Codex`).
-const COMPANION_WORDS: &[&str] = &[
-    "code",
-    "agent",
-    "ai",
-    "bot",
-    "assistant",
-    "cli",
-    "app",
-    "opus",
-    "sonnet",
-    "haiku",
-    "instant",
-    "pro",
-    "mini",
-    "flash",
-    "turbo",
-    "max",
-    "github",
-    "anthropic",
-    "openai",
-    "google",
-];
-
-/// The lowercase alphanumeric words of `text`.
-fn words_of(text: &str) -> Vec<String> {
-    text.split(|c: char| !c.is_alphanumeric())
-        .filter(|w| !w.is_empty())
-        .map(str::to_lowercase)
-        .collect()
-}
-
-/// What is left of a name once the words that ride along are taken off, which is
-/// what two spellings of one tool's name have in common. A version is a word that
-/// opens with a digit. When taking them off would leave nothing the name is kept
-/// whole, so `SWE-agent` is a tool and `Agent` on its own is not.
-fn core_words(text: &str) -> Vec<String> {
-    let all = words_of(text);
-    let core: Vec<String> = all
-        .iter()
-        .filter(|w| {
-            !COMPANION_WORDS.contains(&w.as_str())
-                && !w.chars().next().is_some_and(|c| c.is_ascii_digit())
-        })
-        .cloned()
-        .collect();
-    if core.is_empty() { all } else { core }
-}
-
-/// The name and the mailbox of an identity: `Name <mailbox>`, or a bare mailbox
-/// when it holds an `@` and no spaces, or a bare name.
-fn split_identity(value: &str) -> (&str, &str) {
-    let value = value.trim();
-    if let (Some(open), Some(close)) = (value.rfind('<'), value.rfind('>')) {
-        if open < close {
-            return (value[.. open].trim(), value[open + 1 .. close].trim());
-        }
-    }
-    if value.contains('@') && !value.contains(char::is_whitespace) {
-        return ("", value);
-    }
-    (value, "")
-}
-
-/// The text inside a closing parenthesis at the end of a name, if there is one.
-fn parenthetical(name: &str) -> Option<&str> {
-    let inner = name.trim_end().strip_suffix(')')?;
-    let open = inner.rfind('(')?;
-    Some(&inner[open + 1 ..])
 }
 
 /// The authored lines of a message, numbered from one.
@@ -507,30 +363,6 @@ fn coauthor_value(line: &str) -> Option<String> {
     let lower = line.to_ascii_lowercase();
     let at = lower.find("co-authored-by:")?;
     Some(line[at + "co-authored-by:".len() ..].to_string())
-}
-
-/// Whether `value` matches `pattern`, a glob supporting `*` and `?`.
-///
-/// An empty pattern matches nothing, which is what makes "configure nothing" mean
-/// "permit nothing" rather than "permit everything".
-fn glob_matches(pattern: &str, value: &str) -> bool {
-    if pattern.is_empty() {
-        return false;
-    }
-    glob_rec(pattern.as_bytes(), value.as_bytes())
-}
-
-fn glob_rec(p: &[u8], v: &[u8]) -> bool {
-    match (p.first(), v.first()) {
-        (None, None) => true,
-        (Some(b'*'), _) => {
-            // match zero characters, or one more then retry
-            glob_rec(&p[1 ..], v) || (!v.is_empty() && glob_rec(p, &v[1 ..]))
-        },
-        (Some(b'?'), Some(_)) => glob_rec(&p[1 ..], &v[1 ..]),
-        (Some(a), Some(b)) if a.eq_ignore_ascii_case(b) => glob_rec(&p[1 ..], &v[1 ..]),
-        _ => false,
-    }
 }
 
 fn split_list(v: &str) -> Vec<String> {
@@ -558,16 +390,13 @@ mod tests {
     use super::*;
 
     fn check(l: &MessageAttribution, mode: AgentMode, msg: &str) -> Vec<String> {
-        let ctx = MessageContext {
-            domain: MessageDomain::CommitMessage,
+        let ctx = MessageContext::new(
+            MessageDomain::CommitMessage,
             mode,
-            message: msg,
-            origin: "COMMIT_EDITMSG",
-            repo_root: std::path::Path::new("/tmp"),
-            invocation: None,
-            author: None,
-            committer: None,
-        };
+            msg,
+            "COMMIT_EDITMSG",
+            std::path::Path::new("/tmp"),
+        );
         l.check_message(&ctx)
             .into_iter()
             .map(|e| e.finding_kind.unwrap_or("none").to_string())
@@ -827,7 +656,7 @@ mod tests {
                 check(
                     &l,
                     AgentMode::Assistant,
-                    &format!("feat: x\n\n{form} Claude <a@b.test>")
+                    &format!("feat: x\n\n{form} Claude Opus <a@b.test>")
                 ),
                 vec!["byline"],
                 "{form} should be recognised"
