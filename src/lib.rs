@@ -50,6 +50,7 @@ pub mod lints {
     pub mod no_runtime_registration;
     pub mod no_runtime_spawn;
     pub mod no_std;
+    pub mod no_superseded_citation;
     pub mod no_vec_in_trait_sig;
     pub mod re_export_foreign_names;
     pub mod semantic_alias_nudge;
@@ -74,6 +75,7 @@ use lints::no_public_raw_field::NoPublicRawField;
 use lints::no_runtime_registration::NoRuntimeRegistration;
 use lints::no_runtime_spawn::NoRuntimeSpawn;
 use lints::no_std::NoStd;
+use lints::no_superseded_citation::NoSupersededCitation;
 use lints::no_vec_in_trait_sig::NoVecInTraitSig;
 use lints::re_export_foreign_names::ReExportForeignNames;
 use lints::semantic_alias_nudge::SemanticAliasNudge;
@@ -107,6 +109,9 @@ mockspace_lint_rules::lint_pack! {
     ],
     workspace_lints: [
         WritingStyle,
+    ],
+    repo_lints: [
+        NoSupersededCitation,
     ],
     // Both carry configuration, so they are constructed rather than named as
     // unit structs. The macro takes expressions for exactly this case.
