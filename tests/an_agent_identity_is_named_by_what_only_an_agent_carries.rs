@@ -92,14 +92,19 @@ fn every_agent_row_is_refused_as_a_co_author() {
 fn a_given_name_tool_is_an_agent_with_a_second_signal_and_a_person_without() {
     // The edge the second signal exists for. `Claude` and `Devin` on their own are
     // somebody's name, and a companion after them, a mailbox the tool commits from
-    // or the tool's own address is the tool. They are rows of the table as well;
-    // this names the reason.
+    // or the tool's own address on a machine is the tool, while a person called
+    // that at an ordinary domain stays a person. They are rows of the table as
+    // well; this names the reason.
     for who in [
         "Claude <c.dupont@example.com>",
         "Claude <c.dupont@notanthropic.com>",
         "Devin <d.patel@patel.example>",
         "Claude Max <c@example.com>",
         "Claude Monet <claude@anthropic.com>",
+        "Devin <devin@acme.com>",
+        "Cody <cody@gmail.com>",
+        "Claude <claude@example.org>",
+        "Claude <claude@users.noreply.github.com>",
     ] {
         let found = judged(&[], AgentMode::Assistant, CLEAN, Some(who), Some(who));
         assert!(found.is_empty(), "{who}: {found:?}");
@@ -108,6 +113,8 @@ fn a_given_name_tool_is_an_agent_with_a_second_signal_and_a_person_without() {
         "Claude Code <c@example.com>",
         "Claude Code Action <c@example.com>",
         "Claude <claude@localhost>",
+        "claude <claude@buildbox>",
+        "Claude <claude@ci.local>",
         "Claude <12345+claude@users.noreply.github.com>",
         "Claude <claude@anthropic.com>",
         "Devin <devin@cognition.ai>",

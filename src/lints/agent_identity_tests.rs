@@ -20,6 +20,7 @@ use super::{
     DEFAULT_TOOLS,
     GROUP_TAGS,
     HEAD_WORDS,
+    MACHINE_SUFFIXES,
     VENDOR_DOMAINS,
 };
 
@@ -158,40 +159,82 @@ fn each_given_name_tool_wants_a_second_signal() {
 fn a_given_name_is_read_behind_a_mailbox_that_is_the_tools() {
     let t = t();
     for g in &t.given {
-        // the local part is the tool's word, whole, and at GitHub's noreply domain
-        // it is the login after the number
-        assert!(agent(&format!("{g} <{g}@example.com>")), "{g} local part");
-        assert!(
-            agent(&format!(
-                "{} <{}@EXAMPLE.COM>",
-                g.to_uppercase(),
-                g.to_uppercase()
-            )),
-            "{g} in capitals"
-        );
-        assert!(agent(&format!("{g} <{g}@localhost>")), "{g} at localhost");
+        let up = g.to_uppercase();
+        // the local part is the tool's word, whole, at a mailbox that is a
+        // machine's: localhost, a domain of one label, a name only a private
+        // network uses, or GitHub's noreply form with the login after the number
+        for at in ["localhost", "buildbox"] {
+            assert!(agent(&format!("{g} <{g}@{at}>")), "{g} at {at}");
+        }
+        assert!(agent(&format!("{up} <{up}@BUILDBOX>")), "{g} in capitals");
+        for suffix in MACHINE_SUFFIXES {
+            assert!(agent(&format!("{g} <{g}@ci{suffix}>")), "{g} at ci{suffix}");
+            assert!(
+                agent(&format!("{up} <{up}@CI{}>", suffix.to_uppercase())),
+                "{g} at CI{suffix} in capitals"
+            );
+        }
         assert!(
             agent(&format!("{g} <12345+{g}@users.noreply.github.com>")),
             "{g} behind a number"
         );
         assert!(
-            agent(&format!("{g} <{g}@users.noreply.github.com>")),
+            agent(&format!("{up} <12345+{up}@USERS.NOREPLY.GITHUB.COM>")),
+            "{g} behind a number in capitals"
+        );
+        // the same local part at an ordinary domain is a person called that
+        for at in ["example.com", "acme.com", "gmail.com"] {
+            assert!(!agent(&format!("{g} <{g}@{at}>")), "{g} at {at}");
+        }
+        assert!(
+            !agent(&format!("{up} <{up}@EXAMPLE.COM>")),
+            "{g} at EXAMPLE.COM"
+        );
+        // and so is the login without its number, and the number off GitHub
+        assert!(
+            !agent(&format!("{g} <{g}@users.noreply.github.com>")),
             "{g} without a number"
         );
         assert!(
             !agent(&format!("{g} <12345+{g}@example.com>")),
             "{g} behind a number off GitHub"
         );
-        assert!(!agent(&format!("{g} <x{g}@example.com>")), "x{g}");
-        assert!(!agent(&format!("{g} <{g}.x@example.com>")), "{g}.x");
+        assert!(
+            !agent(&format!("{g} <12345+{g}@ci.local>")),
+            "{g} behind a number at a machine"
+        );
+        // a name only a private network uses has to end the domain
+        for at in [
+            "ci.local.example.com",
+            "local.example.com",
+            "lan.example.com",
+            "x.home.arpa.example",
+        ] {
+            assert!(!agent(&format!("{g} <{g}@{at}>")), "{g} at {at}");
+        }
+        // the local part is the tool's word whole
+        for who in [
+            format!("{g} <x{g}@localhost>"),
+            format!("{g} <{g}.x@localhost>"),
+            format!("{g} <x{g}@ci.local>"),
+            format!("{g} <12345+x{g}@users.noreply.github.com>"),
+        ] {
+            assert!(!agent(&who), "{who}");
+        }
         // the mailbox is the whole of the signal, so it needs the whole of the name
         assert!(
-            !agent(&format!("{g} Monet <{g}@example.com>")),
-            "{g} Monet at {g}"
+            !agent(&format!("{g} Monet <{g}@localhost>")),
+            "{g} Monet at localhost"
         );
-        // a bare mailbox has no name, and a name with no mailbox has no domain
-        assert!(!agent(&format!("{g}@example.com")), "{g}@example.com bare");
+        assert!(
+            !agent(&format!("{g} Monet <{g}@ci.local>")),
+            "{g} Monet at ci.local"
+        );
+        // a bare mailbox has no name, a name with no mailbox has no domain, and a
+        // mailbox with no domain is nobody's
+        assert!(!agent(&format!("{g}@localhost")), "{g}@localhost bare");
         assert!(!agent(g), "{g} bare");
+        assert!(!agent(&format!("{g} <{g}@>")), "{g} at nothing");
     }
     // a vendor's domain, matched whole, and only the vendor of that tool
     for (tool, domain) in &t.vendors {
@@ -382,4 +425,18 @@ fn each_agent_row_is_an_agent_in_every_form_it_arrives_in() {
         assert!(agent(a), "{a}");
         assert!(agent(&format!("{a} 1791567502 +0000")), "{a} with a date");
     }
+}
+
+#[test]
+fn the_machine_suffixes_are_exactly_the_names_only_a_private_network_uses() {
+    // The loop above walks the constant, so a suffix taken out of it would only
+    // make that loop shorter. The list is pinned here, and the shell recogniser's
+    // suite spells the same five out.
+    assert_eq!(MACHINE_SUFFIXES, &[
+        ".local",
+        ".localdomain",
+        ".lan",
+        ".internal",
+        ".home.arpa"
+    ]);
 }

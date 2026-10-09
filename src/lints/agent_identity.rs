@@ -27,15 +27,20 @@
 //! (`Claude Code Action`, `Claude Agent SDK`, `Claude Code on the web`), when
 //! nothing but versions follow it (`Claude 3.5`), or when nothing follows it and
 //! either a vendor word stands in front (`Google Gemini`) or the mailbox is the
-//! tool's: its local part is the tool's word (the login after `NNN+` for a
-//! `users.noreply.github.com` mailbox), or its domain is one of the tool's
-//! `VENDOR_DOMAINS`, matched whole. Any other word after it is a word of
+//! tool's. The mailbox is the tool's when its domain is one of the tool's
+//! `VENDOR_DOMAINS`, matched whole, or when its local part is the tool's word at a
+//! mailbox that is a machine's: a domain that is `localhost`, one label with no
+//! dot, or one ending in one of `MACHINE_SUFFIXES`, or a `users.noreply.github.com`
+//! mailbox whose login after `NNN+` is the tool's word. The same local part at any
+//! other domain is a person called that, `Devin <devin@acme.com>`, and so is the
+//! login without its number. Any other word after the name is a word of
 //! somebody's name, so `Claude Monet`, `Claude Max` and `Claude Pro` are people.
 //!
 //! What the default lets through is a bare given name behind a mailbox that is
-//! neither the tool's nor on the list, `claude <root@buildhost.local>` being the
-//! one found, and a project that knows its own build hosts names the name in
-//! `agent_names`. Only a name it lists is read that way.
+//! neither the tool's nor on the list: `claude <root@buildhost.local>`, which was
+//! found, and a person's own `Devin <devin@acme.com>`, which has to stay a person.
+//! A project that knows its own build hosts names the name in `agent_names`, and
+//! only a name it lists is read that way.
 //!
 //! # Configuration
 //!
@@ -160,6 +165,11 @@ pub(crate) const VENDOR_DOMAINS: &[(&str, &str)] = &[
 pub(crate) const HEAD_WORDS: &[&str] =
     &["github", "google", "anthropic", "openai", "microsoft", "amazon", "aws"];
 
+/// Name endings only a private network uses, so a mailbox at one is a machine's.
+/// A domain that is `localhost`, or one label with no dot, is a machine's as well.
+pub(crate) const MACHINE_SUFFIXES: &[&str] =
+    &[".local", ".localdomain", ".lan", ".internal", ".home.arpa"];
+
 /// Words allowed after a tool's name: a model, a product, a surface. Not a word
 /// that is also somebody's name, so `max` and `pro` are not here.
 pub(crate) const COMPANION_WORDS: &[&str] = &[
@@ -238,16 +248,22 @@ struct Lists {
     tools:   Vec<Tool>,
 }
 
-/// A mailbox as the two halves a given-name tool is judged on.
+/// A mailbox as the parts a given-name tool is judged on.
 #[derive(Default)]
 struct Mailbox {
-    local:  String,
-    domain: String,
+    local:   String,
+    domain:  String,
+    /// Whether the mailbox is a machine's, which is what makes a local part that
+    /// is the tool's word a signal. A person is called the same at an ordinary
+    /// domain.
+    machine: bool,
 }
 
 impl Mailbox {
-    /// The local part, which is the login after `NNN+` at GitHub's noreply domain,
-    /// and the domain. A value with no `@` has neither.
+    /// The local part, the domain, and whether it is a machine's: a domain that is
+    /// `localhost`, one label with no dot, or one ending in a machine suffix, or a
+    /// GitHub noreply mailbox with a number, whose local part is then the login
+    /// after the `NNN+`. A value with no `@` has none of them.
     fn of(mailbox: &str) -> Self {
         let Some((local, domain)) = mailbox.rsplit_once('@') else {
             return Self::default();
@@ -259,18 +275,23 @@ impl Mailbox {
                 !id.is_empty() && id.chars().all(|c| c.is_ascii_digit()) && !login.is_empty()
             })
             .map(|(_, login)| login);
+        let machine = login.is_some()
+            || (domain != "users.noreply.github.com"
+                && !domain.is_empty()
+                && (!domain.contains('.') || MACHINE_SUFFIXES.iter().any(|s| domain.ends_with(s))));
         Self {
-            local:  login.unwrap_or(local).to_string(),
+            local: login.unwrap_or(local).to_string(),
             domain: domain.to_string(),
+            machine,
         }
     }
 
-    /// Whether the mailbox is a given-name tool's: its local part is the tool's
-    /// word, or its domain is one of the tool's vendor domains. One with no domain
-    /// is nobody's.
+    /// Whether the mailbox is a given-name tool's: its domain is one of the tool's
+    /// vendor domains, or its local part is the tool's word at a machine's mailbox.
+    /// One with no domain is nobody's.
     fn is_the_tools(&self, tool: &str) -> bool {
         !self.domain.is_empty()
-            && (self.local == tool
+            && ((self.machine && self.local == tool)
                 || VENDOR_DOMAINS
                     .iter()
                     .any(|(t, d)| *t == tool && *d == self.domain))

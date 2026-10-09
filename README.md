@@ -137,18 +137,26 @@ is read more carefully. It is an agent when a word that rides along with a tool
 comes anywhere after it (`Claude Code Action`, `Claude Agent SDK`, `Claude Code on
 the web`), when nothing but versions follow it (`Claude 3.5`), or when nothing
 follows it and either a vendor word stands before it (`Google Gemini`) or the
-mailbox is the tool's. The mailbox is the tool's when its local part is the tool's
-word, which for a GitHub noreply address is the login after the number, or when
-its domain is a domain the tool commits from, matched whole. `Claude
-<claude@localhost>`, `Claude <12345+claude@users.noreply.github.com>`, `Claude
-<claude@anthropic.com>`, `Devin <devin@cognition.ai>`, `Gemini <gemini@google.com>`
-and `Amp <noreply@ampcode.com>` are the tools. Any other word after the name is
-somebody's, so `Claude Monet` and `Claude Max` are people.
+mailbox is the tool's. The mailbox is the tool's when its domain is a domain the
+tool commits from, matched whole, or when its local part is the tool's word at a
+mailbox that is a machine's: a domain that is `localhost`, one label with no dot,
+or one ending in `.local`, `.localdomain`, `.lan`, `.internal` or `.home.arpa`, or
+a GitHub noreply address whose login after the number is the tool's word. `Claude
+<claude@localhost>`, `claude <claude@buildbox>`, `Claude <claude@ci.local>`,
+`Claude <12345+claude@users.noreply.github.com>`, `Claude <claude@anthropic.com>`,
+`Devin <devin@cognition.ai>`, `Gemini <gemini@google.com>` and `Amp
+<noreply@ampcode.com>` are the tools. The same local part at any other domain is a
+person called that, so `Devin <devin@acme.com>`, `Cody <cody@gmail.com>` and `Claude
+<claude@example.org>` are people, and so is a GitHub login without its number. Any
+other word after the name is somebody's, so `Claude Monet` and `Claude Max` are
+people.
 
 What the default lets through is a bare given name behind a mailbox that is
-neither the tool's nor on the list, `claude <root@buildhost.local>` being the one
-that was found. It reads as a person until the project lists the name in
-`agent_names`.
+neither the tool's nor on the list. `claude <root@buildhost.local>` is the one
+that was found, a machine's mailbox whose local part is not the tool's word, and
+`Devin <devin@acme.com>` is the one that has to stay a person. Both read as a
+person until the project lists the name in `agent_names`, and listing `Devin` reads
+every bare `Devin` as the tool, whatever the mailbox.
 
 Four keys on the lint carry the list, and they take a comma-separated value:
 
