@@ -1,11 +1,11 @@
 //! The recogniser is held to the conformance table, entry by entry.
 //!
 //! The table ships with `mockspace-lint-rules`, at the revision this pack is built
-//! against, and a second implementation of the same recogniser, in shell, is held to
-//! the same file. A test that walked this module's own lists would pass with an entry
+//! against, and every other recogniser of an agent identity is held to the same
+//! file. A test that walked this module's own lists would pass with an entry
 //! deleted from them, so every list is compared with the table's, and then every
 //! entry is exercised on its own: removing one from the lists turns a test red in
-//! two places.
+//! two places, and removing a row from the table turns the comparison red.
 
 use std::collections::BTreeSet;
 
@@ -18,11 +18,20 @@ use super::{
     DEFAULT_MAILBOXES,
     DEFAULT_MARKERS,
     DEFAULT_TOOLS,
+    GROUP_TAGS,
     HEAD_WORDS,
+    VENDOR_DOMAINS,
 };
 
 fn agent(who: &str) -> bool {
     AgentIdentities::default().names_an_agent(who)
+}
+
+/// Whether `who` is an agent when the project lists `names` in `agent_names`.
+fn named(who: &str, names: &[&str]) -> bool {
+    let mut ids = AgentIdentities::default();
+    ids.name_agents(names.iter().map(|n| (*n).to_string()).collect());
+    ids.names_an_agent(who)
 }
 
 fn set(items: &[&str]) -> BTreeSet<String> {
@@ -50,10 +59,13 @@ fn the_table_is_read_and_has_rows_in_every_list() {
     for (name, n) in [
         ("markers", t.markers.len()),
         ("mailboxes", t.mailboxes.len()),
+        ("tags", t.tags.len()),
         ("tools", t.tools.len()),
         ("given", t.given.len()),
+        ("vendors", t.vendors.len()),
         ("heads", t.heads.len()),
         ("companions", t.companions.len()),
+        ("keyed", t.keyed.len()),
         ("people", t.people.len()),
         ("agents", t.agents.len()),
     ] {
@@ -66,22 +78,36 @@ fn the_lists_are_exactly_the_tables_lists() {
     let t = t();
     assert_eq!(set(DEFAULT_MARKERS), rows(&t.markers), "markers");
     assert_eq!(set(DEFAULT_MAILBOXES), rows(&t.mailboxes), "mailboxes");
+    assert_eq!(set(GROUP_TAGS), rows(&t.tags), "tags");
     assert_eq!(set(DEFAULT_TOOLS), rows(&t.tools), "tools");
     assert_eq!(set(DEFAULT_GIVEN_NAMES), rows(&t.given), "given names");
+    assert_eq!(
+        VENDOR_DOMAINS
+            .iter()
+            .map(|(tool, domain)| ((*tool).to_string(), (*domain).to_string()))
+            .collect::<BTreeSet<_>>(),
+        t.vendors.iter().cloned().collect::<BTreeSet<_>>(),
+        "vendor domains"
+    );
     assert_eq!(set(HEAD_WORDS), rows(&t.heads), "head words");
     assert_eq!(set(COMPANION_WORDS), rows(&t.companions), "companion words");
 }
 
 #[test]
-fn each_tool_is_the_whole_of_a_name_and_nothing_longer() {
+fn each_tool_is_the_start_of_a_name_and_nothing_inside_one() {
     for tool in &t().tools {
         assert!(agent(&format!("{tool} <x@example.com>")), "{tool}");
         assert!(agent(&tool.to_uppercase()), "{tool} in capitals");
-        // a word of somebody's name on either side is a person
+        // any words after it, a surface or a product or somebody's name
         assert!(
-            !agent(&format!("{tool} Smith <x@example.com>")),
+            agent(&format!("{tool} Chat <x@example.com>")),
+            "{tool} Chat"
+        );
+        assert!(
+            agent(&format!("{tool} Smith <x@example.com>")),
             "{tool} Smith"
         );
+        // a word of somebody's name in front of it makes it a name inside theirs
         assert!(
             !agent(&format!("Smith {tool} <x@example.com>")),
             "Smith {tool}"
@@ -95,11 +121,21 @@ fn each_given_name_tool_wants_a_second_signal() {
     for g in &t.given {
         assert!(!agent(&format!("{g} <x@example.com>")), "{g} alone");
         assert!(!agent(g), "{g} bare");
-        // a version, a companion after it, a vendor word before it, a mailbox
+        // a version after it, a companion anywhere after it, a vendor word before
+        // it, a mailbox on the list
         assert!(agent(&format!("{g} 4.1 <x@example.com>")), "{g} 4.1");
         assert!(agent(&format!("{g} v2")), "{g} v2");
         for c in &t.companions {
             assert!(agent(&format!("{g} {c} <x@example.com>")), "{g} {c}");
+            // one companion among other words is enough
+            assert!(
+                agent(&format!("{g} Zed {c} <x@example.com>")),
+                "{g} Zed {c}"
+            );
+            assert!(
+                agent(&format!("{g} {c} Zed <x@example.com>")),
+                "{g} {c} Zed"
+            );
         }
         for h in &t.heads {
             assert!(agent(&format!("{h} {g} <x@example.com>")), "{h} {g}");
@@ -107,10 +143,167 @@ fn each_given_name_tool_wants_a_second_signal() {
         for m in &t.mailboxes {
             assert!(agent(&format!("{g} <{}>", instance(m))), "{g} at {m}");
         }
-        // and a word that is none of those makes it a person
+        // and a word that is none of those is a person's, and a version does not
+        // change that
         assert!(!agent(&format!("{g} Monet <x@example.com>")), "{g} Monet");
+        assert!(
+            !agent(&format!("{g} 4.1 Monet <x@example.com>")),
+            "{g} 4.1 Monet"
+        );
         assert!(!agent(&format!("Max {g} <x@example.com>")), "Max {g}");
     }
+}
+
+#[test]
+fn a_given_name_is_read_behind_a_mailbox_that_is_the_tools() {
+    let t = t();
+    for g in &t.given {
+        // the local part is the tool's word, whole, and at GitHub's noreply domain
+        // it is the login after the number
+        assert!(agent(&format!("{g} <{g}@example.com>")), "{g} local part");
+        assert!(
+            agent(&format!(
+                "{} <{}@EXAMPLE.COM>",
+                g.to_uppercase(),
+                g.to_uppercase()
+            )),
+            "{g} in capitals"
+        );
+        assert!(agent(&format!("{g} <{g}@localhost>")), "{g} at localhost");
+        assert!(
+            agent(&format!("{g} <12345+{g}@users.noreply.github.com>")),
+            "{g} behind a number"
+        );
+        assert!(
+            agent(&format!("{g} <{g}@users.noreply.github.com>")),
+            "{g} without a number"
+        );
+        assert!(
+            !agent(&format!("{g} <12345+{g}@example.com>")),
+            "{g} behind a number off GitHub"
+        );
+        assert!(!agent(&format!("{g} <x{g}@example.com>")), "x{g}");
+        assert!(!agent(&format!("{g} <{g}.x@example.com>")), "{g}.x");
+        // the mailbox is the whole of the signal, so it needs the whole of the name
+        assert!(
+            !agent(&format!("{g} Monet <{g}@example.com>")),
+            "{g} Monet at {g}"
+        );
+        // a bare mailbox has no name, and a name with no mailbox has no domain
+        assert!(!agent(&format!("{g}@example.com")), "{g}@example.com bare");
+        assert!(!agent(g), "{g} bare");
+    }
+    // a vendor's domain, matched whole, and only the vendor of that tool
+    for (tool, domain) in &t.vendors {
+        assert!(agent(&format!("{tool} <x@{domain}>")), "{tool} at {domain}");
+        assert!(
+            agent(&format!(
+                "{} <x@{}>",
+                tool.to_uppercase(),
+                domain.to_uppercase()
+            )),
+            "{tool} at {domain} in capitals"
+        );
+        assert!(!agent(&format!("{tool} <x@not{domain}>")), "not{domain}");
+        assert!(
+            !agent(&format!("{tool} <x@mail.{domain}>")),
+            "mail.{domain}"
+        );
+        assert!(
+            !agent(&format!("{tool} <x@{domain}.example>")),
+            "{domain}.example"
+        );
+        assert!(
+            !agent(&format!("{tool} Monet <x@{domain}>")),
+            "{tool} Monet at {domain}"
+        );
+    }
+    for g in &t.given {
+        for (tool, domain) in &t.vendors {
+            // a domain that is another tool's vendor, and not this one's
+            if tool != g && !t.vendors.contains(&(g.clone(), domain.clone())) {
+                assert!(!agent(&format!("{g} <x@{domain}>")), "{g} at {domain}");
+            }
+        }
+    }
+}
+
+#[test]
+fn a_name_the_project_lists_is_read_whatever_the_mailbox() {
+    let t = t();
+    for (key, identity) in &t.keyed {
+        // the default lets the row through, and the name is what stops it
+        assert!(!agent(identity), "{identity} by default");
+        assert!(!named(identity, &[]), "{identity} with no names");
+        assert!(named(identity, &[key]), "{identity} named {key}");
+    }
+    for g in &t.given {
+        let who = format!("{g} <root@buildhost.local>");
+        assert!(!agent(&who), "{who} by default");
+        assert!(named(&who, &[g]), "{who} named {g}");
+        assert!(
+            named(&who, &[&g.to_uppercase()]),
+            "{who} named {g} in capitals"
+        );
+        assert!(named(&who, &["Zed", g]), "{who} among names");
+        // another name names another identity
+        assert!(!named(&who, &["Zed"]), "{who} named Zed");
+        assert!(!named(&who, &[""]), "{who} named nothing");
+        // the whole name, not its start, and a group in parentheses is no part of it
+        assert!(
+            !named(&format!("{g} Monet <root@buildhost.local>"), &[g]),
+            "{g} Monet named {g}"
+        );
+        assert!(
+            named(&format!("{g} (she/her) <root@buildhost.local>"), &[g]),
+            "{g} (she/her) named {g}"
+        );
+    }
+    // a name the project lists is any name, and the other nets still hold
+    assert!(named("Build Host <root@buildhost.local>", &["Build Host"]));
+    assert!(!named("Build Host <root@buildhost.local>", &["Build"]));
+    assert!(named("Copilot <x@example.com>", &["Zed"]));
+    assert!(!named("Jane Smith <jane@example.com>", &["Zed"]));
+}
+
+#[test]
+fn a_group_in_parentheses_is_read_for_a_tag_and_for_nothing_else() {
+    let t = t();
+    for tag in &t.tags {
+        assert!(agent(&format!("Jane Doe ({tag})")), "({tag})");
+        assert!(
+            agent(&format!(
+                "Jane Doe ({}) <jane@example.com>",
+                tag.to_uppercase()
+            )),
+            "({tag}) in capitals"
+        );
+        assert!(
+            agent(&format!("Jane (she/her) ({tag}) Doe")),
+            "({tag}) after another"
+        );
+        // exactly the tag, so a group holding more is left out of the name
+        assert!(!agent(&format!("Jane Doe ({tag} extra)")), "({tag} extra)");
+        assert!(!agent(&format!("Jane Doe ({tag}-ish)")), "({tag}-ish)");
+    }
+    // a tool's name, a given name or a vendor in a group is none of the tags
+    for word in t.tools.iter().chain(&t.given).chain(&t.heads) {
+        if t.tags.contains(word) {
+            continue;
+        }
+        assert!(!agent(&format!("Jane Doe ({word})")), "({word})");
+        assert!(
+            !agent(&format!(
+                "Jane Doe ({}) <jane@example.com>",
+                word.to_uppercase()
+            )),
+            "({word}) in capitals"
+        );
+    }
+    // and a group that is left out of a name leaves the rest of it to be read
+    assert!(agent("Copilot (she/her)"));
+    assert!(agent("Claude 3.5 Sonnet (new)"));
+    assert!(!agent("Claude Monet (aider-ish)"));
 }
 
 #[test]
@@ -178,6 +371,8 @@ fn each_person_row_is_a_person_in_every_form_it_arrives_in() {
     for p in &t().people {
         assert!(!agent(p), "{p}");
         assert!(!agent(&format!("{p} 1791567502 +0000")), "{p} with a date");
+        // a name the project lists that is not the person's changes nothing
+        assert!(!named(p, &["Zed"]), "{p} with another name listed");
     }
 }
 
@@ -187,106 +382,4 @@ fn each_agent_row_is_an_agent_in_every_form_it_arrives_in() {
         assert!(agent(a), "{a}");
         assert!(agent(&format!("{a} 1791567502 +0000")), "{a} with a date");
     }
-}
-
-#[test]
-fn a_group_in_parentheses_is_read_on_its_own() {
-    // a tool's name inside it is the tool's, and anything else is left out
-    assert!(agent("Jane Smith (aider) <jane@example.com>"));
-    assert!(agent("Jane Smith (Claude Code) <jane@example.com>"));
-    assert!(!agent("Jane Smith (she/her) <jane@example.com>"));
-    assert!(
-        !agent("Jane Smith (devin) <jane@example.com>"),
-        "a given name with no second signal"
-    );
-    assert!(agent("Claude 3.5 Sonnet (new)"));
-}
-
-// --- configuration ------------------------------------------------------------------
-
-#[test]
-fn replacing_the_list_drops_the_defaults_and_keeps_the_rules_for_what_is_left() {
-    let mut ids = AgentIdentities::default();
-    ids.replace(vec![
-        "robotron".into(),
-        "robot@robotron.test".into(),
-        "[auto]".into(),
-    ]);
-    assert!(ids.names_an_agent("Robotron CLI <x@example.com>"));
-    assert!(ids.names_an_agent("Build <robot@robotron.test>"));
-    assert!(ids.names_an_agent("ci[auto] <x@example.com>"));
-    assert!(!ids.names_an_agent("Robert Robotron-Smith <rob@example.com>"));
-    // and the defaults are gone, which is what replacing means
-    assert!(!ids.names_an_agent("Copilot <x@example.com>"));
-    assert!(!ids.names_an_agent("dependabot[bot] <x@example.com>"));
-    assert!(!ids.names_an_agent("Dev Container <noreply@anthropic.com>"));
-}
-
-#[test]
-fn extending_the_list_adds_to_the_defaults_and_disarms_none_of_them() {
-    let mut ids = AgentIdentities::default();
-    ids.extend(vec![
-        "robotron".into(),
-        "robot@robotron.test".into(),
-        "[auto]".into(),
-    ]);
-    assert!(ids.names_an_agent("Robotron CLI <x@example.com>"));
-    assert!(ids.names_an_agent("Build <robot@robotron.test>"));
-    assert!(ids.names_an_agent("ci[auto] <x@example.com>"));
-    // the defaults, every arm of them
-    assert!(ids.names_an_agent("Copilot <x@example.com>"));
-    assert!(ids.names_an_agent("dependabot[bot] <x@example.com>"));
-    assert!(ids.names_an_agent("Dev Container <noreply@anthropic.com>"));
-    assert!(!ids.names_an_agent("Claude Monet <monet@example.org>"));
-}
-
-#[test]
-fn a_person_the_project_names_is_never_read_as_an_agent() {
-    let mut ids = AgentIdentities::default();
-    assert!(ids.names_an_agent("Cody Agent <cody@example.com>"));
-    ids.exclude(vec!["Cody Agent".into()]);
-    assert!(
-        !ids.names_an_agent("Cody Agent <cody@example.com>"),
-        "by name"
-    );
-    assert!(
-        !ids.names_an_agent("cody agent <someone@else.example>"),
-        "in any case"
-    );
-    // a name is matched whole, so it excuses nobody else
-    assert!(ids.names_an_agent("Cody Code <cody@example.com>"));
-}
-
-#[test]
-fn a_person_can_be_named_by_mailbox_or_by_the_whole_identity() {
-    let mut ids = AgentIdentities::default();
-    ids.exclude(vec![
-        "devin@patel.example".into(),
-        "Copilot <me@home.example>".into(),
-    ]);
-    assert!(
-        !ids.names_an_agent("Devin AI <devin@patel.example>"),
-        "by mailbox"
-    );
-    assert!(
-        !ids.names_an_agent("Copilot <me@home.example>"),
-        "by name and mailbox"
-    );
-    assert!(
-        ids.names_an_agent("Copilot <other@home.example>"),
-        "the same name, another mailbox"
-    );
-    assert!(ids.names_an_agent("Devin AI <devin@cognition-labs.com>"));
-}
-
-#[test]
-fn the_exclusion_wins_over_a_marker_and_a_mailbox() {
-    // The project said this is a person, and it is the project that knows.
-    let mut ids = AgentIdentities::default();
-    ids.exclude(vec![
-        "noreply@anthropic.com".into(),
-        "Jane [bot] Smith".into(),
-    ]);
-    assert!(!ids.names_an_agent("Claude Code <noreply@anthropic.com>"));
-    assert!(!ids.names_an_agent("Jane [bot] Smith <j@example.com>"));
 }

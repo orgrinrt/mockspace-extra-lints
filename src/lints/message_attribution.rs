@@ -33,12 +33,14 @@
 //! none.
 //!
 //! What names an agent is [`agent_identity`](super::agent_identity): what only an
-//! agent carries, a marker, a mailbox it commits from, or a name that is wholly a
-//! tool's own, and never a word that happens to sit inside somebody's name. Three
-//! keys carry it: `agent_identities` replaces the whole list, `extra_agent_identities`
-//! adds to it, and `not_agents` names people who are never to be read as agents.
-//! Its lists and verdicts are held to the conformance table that ships with
-//! `mockspace-lint-rules`, which a shell recogniser is held to as well.
+//! agent carries, a marker, a mailbox it commits from, a tag a tool writes into a
+//! name, or a name that starts with a tool's own, and never a word that happens to
+//! sit inside somebody's name. Four keys carry it: `agent_identities` replaces the
+//! whole list, `extra_agent_identities` adds to it, `agent_names` names whole names
+//! that are agents whatever the mailbox, and `not_agents` names people who are never
+//! to be read as agents. Its lists and verdicts are held to the conformance table
+//! that ships with `mockspace-lint-rules`, the one every recogniser of an agent
+//! identity is held to.
 //!
 //! # Patterns are configuration
 //!
@@ -87,7 +89,7 @@ pub struct MessageAttribution {
     advert_patterns: Vec<String>,
     /// Advert patterns added to whatever set is active.
     extra_patterns:  Vec<String>,
-    /// What names an agent, from the shipped defaults and the three keys.
+    /// What names an agent, from the shipped defaults and the four keys.
     identities:      AgentIdentities,
 }
 
@@ -137,6 +139,7 @@ impl Lint for MessageAttribution {
             "extra_patterns",
             "agent_identities",
             "extra_agent_identities",
+            "agent_names",
             "not_agents",
         ]
     }
@@ -162,6 +165,9 @@ impl Lint for MessageAttribution {
         }
         if let Some(v) = params.get("extra_agent_identities") {
             self.identities.extend(split_list(v));
+        }
+        if let Some(v) = params.get("agent_names") {
+            self.identities.name_agents(split_list(v));
         }
         if let Some(v) = params.get("not_agents") {
             self.identities.exclude(split_list(v));
@@ -634,6 +640,24 @@ mod tests {
                 "feat: x\n\nCo-Authored-By: Robotron <a@b.test>"
             ),
             vec!["byline"]
+        );
+    }
+
+    #[test]
+    fn a_project_can_name_a_name_as_an_agent_whatever_the_mailbox() {
+        let msg = "feat: x\n\nCo-Authored-By: claude <root@buildhost.local>";
+        // the default lets a bare given name behind a mailbox of nobody's through
+        assert!(check(&MessageAttribution::default(), AgentMode::Assistant, msg).is_empty());
+        let l = with(&[("agent_names", "Claude")]);
+        assert_eq!(check(&l, AgentMode::Assistant, msg), vec!["byline"]);
+        // the whole name, so a person called Claude Monet is still a person
+        assert!(
+            check(
+                &l,
+                AgentMode::Assistant,
+                "feat: x\n\nCo-Authored-By: Claude Monet <root@buildhost.local>"
+            )
+            .is_empty()
         );
     }
 
