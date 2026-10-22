@@ -23,6 +23,7 @@
 mod const_generic_parameters;
 mod dep_surface;
 mod paths;
+mod repo_files;
 pub mod tools;
 mod util;
 
@@ -36,6 +37,7 @@ pub mod lints {
     pub(crate) mod agent_identity;
     pub mod arvo_types_only;
     pub(crate) mod authored_message;
+    pub mod catalogue_ignore;
     pub mod commit_style;
     pub mod forge_body;
     pub mod lint_allow_requires_task_id;
@@ -60,6 +62,7 @@ pub mod lints {
 }
 
 use lints::arvo_types_only::ArvoTypesOnly;
+use lints::catalogue_ignore::CatalogueIgnore;
 use lints::commit_style::CommitStyle;
 use lints::forge_body::ForgeBody;
 use lints::lint_allow_requires_task_id::LintAllowRequiresTaskId;
@@ -108,6 +111,9 @@ mockspace_lint_rules::lint_pack! {
     ],
     workspace_lints: [
         WritingStyle,
+    ],
+    repo_lints: [
+        CatalogueIgnore::default(),
     ],
     // Both carry configuration, so they are constructed rather than named as
     // unit structs. The macro takes expressions for exactly this case.
