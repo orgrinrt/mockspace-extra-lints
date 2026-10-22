@@ -24,6 +24,7 @@ mod const_generic_parameters;
 mod dep_surface;
 mod paths;
 mod repo_files;
+mod string_literal;
 pub mod tools;
 mod util;
 
@@ -52,6 +53,7 @@ pub mod lints {
     pub mod no_public_raw_field;
     pub mod no_runtime_registration;
     pub mod no_runtime_spawn;
+    pub mod no_source_include_in_test;
     pub mod no_std;
     pub mod no_vec_in_trait_sig;
     pub mod re_export_foreign_names;
@@ -77,6 +79,7 @@ use lints::no_dyn_dispatch::NoDynDispatch;
 use lints::no_public_raw_field::NoPublicRawField;
 use lints::no_runtime_registration::NoRuntimeRegistration;
 use lints::no_runtime_spawn::NoRuntimeSpawn;
+use lints::no_source_include_in_test::NoSourceIncludeInTest;
 use lints::no_std::NoStd;
 use lints::no_vec_in_trait_sig::NoVecInTraitSig;
 use lints::re_export_foreign_names::ReExportForeignNames;
@@ -114,6 +117,7 @@ mockspace_lint_rules::lint_pack! {
     ],
     repo_lints: [
         CatalogueIgnore::default(),
+        NoSourceIncludeInTest,
     ],
     // Both carry configuration, so they are constructed rather than named as
     // unit structs. The macro takes expressions for exactly this case.

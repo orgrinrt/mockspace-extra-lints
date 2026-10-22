@@ -123,6 +123,14 @@ including integration tests, so one inside a string or a comment is not an
 ignore. The findings carry a kind, `bare`, `malformed` or `unresolved`, which
 `[lints.catalogue-ignore.findings]` can give a severity of its own.
 
+`no-source-include-in-test`. A repo lint against the test that reads a source
+file as text and searches it for a word, which is a check on spelling written
+where nothing runs it as one. An `include_str!` or `include_bytes!` whose path
+ends in `.rs` is refused inside a test: a `#[test]` function, a `#[cfg(test)]`
+item, or a file under a `tests` directory or named `tests.rs` or `*_tests.rs`.
+A data fixture is included freely, and so is source outside a test. The check
+the test stood for is written as a lint instead.
+
 ### Prose and process
 
 `writing-style`, `commit-style`, `forge-body`, `message-attribution`,

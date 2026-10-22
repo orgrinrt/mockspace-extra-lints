@@ -240,17 +240,6 @@ fn the_default_blocks_every_gate_and_the_kinds_are_declared() {
 }
 
 #[test]
-fn escapes_are_read_the_way_the_compiler_reads_them() {
-    assert_eq!(unescape(r#"a \"b\" \\ \n\t"#), "a \"b\" \\ \n\t");
-    assert_eq!(unescape("one \\\n     two"), "one two");
-    assert_eq!(unescape("one \\\r\n\t two"), "one two");
-    assert_eq!(literal("\"x\""), Some("x".to_string()));
-    assert_eq!(literal("r\"x\\y\""), Some("x\\y".to_string()));
-    assert_eq!(literal("r##\"a\"#b\"##"), Some("a\"#b".to_string()));
-    assert_eq!(literal("concat!(\"x\")"), None);
-}
-
-#[test]
 fn the_ids_are_what_follows_the_last_tracked_so_a_gap_may_say_the_word() {
     let found = run("#[ignore = \"catalogue: it says; tracked #nowhere in prose; tracked #C1-001\"]\nfn t() {}\n");
     assert!(found.is_empty(), "{found:?}");
