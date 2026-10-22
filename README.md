@@ -120,8 +120,19 @@ ledgers = "mock/research/*/LEDGER.md"
 
 The attribute is found in the parse, in every `.rs` file of the repository
 including integration tests, so one inside a string or a comment is not an
-ignore. The findings carry a kind, `bare`, `malformed` or `unresolved`, which
+ignore. One in the tokens of a macro call, such as `proptest! { #[ignore] fn
+t() {} }`, is read like any other. A conditional ignore,
+`#[cfg_attr(unix, ignore)]`, is not read: it keeps a test out of one
+configuration for a reason about that configuration, which is not a gap to
+track. The record directories (`design_rounds` and `research` under the mock
+directory) are not read, and `exclude`, a comma-separated list of globs from
+the repository root, leaves more paths alone, such as a directory of fixture
+sources. The findings carry a kind, `bare`, `malformed` or `unresolved`, which
 `[lints.catalogue-ignore.findings]` can give a severity of its own.
+
+A ledger row is a list item, a numbered item, a table row or a heading whose
+first word is the id, with or without a `#` of its own, so `- #C1-188`,
+`1. C1-188` and `## C1-188` are rows and `## Map` is a title.
 
 ### Prose and process
 
