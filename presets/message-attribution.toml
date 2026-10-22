@@ -6,6 +6,10 @@ description = "no agent authorship byline unless the active mode permits one, an
 # Applies to commit messages AND forge bodies. A pull-request body never passes
 # through git, so no git hook can inspect one; this is the only layer that can.
 #
+# The globs below also judge a commit's author and committer, which only a
+# commit has: an identity that names an agent is refused where an agent byline
+# is, and permitted where the glob for the active mode matches it.
+#
 # Both globs are empty, which permits nothing. That is the right default on the
 # provenance axis (work done with a human in the loop is the human's) and on the
 # advert axis (nobody wants a tool advert in their durable record).

@@ -208,14 +208,13 @@ mod tests {
     use super::*;
 
     fn check(l: &ForgeBody, domain: MessageDomain, msg: &str) -> Vec<String> {
-        let ctx = MessageContext {
+        let ctx = MessageContext::new(
             domain,
-            mode: AgentMode::Assistant,
-            message: msg,
-            origin: "pr-body",
-            repo_root: std::path::Path::new("/tmp"),
-            invocation: None,
-        };
+            AgentMode::Assistant,
+            msg,
+            "pr-body",
+            std::path::Path::new("/tmp"),
+        );
         l.check_message(&ctx)
             .into_iter()
             .map(|e| e.finding_kind.unwrap_or("none").to_string())
@@ -229,17 +228,17 @@ mod tests {
             "{{\"command\":\"{}\",\"description\":\"open the pull request\"}}",
             command.replace('"', "\\\"")
         );
-        let ctx = MessageContext {
-            domain:     MessageDomain::PullRequestBody,
-            mode:       AgentMode::Assistant,
-            message:    &serialised,
-            origin:     "<stdin>",
-            repo_root:  std::path::Path::new("/tmp"),
-            invocation: Some(mockspace_lint_rules::Invocation {
-                command:   Some(command),
-                tool_name: Some("Bash"),
-            }),
-        };
+        let ctx = MessageContext::new(
+            MessageDomain::PullRequestBody,
+            AgentMode::Assistant,
+            &serialised,
+            "<stdin>",
+            std::path::Path::new("/tmp"),
+        )
+        .with_invocation(Some(mockspace_lint_rules::Invocation {
+            command:   Some(command),
+            tool_name: Some("Bash"),
+        }));
         l.check_message(&ctx)
             .into_iter()
             .map(|e| e.finding_kind.unwrap_or("none").to_string())
@@ -384,17 +383,17 @@ mod tests {
         // because it never depended on the extraction.
         let l = with(&[("min_length", "40"), ("forbidden", "internal.corp")]);
         let judged = |message: &str| -> Vec<String> {
-            let ctx = MessageContext {
-                domain: MessageDomain::PullRequestBody,
-                mode: AgentMode::Assistant,
+            let ctx = MessageContext::new(
+                MessageDomain::PullRequestBody,
+                AgentMode::Assistant,
                 message,
-                origin: "<stdin>",
-                repo_root: std::path::Path::new("/tmp"),
-                invocation: Some(mockspace_lint_rules::Invocation {
-                    command:   Some("   "),
-                    tool_name: Some("Bash"),
-                }),
-            };
+                "<stdin>",
+                std::path::Path::new("/tmp"),
+            )
+            .with_invocation(Some(mockspace_lint_rules::Invocation {
+                command:   Some("   "),
+                tool_name: Some("Bash"),
+            }));
             l.check_message(&ctx)
                 .into_iter()
                 .map(|e| e.finding_kind.unwrap_or("none").to_string())
@@ -483,14 +482,13 @@ mod tests {
             "forbidden",
             "staging.internal=internal hosts do not belong in a public record",
         )]);
-        let ctx = MessageContext {
-            domain:     MessageDomain::PullRequestBody,
-            mode:       AgentMode::Assistant,
-            message:    "see https://staging.internal/x",
-            origin:     "pr-body",
-            repo_root:  std::path::Path::new("/tmp"),
-            invocation: None,
-        };
+        let ctx = MessageContext::new(
+            MessageDomain::PullRequestBody,
+            AgentMode::Assistant,
+            "see https://staging.internal/x",
+            "pr-body",
+            std::path::Path::new("/tmp"),
+        );
         let errs = l.check_message(&ctx);
         assert_eq!(errs.len(), 1);
         assert!(

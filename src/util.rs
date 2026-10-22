@@ -308,3 +308,27 @@ mod tests {
         assert!(!line_lint_allowed("x // lint:allow()", "anything"));
     }
 }
+
+/// Whether `value` matches `pattern`, a glob supporting `*` and `?`.
+///
+/// An empty pattern matches nothing, which is what makes "configure nothing" mean
+/// "permit nothing" rather than "permit everything".
+pub(crate) fn glob_matches(pattern: &str, value: &str) -> bool {
+    if pattern.is_empty() {
+        return false;
+    }
+    glob_rec(pattern.as_bytes(), value.as_bytes())
+}
+
+fn glob_rec(p: &[u8], v: &[u8]) -> bool {
+    match (p.first(), v.first()) {
+        (None, None) => true,
+        (Some(b'*'), _) => {
+            // match zero characters, or one more then retry
+            glob_rec(&p[1 ..], v) || (!v.is_empty() && glob_rec(p, &v[1 ..]))
+        },
+        (Some(b'?'), Some(_)) => glob_rec(&p[1 ..], &v[1 ..]),
+        (Some(a), Some(b)) if a.eq_ignore_ascii_case(b) => glob_rec(&p[1 ..], &v[1 ..]),
+        _ => false,
+    }
+}
