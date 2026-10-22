@@ -120,16 +120,34 @@ ledgers = "mock/research/*/LEDGER.md"
 
 The attribute is found in the parse, in every `.rs` file of the repository
 including integration tests, so one inside a string or a comment is not an
-ignore. The findings carry a kind, `bare`, `malformed` or `unresolved`, which
+ignore. One in the tokens of a macro call, such as `proptest! { #[ignore] fn
+t() {} }`, is read like any other. A conditional ignore,
+`#[cfg_attr(unix, ignore)]`, is not read: it keeps a test out of one
+configuration for a reason about that configuration, which is not a gap to
+track. The record directories (`design_rounds` and `research` under the mock
+directory) are not read, and `exclude`, a comma-separated list of globs from
+the repository root, leaves more paths alone, such as a directory of fixture
+sources. The findings carry a kind, `bare`, `malformed` or `unresolved`, which
 `[lints.catalogue-ignore.findings]` can give a severity of its own.
+
+A ledger row is a list item, a numbered item, a table row or a heading whose
+first word is the id, with or without a `#` of its own, so `- #C1-188`,
+`1. C1-188` and `## C1-188` are rows and `## Map` is a title.
 
 `no-source-include-in-test`. A repo lint against the test that reads a source
 file as text and searches it for a word, which is a check on spelling written
 where nothing runs it as one. An `include_str!` or `include_bytes!` whose path
-ends in `.rs` is refused inside a test: a `#[test]` function, a `#[cfg(test)]`
-item, or a file under a `tests` directory or named `tests.rs` or `*_tests.rs`.
-A data fixture is included freely, and so is source outside a test. The check
-the test stood for is written as a lint instead.
+ends in `.rs` is refused inside a test: a function carrying `#[test]`,
+`#[rstest]`, `#[test_case]` or `#[quickcheck]`, an item under a `cfg` that
+cannot hold without `test` (`all(unix, test)` does, `any(test, unix)` does
+not), a file or module opened with `#![cfg(test)]`, any module a test module
+declares, or a file under a `tests` directory or named `tests.rs` or
+`*_tests.rs`. The `std::` and `core::` spellings of the macros are read too, and
+the path is the last literal in the call. A data fixture is included freely, and
+so is source outside a test. The check the test stood for is written as a lint
+instead. The `allow` key under `[lints.no-source-include-in-test]` takes globs
+for the source fixtures that are meant to be included, matched against the
+path as written or as resolved.
 
 ### Prose and process
 

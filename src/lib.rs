@@ -117,7 +117,7 @@ mockspace_lint_rules::lint_pack! {
     ],
     repo_lints: [
         CatalogueIgnore::default(),
-        NoSourceIncludeInTest,
+        NoSourceIncludeInTest::default(),
     ],
     // Both carry configuration, so they are constructed rather than named as
     // unit structs. The macro takes expressions for exactly this case.

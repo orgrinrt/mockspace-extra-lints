@@ -24,8 +24,16 @@
 //! A project that names no ledger and has no registry row for an id is refused every id, which is
 //! right: it has said ignores must be tracked and given nowhere to track them.
 //!
-//! The attribute is found in the parse, so one inside a string, a comment or a macro's tokens is
-//! not an ignore.
+//! The attribute is found in the parse, so one inside a string or a comment is not an ignore. One in
+//! the tokens of a macro call (`proptest! { #[ignore] fn t() {} }`) is, since the macro hands it to
+//! the test harness as written.
+//!
+//! A conditional ignore, `#[cfg_attr(unix, ignore)]`, is not read: it keeps a test out of one
+//! configuration for a reason about that configuration, which is not a gap to track.
+//!
+//! The record directories (`design_rounds` and `research` under the mock directory) are not read,
+//! and `exclude`, a comma-separated list of globs from the repository root, names more paths to
+//! leave alone, such as a directory of fixture sources.
 
 use std::collections::{BTreeSet, HashMap};
 use std::fs;
@@ -52,10 +60,19 @@ const BARE: &str = "bare";
 const MALFORMED: &str = "malformed";
 const UNRESOLVED: &str = "unresolved";
 
+/// The key naming the paths no ignore is read in, as globs from the repository root.
+const EXCLUDE_KEY: &str = "exclude";
+
 /// The configured lint. With no ledger named, only the registry can resolve an id.
 #[derive(Default)]
 pub struct CatalogueIgnore {
     ledgers: Vec<String>,
+    exclude: Vec<String>,
+}
+
+/// A comma-separated config value as its non-empty items.
+fn list(value: &str) -> Vec<String> {
+    value.split(',').map(str::trim).filter(|s| !s.is_empty()).map(str::to_string).collect()
 }
 
 impl Lint for CatalogueIgnore {
@@ -72,24 +89,22 @@ impl Lint for CatalogueIgnore {
     }
 
     fn config_keys(&self) -> &[&str] {
-        &[LEDGERS_KEY]
+        &[LEDGERS_KEY, EXCLUDE_KEY]
     }
 
     fn configure(&mut self, params: &HashMap<String, String>) {
         if let Some(v) = params.get(LEDGERS_KEY) {
-            self.ledgers = v
-                .split(',')
-                .map(str::trim)
-                .filter(|s| !s.is_empty())
-                .map(str::to_string)
-                .collect();
+            self.ledgers = list(v);
+        }
+        if let Some(v) = params.get(EXCLUDE_KEY) {
+            self.exclude = list(v);
         }
     }
 }
 
 impl RepoLint for CatalogueIgnore {
     fn check_repo(&self, ctx: &RepoContext) -> Vec<LintError> {
-        let files = rust_files(ctx.repo_root, ctx.all_crates);
+        let files = rust_files(ctx.repo_root, ctx.mock_dir, ctx.all_crates, &self.exclude);
         let mut parser = Parser::new();
         if parser.set_language(&tree_sitter_rust::LANGUAGE.into()).is_err() {
             return Vec::new();
@@ -174,15 +189,44 @@ fn ignores(parser: &mut Parser, source: &str) -> Vec<Ignore> {
 
 fn collect(source: &str, node: Node, out: &mut Vec<Ignore>) {
     let mut cursor = node.walk();
-    for child in node.children(&mut cursor) {
-        if child.kind() == "attribute_item" {
-            if let Some(reason) = ignore_reason(source, child) {
-                out.push(Ignore { line: child.start_position().row + 1, reason });
+    let children: Vec<Node> = node.children(&mut cursor).collect();
+    for (i, child) in children.iter().enumerate() {
+        match child.kind() {
+            "attribute_item" => {
+                if let Some(reason) = ignore_reason(source, *child) {
+                    out.push(Ignore { line: child.start_position().row + 1, reason });
+                }
             }
-        } else {
-            collect(source, child, out);
+            // Inside a macro call the attribute is loose tokens: a `#`, then a bracketed tree.
+            "#" if node.kind() == "token_tree" => {
+                if let Some(reason) = children.get(i + 1).and_then(|t| token_reason(source, *t)) {
+                    out.push(Ignore { line: child.start_position().row + 1, reason });
+                }
+            }
+            _ => collect(source, *child, out),
         }
     }
+}
+
+/// The reason of the bracketed token tree that follows a `#`, when it is `[ignore ...]`.
+fn token_reason(source: &str, tree: Node) -> Option<Reason> {
+    if tree.kind() != "token_tree" || !source.get(tree.byte_range())?.starts_with('[') {
+        return None;
+    }
+    let mut cursor = tree.walk();
+    let inner: Vec<Node> = tree.children(&mut cursor).filter(|c| !matches!(c.kind(), "[" | "]")).collect();
+    let name = inner.first()?;
+    if name.kind() != "identifier" || source.get(name.byte_range()) != Some("ignore") {
+        return None;
+    }
+    Some(match inner.as_slice() {
+        [_] => Reason::Bare,
+        [_, eq, value] if eq.kind() == "=" => match source.get(value.byte_range()).and_then(literal) {
+            Some(text) => Reason::Text(text),
+            None => Reason::Opaque,
+        },
+        _ => Reason::Opaque,
+    })
 }
 
 /// The reason of an attribute item, when the attribute is `ignore`.
@@ -207,7 +251,10 @@ fn ignore_reason(source: &str, item: Node) -> Option<Reason> {
 
 /// The ids a reason tracks, without their `#`, or what is wrong with its shape.
 fn ids(reason: &str) -> Result<Vec<String>, &'static str> {
-    let rest = reason.trim().strip_prefix(PREFIX.trim_end()).ok_or("it does not begin with `catalogue:`")?;
+    // A literal that runs over several lines keeps its newlines and the indent after them, and the
+    // reason reads the same with each run of whitespace as one space.
+    let reason = reason.split_whitespace().collect::<Vec<_>>().join(" ");
+    let rest = reason.strip_prefix(PREFIX.trim_end()).ok_or("it does not begin with `catalogue:`")?;
     let rest = rest.strip_prefix(' ').ok_or("`catalogue:` is followed by a space and the gap")?;
     let (gap, tracked) = rest.rsplit_once(TRACKED).ok_or("it has no `; tracked #<id>` after the gap")?;
     if gap.trim().is_empty() {
@@ -246,20 +293,36 @@ fn known_ids(ctx: &RepoContext, ledgers: &[String]) -> BTreeSet<String> {
     known
 }
 
-/// The id a ledger line opens with, when the line is a list item or a table row.
+/// What follows a marker when the marker is followed by whitespace.
+fn after_marker(rest: Option<&str>) -> Option<&str> {
+    rest.filter(|r| r.starts_with(char::is_whitespace))
+}
+
+/// The id a ledger line opens with, when the line is a list item, a numbered item, a table row or
+/// a heading. The id may carry a `#` of its own, as in `- #C1-188`. A heading reads as a row only
+/// when its first word has a digit, so `## Map` is a title and `## C1-188` is a row.
 fn row_id(line: &str) -> Option<String> {
     let line = line.trim_start();
-    let cell = match line.strip_prefix('|') {
-        Some(rest) => rest,
-        None => line
-            .strip_prefix(['-', '*', '+'])
-            .filter(|rest| rest.starts_with(char::is_whitespace))?,
+    let digits = line.chars().take_while(char::is_ascii_digit).count();
+    let hashes = line.chars().take_while(|&c| c == '#').count();
+    let (cell, heading) = if let Some(rest) = line.strip_prefix('|') {
+        (rest, false)
+    } else if let Some(rest) = after_marker(line.strip_prefix(['-', '*', '+'])) {
+        (rest, false)
+    } else if digits > 0 && after_marker(line[digits..].strip_prefix(['.', ')'])).is_some() {
+        (&line[digits + 1..], false)
+    } else if (1..=6).contains(&hashes) && after_marker(Some(&line[hashes..])).is_some() {
+        (&line[hashes..], true)
+    } else {
+        return None;
     };
     let cell = cell.trim_start().trim_start_matches('`');
+    let cell = cell.strip_prefix('#').unwrap_or(cell);
     let id: String = cell.chars().take_while(|&c| id_char(c)).collect();
     let id = id.trim_end_matches(['-', '.']);
     let after = cell[id.len()..].chars().next();
-    (!id.is_empty() && after.is_none_or(|c| !id_char(c))).then(|| id.to_string())
+    let titled = heading && !id.chars().any(|c| c.is_ascii_digit());
+    (!id.is_empty() && !titled && after.is_none_or(|c| !id_char(c))).then(|| id.to_string())
 }
 
 #[cfg(test)]

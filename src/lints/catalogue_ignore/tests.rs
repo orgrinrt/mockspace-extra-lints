@@ -124,6 +124,16 @@ fn a_ledger_row_is_a_list_item_or_a_table_row_and_nothing_else_is() {
     assert_eq!(rows("* C1-001 a row"), Some("C1-001".into()));
     assert_eq!(rows("  | C2-054 | another |"), Some("C2-054".into()));
     assert_eq!(rows("|`M-3`|x|"), Some("M-3".into()));
+    assert_eq!(rows("- #C1-188 with a hash of its own"), Some("C1-188".into()));
+    assert_eq!(rows("- `#C1-188`"), Some("C1-188".into()));
+    assert_eq!(rows("1. C1-188 a numbered item"), Some("C1-188".into()));
+    assert_eq!(rows("12) C1-188 another"), Some("C1-188".into()));
+    assert_eq!(rows("## C1-188"), Some("C1-188".into()));
+    assert_eq!(rows("### `C1-188` the heading with backticks"), Some("C1-188".into()));
+    assert_eq!(rows("- v1.2 an id with a dot"), Some("v1.2".into()));
+    assert_eq!(rows("1.2 not a numbered item"), None);
+    assert_eq!(rows("#C1-188 no space after the hash"), None);
+    assert_eq!(rows("####### C1-188 seven hashes"), None);
     assert_eq!(rows("## Map"), None);
     assert_eq!(rows("The census review turned up"), None);
     assert_eq!(rows("-C1-001 no space after the marker"), None);
@@ -157,7 +167,92 @@ fn the_ledgers_come_from_the_config_and_an_unconfigured_lint_resolves_only_the_r
 fn the_ledgers_key_takes_a_list_and_is_the_only_key() {
     let lint = configured(" a.md , b/*.md ,, ");
     assert_eq!(lint.ledgers, ["a.md", "b/*.md"]);
-    assert_eq!(lint.config_keys(), &[LEDGERS_KEY]);
+    assert_eq!(lint.config_keys(), &["ledgers", "exclude"]);
+    let mut lint = lint;
+    lint.configure(&HashMap::from([("exclude".to_string(), " x/*.rs , ,y.rs ".to_string())]));
+    assert_eq!(lint.exclude, ["x/*.rs", "y.rs"]);
+    assert_eq!(lint.ledgers, ["a.md", "b/*.md"]);
+}
+
+#[test]
+fn an_ignore_in_the_tokens_of_a_macro_call_is_read_like_any_other() {
+    let found = run("proptest! {\n    #[test]\n    #[ignore]\n    fn t() {}\n}\n");
+    assert_eq!(kinds(&found), [Some(BARE)], "{found:?}");
+    assert_eq!(found[0].line, 3);
+    let ok = run("proptest! {\n    #[ignore = \"catalogue: g; tracked #C1-001\"]\n    fn t() {}\n}\n");
+    assert!(ok.is_empty(), "{ok:?}");
+    let bad = run("proptest! { #[ignore = \"a probe\"] fn t() {} }\n");
+    assert_eq!(kinds(&bad), [Some(MALFORMED)], "{bad:?}");
+    let lost = run("proptest! { #[ignore = \"catalogue: g; tracked #C9-999\"] fn t() {} }\n");
+    assert_eq!(kinds(&lost), [Some(UNRESOLVED)], "{lost:?}");
+    let opaque = run("proptest! { #[ignore = concat!(\"a\", \"b\")] fn t() {} }\n");
+    assert_eq!(kinds(&opaque), [Some(MALFORMED)], "{opaque:?}");
+}
+
+#[test]
+fn a_macro_call_with_other_attributes_and_loose_hashes_is_not_an_ignore() {
+    let body = concat!(
+        "m! { #[test] fn a() {} }\n",
+        "m! { #[cfg_attr(unix, ignore)] fn b() {} }\n",
+        "m! { #[ignored] fn c() {} }\n",
+        "m! { # [derive(Debug)] struct D; }\n",
+        "m! { let x = 1 # 2; ignore }\n",
+        "m! { # (ignore) }\n",
+    );
+    let found = run(body);
+    assert!(found.is_empty(), "{found:?}");
+}
+
+#[test]
+fn the_record_directories_and_the_excluded_paths_are_not_read() {
+    let d = tempfile::tempdir().unwrap();
+    for rel in [
+        "mock/research/sketches/x/probe.rs",
+        "mock/design_rounds/1/probe.rs",
+        "mock/crates/alpha/tests/fixtures/a.rs",
+    ] {
+        write(d.path(), rel, "#[ignore]\nfn t() {}\n");
+    }
+    write(d.path(), "mock/crates/alpha/tests/it.rs", "#[ignore]\nfn t() {}\n");
+    let mut lint = CatalogueIgnore::default();
+    let found = run_with(&lint, &registry(&[]), d.path());
+    let at: Vec<_> = found.iter().map(|e| e.path.clone().unwrap()).collect();
+    assert_eq!(at, ["mock/crates/alpha/tests/fixtures/a.rs", "mock/crates/alpha/tests/it.rs"]);
+    lint.configure(&HashMap::from([("exclude".to_string(), "**/fixtures/*.rs".to_string())]));
+    let found = run_with(&lint, &registry(&[]), d.path());
+    let at: Vec<_> = found.iter().map(|e| e.path.clone().unwrap()).collect();
+    assert_eq!(at, ["mock/crates/alpha/tests/it.rs"]);
+}
+
+#[test]
+fn a_ledger_in_the_record_directory_still_resolves_ids() {
+    let d = tempfile::tempdir().unwrap();
+    write(d.path(), "mock/crates/alpha/src/lib.rs", GOOD);
+    write(d.path(), "mock/research/a/LEDGER.md", "1. C1-001 a numbered row\n");
+    let found = run_with(&configured("mock/research/*/LEDGER.md"), &registry(&[]), d.path());
+    assert!(found.is_empty(), "{found:?}");
+}
+
+#[test]
+fn an_id_with_a_dot_is_an_id() {
+    let d = tempfile::tempdir().unwrap();
+    write(
+        d.path(),
+        "mock/crates/alpha/src/lib.rs",
+        "#[ignore = \"catalogue: g; tracked #v1.2\"]\nfn t() {}\n",
+    );
+    write(d.path(), "LEDGER.md", "- v1.2 a row\n");
+    assert!(run_with(&configured("LEDGER.md"), &registry(&[]), d.path()).is_empty());
+    assert!(ids("catalogue: g; tracked #v1.2").is_ok());
+}
+
+#[test]
+fn a_reason_across_lines_without_a_continuation_is_read_with_its_whitespace_folded() {
+    let found = run("#[ignore = \"catalogue: the gap runs\n    over two lines; tracked\n    #C1-001\"]\nfn t() {}\n");
+    assert!(found.is_empty(), "{found:?}");
+    let bad = run("#[ignore = \"catalogue: the gap runs\n    over two lines\"]\nfn t() {}\n");
+    assert_eq!(kinds(&bad), [Some(MALFORMED)], "{bad:?}");
+    assert!(bad[0].message.contains("no `; tracked"), "{:?}", bad[0].message);
 }
 
 #[test]
@@ -193,10 +288,8 @@ fn only_the_attribute_is_an_ignore() {
         "#[cfg_attr(unix, ignore)]\n",
         "#[ignored]\n",
         "fn ignore() {}\n",
-        "macro_rules! m { () => { #[ignore] fn x() {} } }\n",
     );
     let found = run(body);
-    // The macro body is tokens, not an item, so it is not an attribute either.
     assert!(found.is_empty(), "{found:?}");
 }
 
