@@ -102,14 +102,18 @@ reasoning that a consumer names a kit's crates and nothing under them.
 
 `no-superseded-citation`. A repo lint for a project whose canon is typed rows that
 carry a field naming the rows that replace them: a design, a source file or a
-content file that names a superseded row as a whole word is a hard failure at
-commit, push and build, and the finding names the row that binds now. A
-sentence that says the row is superseded may still name it. The canon files,
+content file that names a superseded row as a whole word, a hyphen being part of the
+word, is a hard failure at commit, push and build, and the finding names the row
+that binds now. A row whose slug is one plain lowercase word counts only when
+backticked. A sentence that says the row is superseded may still name it, within
+its block, or its line in a file that is not prose. A slug a live row of another
+namespace also carries is not read. The canon files,
 the design rounds and research notes, generated files and build output are not
 read.
 
 The project names the field, since what a registry calls that edge is its own
-choice, and the lint has no default for it. Without the key it answers nothing.
+choice, and the lint has no default for it. Without the key it gives one finding
+at `mockspace.toml` while the registry has rows.
 
 ```toml
 [lints.no-superseded-citation]
