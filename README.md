@@ -98,6 +98,31 @@ source through `cargo metadata` to find them. It stops at the dependency's own
 declarations, and crates of the same workspace are not foreign, on the
 reasoning that a consumer names a kit's crates and nothing under them.
 
+### Test discipline
+
+`catalogue-ignore`. A repo lint for a project that writes tests ahead of the
+code. An ignored test is a catalogue entry, a contract the code does not meet
+yet, and the reason says so and says which row tracks it:
+
+```rust
+#[ignore = "catalogue: a creature at the opening zoom is a 3D body; tracked #C1-188"]
+```
+
+A bare `#[ignore]` is refused, and so is a reason of any other shape. Every
+`#<id>` has to resolve to a row of the project's registry, by its slug, or to a
+row of a ledger file, a list item or a table row whose first cell is the id. The
+ledger files are named by the project, as globs from the repository root.
+
+```toml
+[lints.catalogue-ignore]
+ledgers = "mock/research/*/LEDGER.md"
+```
+
+The attribute is found in the parse, in every `.rs` file of the repository
+including integration tests, so one inside a string or a comment is not an
+ignore. The findings carry a kind, `bare`, `malformed` or `unresolved`, which
+`[lints.catalogue-ignore.findings]` can give a severity of its own.
+
 ### Prose and process
 
 `writing-style`, `commit-style`, `forge-body`, `message-attribution`,
