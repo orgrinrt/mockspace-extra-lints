@@ -112,7 +112,7 @@ mockspace_lint_rules::lint_pack! {
         WritingStyle,
     ],
     repo_lints: [
-        NoSupersededCitation,
+        NoSupersededCitation::default(),
     ],
     // Both carry configuration, so they are constructed rather than named as
     // unit structs. The macro takes expressions for exactly this case.

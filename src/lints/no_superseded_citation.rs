@@ -13,10 +13,13 @@
 //! through: a sentence that says the row is superseded, since a design may explain what a row was
 //! replaced by without relying on it.
 //!
-//! A project names the field with a `superseded_by` field on its rows. A repository whose registry
-//! has none declares nothing superseded and the lint answers nothing.
+//! A project names the field in its `mockspace.toml`, as `field` under
+//! `[lints.no-superseded-citation]`, because what a registry calls its replacement edge is the
+//! project's own choice and nothing here knows it. There is no default: a project that has not
+//! named the field, or whose registry has no row carrying it, declares nothing superseded and the
+//! lint answers nothing.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -25,8 +28,9 @@ use mockspace_lint_rules::{Lint, LintError, RegistryView, RepoContext, RepoLint,
 /// The lint's name, as a project's `[lints.*]` table spells it.
 pub const NAME: &str = "no-superseded-citation";
 
-/// The field a registry row carries to say what replaced it.
-const FIELD: &str = "superseded_by";
+/// The key under `[lints.no-superseded-citation]` that names the field a registry row carries to say
+/// what replaced it.
+const FIELD_KEY: &str = "field";
 
 /// The separator the engine joins a list field with.
 const JOIN: &str = ", ";
@@ -46,7 +50,11 @@ const GENERATED: &str = "AUTO-GENERATED";
 /// How many lines at the top of a file the generated marker may sit in.
 const HEADER: usize = 12;
 
-pub struct NoSupersededCitation;
+/// The configured lint. `field` is empty until the project names it, and an empty one finds nothing.
+#[derive(Default)]
+pub struct NoSupersededCitation {
+    field: String,
+}
 
 impl Lint for NoSupersededCitation {
     fn name(&self) -> &'static str {
@@ -56,11 +64,21 @@ impl Lint for NoSupersededCitation {
     fn default_severity(&self) -> Severity {
         Severity::HARD_ERROR
     }
+
+    fn config_keys(&self) -> &[&str] {
+        &[FIELD_KEY]
+    }
+
+    fn configure(&mut self, params: &HashMap<String, String>) {
+        if let Some(v) = params.get(FIELD_KEY) {
+            self.field = v.trim().to_string();
+        }
+    }
 }
 
 impl RepoLint for NoSupersededCitation {
     fn check_repo(&self, ctx: &RepoContext) -> Vec<LintError> {
-        let replaced = replaced(ctx.registry);
+        let replaced = replaced(ctx.registry, &self.field);
         if replaced.is_empty() {
             return Vec::new();
         }
@@ -114,11 +132,11 @@ fn names(successors: &[String]) -> String {
 
 /// Every replaced row's slug, with the rows that stand in its place now: a successor that is itself
 /// replaced is followed to what replaced it, so the name given is one that binds.
-fn replaced(reg: &RegistryView) -> BTreeMap<String, Vec<String>> {
+fn replaced(reg: &RegistryView, field: &str) -> BTreeMap<String, Vec<String>> {
     let mut direct: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for ns in reg.namespaces() {
         for q in reg.rows_in(ns) {
-            let Some(raw) = reg.field(q, FIELD) else {
+            let Some(raw) = reg.field(q, field) else {
                 continue;
             };
             let to: Vec<String> = raw
@@ -302,8 +320,18 @@ mod tests {
         fs::write(p, text).unwrap();
     }
 
-    fn run(root: &Path, canon_paths: &[String]) -> Vec<LintError> {
-        let reg = canon();
+    fn configured(field: &str) -> NoSupersededCitation {
+        let mut lint = NoSupersededCitation::default();
+        lint.configure(&HashMap::from([(FIELD_KEY.to_string(), field.to_string())]));
+        lint
+    }
+
+    fn run_with(
+        lint: &NoSupersededCitation,
+        reg: &RegistryView,
+        root: &Path,
+        canon_paths: &[String],
+    ) -> Vec<LintError> {
         let crates = BTreeSet::from(["alpha".to_string()]);
         let ctx = RepoContext {
             mock_dir: &root.join("mock"),
@@ -313,9 +341,13 @@ mod tests {
             invocation: None,
             canon_paths,
             open_panels: &[],
-            registry: &reg,
+            registry: reg,
         };
-        NoSupersededCitation.check_repo(&ctx)
+        lint.check_repo(&ctx)
+    }
+
+    fn run(root: &Path, canon_paths: &[String]) -> Vec<LintError> {
+        run_with(&configured("superseded_by"), &canon(), root, canon_paths)
     }
 
     fn messages(root: &Path) -> Vec<String> {
@@ -328,7 +360,7 @@ mod tests {
 
     #[test]
     fn the_default_blocks_every_gate() {
-        assert_eq!(NoSupersededCitation.default_severity(), Severity::HARD_ERROR);
+        assert_eq!(NoSupersededCitation::default().default_severity(), Severity::HARD_ERROR);
     }
 
     #[test]
@@ -432,17 +464,38 @@ mod tests {
         let d = dir("none");
         write(d.path(), "mock/DESIGN.md.tmpl", "After `old`.\n");
         let reg = registry(&[("tenet::old", &[("what", "x")])]);
-        let crates = BTreeSet::new();
-        let ctx = RepoContext {
-            mock_dir: &d.path().join("mock"),
-            repo_root: d.path(),
-            all_crates: &crates,
-            src_dirs: &[],
-            invocation: None,
-            canon_paths: &[],
-            open_panels: &[],
-            registry: &reg,
-        };
-        assert!(NoSupersededCitation.check_repo(&ctx).is_empty());
+        assert!(run_with(&configured("superseded_by"), &reg, d.path(), &[]).is_empty());
+    }
+
+    #[test]
+    fn the_field_is_the_one_the_project_names_and_no_other() {
+        let d = dir("named");
+        write(d.path(), "mock/DESIGN.md.tmpl", "After `old` and `gone`.\n");
+        let reg = registry(&[
+            ("tenet::old", &[("superseded_by", "new")]),
+            ("tenet::gone", &[("replaced_by", "new")]),
+            ("tenet::new", &[]),
+        ]);
+        let first = run_with(&configured("superseded_by"), &reg, d.path(), &[]);
+        assert_eq!(first.len(), 1, "{first:?}");
+        assert!(first[0].message.contains("`old`"), "{first:?}");
+        let second = run_with(&configured("replaced_by"), &reg, d.path(), &[]);
+        assert_eq!(second.len(), 1, "{second:?}");
+        assert!(second[0].message.contains("`gone`"), "{second:?}");
+    }
+
+    #[test]
+    fn a_project_that_names_no_field_declares_nothing_superseded() {
+        let d = dir("unnamed");
+        write(d.path(), "mock/DESIGN.md.tmpl", "After `old`.\n");
+        let none = run_with(&NoSupersededCitation::default(), &canon(), d.path(), &[]);
+        assert!(none.is_empty(), "{none:?}");
+        let blank = run_with(&configured("  "), &canon(), d.path(), &[]);
+        assert!(blank.is_empty(), "{blank:?}");
+    }
+
+    #[test]
+    fn the_field_is_a_declared_config_key() {
+        assert_eq!(NoSupersededCitation::default().config_keys(), &[FIELD_KEY]);
     }
 }
