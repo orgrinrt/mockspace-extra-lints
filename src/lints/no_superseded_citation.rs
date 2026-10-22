@@ -16,11 +16,14 @@
 //! slug that a live row of another namespace also carries is not read, since a text cannot tell them
 //! apart.
 //!
-//! A project names the field in its `mockspace.toml`, as `field` under
-//! `[lints.no-superseded-citation]`, because what a registry calls its replacement edge is the
-//! project's own choice and nothing here knows it. There is no default: a project that has not
-//! named the field gets one finding at `mockspace.toml` while the registry has rows, and a registry
-//! with no row carrying the field declares nothing superseded.
+//! A project names the field in its `mockspace.toml`, under `[lints.no-superseded-citation]`,
+//! because what a registry calls its replacement edge is the project's own choice and nothing here
+//! knows it. The edge runs one of two ways and the project names whichever its registry has, or
+//! both: `field` is carried by the replaced row and lists its successors (`superseded_by`),
+//! `supersedes_field` is carried by the replacing row and lists what it replaces (`supersedes`).
+//! There is no default: a project that has named neither gets one finding at `mockspace.toml`
+//! while the registry has rows, and a registry with no row carrying a named field declares nothing
+//! superseded.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs;
@@ -34,6 +37,10 @@ pub const NAME: &str = "no-superseded-citation";
 /// The key under `[lints.no-superseded-citation]` that names the field a registry row carries to say
 /// what replaced it.
 const FIELD_KEY: &str = "field";
+
+/// The key under `[lints.no-superseded-citation]` that names the field a registry row carries to say
+/// which older rows it replaces, for a registry whose edge runs from the new row to the old one.
+const SUPERSEDES_KEY: &str = "supersedes_field";
 
 /// The separator the engine joins a list field with.
 const JOIN: &str = ", ";
@@ -53,10 +60,14 @@ const GENERATED: &str = "AUTO-GENERATED";
 /// How many lines at the top of a file the generated marker may sit in.
 const HEADER: usize = 12;
 
-/// The configured lint. `field` is empty until the project names it, and an empty one finds nothing.
+/// The configured lint. Each field is empty until the project names it, and the lint reads the edge
+/// in each direction it is given: `field` runs from the replaced row to its successors and
+/// `supersedes` from the replacing row to what it replaces. With neither named the lint answers
+/// with one finding at the config.
 #[derive(Default)]
 pub struct NoSupersededCitation {
     field: String,
+    supersedes: String,
 }
 
 impl Lint for NoSupersededCitation {
@@ -69,22 +80,25 @@ impl Lint for NoSupersededCitation {
     }
 
     fn config_keys(&self) -> &[&str] {
-        &[FIELD_KEY]
+        &[FIELD_KEY, SUPERSEDES_KEY]
     }
 
     fn configure(&mut self, params: &HashMap<String, String>) {
         if let Some(v) = params.get(FIELD_KEY) {
             self.field = v.trim().to_string();
         }
+        if let Some(v) = params.get(SUPERSEDES_KEY) {
+            self.supersedes = v.trim().to_string();
+        }
     }
 }
 
 impl RepoLint for NoSupersededCitation {
     fn check_repo(&self, ctx: &RepoContext) -> Vec<LintError> {
-        if self.field.is_empty() {
+        if self.field.is_empty() && self.supersedes.is_empty() {
             return unconfigured(ctx.registry);
         }
-        let replaced = replaced(ctx.registry, &self.field);
+        let replaced = replaced(ctx.registry, &self.field, &self.supersedes);
         if replaced.is_empty() {
             return Vec::new();
         }
@@ -141,7 +155,7 @@ fn unconfigured(reg: &RegistryView) -> Vec<LintError> {
         1,
         NAME,
         format!(
-            "the registry has rows but `{FIELD_KEY}` is not named under `[lints.{NAME}]` in `mockspace.toml`, so no row is read as superseded"
+            "the registry has rows but neither `{FIELD_KEY}` nor `{SUPERSEDES_KEY}` is named under `[lints.{NAME}]` in `mockspace.toml`, so no row is read as superseded"
         ),
     );
     e.path = Some("mockspace.toml".to_string());
@@ -159,30 +173,40 @@ fn names(successors: &[String]) -> String {
 
 /// Every replaced row's slug, with the rows that stand in its place now: a successor that is itself
 /// replaced is followed to what replaced it, so the name given is one that binds.
-fn replaced(reg: &RegistryView, field: &str) -> BTreeMap<String, Vec<String>> {
+///
+/// The edge is read in each direction a field is named for: `forward` on a row lists its successors,
+/// `backward` on a row lists the rows it replaces. A name left empty is not read. A bare name in
+/// `backward` is a row of the replacing row's own namespace.
+fn replaced(reg: &RegistryView, forward: &str, backward: &str) -> BTreeMap<String, Vec<String>> {
     let mut direct: BTreeMap<String, Vec<String>> = BTreeMap::new();
-    let mut live: BTreeSet<String> = BTreeSet::new();
+    let mut gone: BTreeSet<String> = BTreeSet::new();
+    let mut rows: Vec<(&str, &str)> = Vec::new();
     for ns in reg.namespaces() {
         for q in reg.rows_in(ns) {
-            let slug = q.rsplit("::").next().unwrap_or(q).to_string();
-            let to: Vec<String> = reg
-                .field(q, field)
-                .unwrap_or_default()
-                .split(JOIN)
-                .map(str::trim)
-                .filter(|s| !s.is_empty())
-                .map(|s| s.rsplit("::").next().unwrap_or(s).to_string())
-                .collect();
-            if to.is_empty() {
-                live.insert(slug);
-            } else {
-                direct.insert(slug, to);
+            rows.push((ns, q));
+            let slug = slug_of(q);
+            let to = listed(reg, q, forward);
+            if !to.is_empty() {
+                gone.insert(q.clone());
+                for s in to {
+                    edge(&mut direct, slug, slug_of(s));
+                }
+            }
+            for old in listed(reg, q, backward) {
+                let old_q = if old.contains("::") { old.to_string() } else { format!("{ns}::{old}") };
+                gone.insert(old_q);
+                edge(&mut direct, slug_of(old), slug);
             }
         }
     }
     // A text names a row by its slug alone, so a slug a live row in another namespace also
     // carries cannot be told apart and is not read as replaced.
-    direct.retain(|slug, _| !live.contains(slug));
+    let live: BTreeSet<&str> = rows
+        .iter()
+        .filter(|(_, q)| !gone.contains(*q))
+        .map(|(_, q)| slug_of(q))
+        .collect();
+    direct.retain(|slug, _| !live.contains(slug.as_str()));
     direct
         .keys()
         .map(|slug| {
@@ -192,6 +216,32 @@ fn replaced(reg: &RegistryView, field: &str) -> BTreeMap<String, Vec<String>> {
             (slug.clone(), live)
         })
         .collect()
+}
+
+/// A row's slug: what follows its last `::`.
+fn slug_of(name: &str) -> &str {
+    name.rsplit("::").next().unwrap_or(name)
+}
+
+/// The names row `q` lists in `field`, none when the field is not named or the row lacks it.
+fn listed<'a>(reg: &'a RegistryView, q: &str, field: &str) -> Vec<&'a str> {
+    if field.is_empty() {
+        return Vec::new();
+    }
+    reg.field(q, field)
+        .unwrap_or_default()
+        .split(JOIN)
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .collect()
+}
+
+/// Records that `old` is replaced by `new`, once.
+fn edge(direct: &mut BTreeMap<String, Vec<String>>, old: &str, new: &str) {
+    let to = direct.entry(old.to_string()).or_default();
+    if !to.iter().any(|t| t == new) {
+        to.push(new.to_string());
+    }
 }
 
 /// The first rows down `slug`'s replacements that nothing replaces, in order, each once.

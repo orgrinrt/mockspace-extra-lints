@@ -112,12 +112,17 @@ the design rounds and research notes, generated files and build output are not
 read.
 
 The project names the field, since what a registry calls that edge is its own
-choice, and the lint has no default for it. Without the key it gives one finding
-at `mockspace.toml` while the registry has rows.
+choice, and the lint has no default for it. The edge runs one of two ways and
+either or both may be named: `field` is carried by the replaced row and lists its
+successors, `supersedes_field` is carried by the replacing row and lists what it
+replaces. Without either key the lint gives one finding at `mockspace.toml` while
+the registry has rows.
 
 ```toml
 [lints.no-superseded-citation]
 field = "superseded_by"
+# or, for a registry whose edge runs from the new row to the old one:
+# supersedes_field = "supersedes"
 ```
 
 ### Prose and process

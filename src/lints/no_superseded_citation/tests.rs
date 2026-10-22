@@ -151,19 +151,29 @@ fn a_sentence_saying_the_row_is_superseded_may_name_it() {
 #[test]
 fn the_canon_the_rounds_the_research_and_generated_files_are_not_read() {
     let d = dir("skipped");
-    write(d.path(), "mock/registry/tenet/a.toml", "what = \"old\"\n");
-    write(d.path(), "mock/design_rounds/1_topic.md", "old\n");
-    write(d.path(), "mock/research/1_x/NOTES.md", "old\n");
-    write(d.path(), "mock/target/debug/x.rs", "// old\n");
-    write(d.path(), "vendor/x/lib.rs", "// old\n");
+    // `old-rule` is a compound slug, so a bare mention is a citation wherever the file is read.
+    write(d.path(), "mock/registry/tenet/a.toml", "what = \"old-rule\"\n");
+    write(d.path(), "mock/design_rounds/1_topic.md", "old-rule\n");
+    write(d.path(), "mock/research/1_x/NOTES.md", "old-rule\n");
+    write(d.path(), "mock/target/debug/x.rs", "// old-rule\n");
+    write(d.path(), "vendor/x/lib.rs", "// old-rule\n");
     write(
         d.path(),
         "docs/ALPHA.md",
-        "<!--\n  AUTO-GENERATED: DO NOT EDIT\n-->\nold\n",
+        "<!--\n  AUTO-GENERATED: DO NOT EDIT\n-->\nold-rule\n",
     );
     let canon_paths = vec!["mock/registry/tenet/*.toml".to_string()];
     let found = run(d.path(), &canon_paths);
     assert!(found.is_empty(), "{found:?}");
+    // The controls: the canon file is read when it is not declared canon, and the generated file
+    // once the marker is gone, so the silence above is the skip and not a blind lint.
+    let undeclared = run(d.path(), &[]);
+    assert_eq!(undeclared.len(), 1, "{undeclared:?}");
+    assert_eq!(undeclared[0].path.as_deref(), Some("mock/registry/tenet/a.toml"));
+    write(d.path(), "docs/ALPHA.md", "old-rule\n");
+    let found = run(d.path(), &canon_paths);
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert_eq!(found[0].path.as_deref(), Some("docs/ALPHA.md"));
 }
 
 #[test]
@@ -217,7 +227,7 @@ fn a_project_with_rows_and_no_field_named_gets_one_finding_at_its_config() {
 #[test]
 fn the_field_is_a_declared_config_key() {
     assert_eq!(FIELD_KEY, "field");
-    assert_eq!(NoSupersededCitation::default().config_keys(), &["field"]);
+    assert_eq!(NoSupersededCitation::default().config_keys(), &["field", "supersedes_field"]);
 }
 
 #[test]
@@ -252,6 +262,112 @@ fn a_plain_word_slug_counts_only_backticked_and_a_compound_one_either_way() {
     assert_eq!(messages(d.path()).len(), 1);
     write(d.path(), "mock/A.md.tmpl", "The 'old' way and (old).\n");
     assert!(messages(d.path()).is_empty());
+    // One backtick only is not a backticked word.
+    for text in ["The `old way.\n", "The old` way.\n"] {
+        write(d.path(), "mock/A.md.tmpl", text);
+        let m = messages(d.path());
+        assert!(m.is_empty(), "{text:?}: {m:?}");
+    }
+}
+
+fn reverse(field: &str) -> NoSupersededCitation {
+    let mut lint = NoSupersededCitation::default();
+    lint.configure(&HashMap::from([(SUPERSEDES_KEY.to_string(), field.to_string())]));
+    lint
+}
+
+/// The same canon as `canon()`, written the other way round: the new row names what it replaces.
+fn canon_reversed() -> RegistryView {
+    registry(&[
+        ("tenet::old", &[]),
+        ("tenet::mid", &[("supersedes", "old")]),
+        ("tenet::new", &[("supersedes", "mid")]),
+        ("tenet::split", &[]),
+        ("tenet::left", &[("supersedes", "split")]),
+        ("tenet::right", &[("supersedes", "tenet::split")]),
+        ("tenet::old-rule", &[]),
+        ("tenet::new-rule", &[("supersedes", "old-rule")]),
+    ])
+}
+
+#[test]
+fn a_supersedes_edge_alone_flags_a_citation_of_the_replaced_row() {
+    let d = dir("reverse");
+    write(d.path(), "mock/A.md.tmpl", "After `old`.\n");
+    let found = run_with(&reverse("supersedes"), &canon_reversed(), d.path(), &[]);
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert!(found[0].message.contains("`old`") && found[0].message.contains("`new`"), "{found:?}");
+    assert!(!found[0].message.contains("`mid`"), "{found:?}");
+    write(d.path(), "mock/A.md.tmpl", "After `new`, `mid`.\n");
+    let found = run_with(&reverse("supersedes"), &canon_reversed(), d.path(), &[]);
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert!(found[0].message.contains("`mid`"), "{found:?}");
+    write(d.path(), "mock/A.md.tmpl", "After `split`.\n");
+    let found = run_with(&reverse("supersedes"), &canon_reversed(), d.path(), &[]);
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert!(found[0].message.contains("`left`") && found[0].message.contains("`right`"), "{found:?}");
+}
+
+#[test]
+fn the_two_directions_agree_and_a_forward_field_alone_ignores_the_reverse_edge() {
+    let d = dir("agree");
+    write(d.path(), "mock/A.md.tmpl", "After `old-rule`.\n");
+    let reg = canon_reversed();
+    // The reverse edge is not read by a lint that named only the forward field.
+    assert!(run_with(&configured("superseded_by"), &reg, d.path(), &[]).is_empty());
+    // And the forward edge is not read by a lint that named only the reverse field.
+    assert!(run_with(&reverse("supersedes"), &canon(), d.path(), &[]).is_empty());
+    let a = run_with(&reverse("supersedes"), &reg, d.path(), &[]);
+    let b = run(d.path(), &[]);
+    assert_eq!(a.len(), 1, "{a:?}");
+    assert_eq!(a[0].message, b[0].message);
+}
+
+#[test]
+fn both_fields_named_read_both_edges_without_doubling_a_finding() {
+    let d = dir("both");
+    write(d.path(), "mock/A.md.tmpl", "After `old-rule` and `gone-rule`.\n");
+    let reg = registry(&[
+        ("tenet::old-rule", &[("superseded_by", "new-rule")]),
+        ("tenet::new-rule", &[("supersedes", "old-rule")]),
+        ("tenet::gone-rule", &[]),
+        ("tenet::next-rule", &[("supersedes", "gone-rule")]),
+    ]);
+    let mut lint = configured("superseded_by");
+    lint.configure(&HashMap::from([(SUPERSEDES_KEY.to_string(), "supersedes".to_string())]));
+    let found = run_with(&lint, &reg, d.path(), &[]);
+    assert_eq!(found.len(), 2, "{found:?}");
+    // Sorted by slug: `gone-rule` is replaced by `next-rule` alone, `old-rule` by `new-rule` alone
+    // although both of its edges are named.
+    assert!(found[0].message.contains("`next-rule`") && !found[0].message.contains("`new-rule`"), "{found:?}");
+    assert!(found[1].message.contains("`new-rule`") && !found[1].message.contains("`next-rule`"), "{found:?}");
+}
+
+#[test]
+fn a_reverse_edge_does_not_hide_the_replacing_row_or_a_namesake_in_another_namespace() {
+    let d = dir("reverse-namespaces");
+    write(d.path(), "mock/A.md.tmpl", "After `dup-row` and `kept-row`.\n");
+    let reg = registry(&[
+        ("tenet::dup-row", &[]),
+        ("term::dup-row", &[]),
+        ("tenet::next-row", &[("supersedes", "dup-row")]),
+        ("tenet::kept-row", &[("supersedes", "dup-row")]),
+    ]);
+    let found = run_with(&reverse("supersedes"), &reg, d.path(), &[]);
+    // `dup-row` in `tenet` is replaced and in `term` it is live, so a text cannot tell them apart.
+    assert!(found.is_empty(), "{found:?}");
+}
+
+#[test]
+fn neither_field_named_is_still_the_one_finding_and_both_keys_are_declared() {
+    let d = dir("neither");
+    write(d.path(), "mock/A.md.tmpl", "After `old`.\n");
+    let found = run_with(&NoSupersededCitation::default(), &canon_reversed(), d.path(), &[]);
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert!(found[0].message.contains("`field`") && found[0].message.contains("`supersedes_field`"), "{found:?}");
+    assert_eq!(SUPERSEDES_KEY, "supersedes_field");
+    assert_eq!(NoSupersededCitation::default().config_keys(), &["field", "supersedes_field"]);
+    assert!(run_with(&reverse("  "), &canon_reversed(), d.path(), &[]).len() == 1);
 }
 
 #[test]
