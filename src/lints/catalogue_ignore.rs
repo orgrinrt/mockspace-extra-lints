@@ -319,10 +319,11 @@ fn row_id(line: &str) -> Option<String> {
     let cell = cell.trim_start().trim_start_matches('`');
     let cell = cell.strip_prefix('#').unwrap_or(cell);
     let id: String = cell.chars().take_while(|&c| id_char(c)).collect();
+    // The run above ends at the first character that is not an id's, so what it took is the whole
+    // word; the dashes and dots it ends on are the sentence's punctuation, not the id's.
     let id = id.trim_end_matches(['-', '.']);
-    let after = cell[id.len()..].chars().next();
     let titled = heading && !id.chars().any(|c| c.is_ascii_digit());
-    (!id.is_empty() && !titled && after.is_none_or(|c| !id_char(c))).then(|| id.to_string())
+    (!id.is_empty() && !titled).then(|| id.to_string())
 }
 
 #[cfg(test)]

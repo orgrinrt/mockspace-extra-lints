@@ -142,6 +142,27 @@ fn a_ledger_row_is_a_list_item_or_a_table_row_and_nothing_else_is() {
 }
 
 #[test]
+fn a_row_id_ending_the_sentence_still_resolves() {
+    for line in ["- C1-188.", "1. C1-188.", "- `C1-188`.", "| C1-188.", "- C1-188- and more"] {
+        assert_eq!(row_id(line), Some("C1-188".into()), "{line:?}");
+    }
+    let d = tempfile::tempdir().unwrap();
+    write(
+        d.path(),
+        "mock/crates/alpha/src/tests/a.rs",
+        "#[ignore = \"catalogue: g; tracked #C1-188\"]\nfn t() {}\n",
+    );
+    for ledger in ["- C1-188.\n", "1. C1-188.\n"] {
+        write(d.path(), "LEDGER.md", ledger);
+        let found = run_with(&configured("LEDGER.md"), &registry(&[]), d.path());
+        assert!(found.is_empty(), "{ledger:?}: {found:?}");
+    }
+    write(d.path(), "LEDGER.md", "- C1-189.\n");
+    let found = run_with(&configured("LEDGER.md"), &registry(&[]), d.path());
+    assert_eq!(kinds(&found), [Some(UNRESOLVED)], "{found:?}");
+}
+
+#[test]
 fn an_id_only_the_prose_of_the_ledger_mentions_does_not_resolve() {
     let d = tempfile::tempdir().unwrap();
     write(d.path(), "mock/crates/alpha/src/lib.rs", "#[ignore = \"catalogue: g; tracked #C7-007\"]\nfn t() {}\n");
@@ -328,7 +349,7 @@ fn build_output_and_vendored_sources_are_not_read() {
 fn the_default_blocks_every_gate_and_the_kinds_are_declared() {
     let lint = CatalogueIgnore::default();
     assert_eq!(lint.default_severity(), Severity::HARD_ERROR);
-    assert_eq!(lint.finding_kinds(), &[BARE, MALFORMED, UNRESOLVED]);
+    assert_eq!(lint.finding_kinds(), &["bare", "malformed", "unresolved"]);
     assert_eq!(lint.name(), "catalogue-ignore");
 }
 
