@@ -17,9 +17,10 @@
 //! `#[ignore]` is refused, and so is a reason of any other shape. What makes the id more than a
 //! number to satisfy the lint is that it has to resolve: to a row of a ledger, or to a row of the
 //! project's registry. A ledger row is a list item or a table row whose first cell is the id, and
-//! the project names its ledger files with `ledgers`, a comma-separated list of globs from the
-//! repository root, under `[lints.catalogue-ignore]`. The registry needs no naming, since the
-//! engine hands it over, and a row resolves by its slug.
+//! the project names its ledger files with `ledgers`, a comma-separated list of globs anchored at
+//! the repository root, under `[lints.catalogue-ignore]`. A bare name is the file at the root, and
+//! `**/name` is that name at any depth. The registry needs no naming, since the engine hands it
+//! over, and a row resolves by its slug.
 //!
 //! A project that names no ledger and has no registry row for an id is refused every id, which is
 //! right: it has said ignores must be tracked and given nowhere to track them.
@@ -32,8 +33,8 @@
 //! configuration for a reason about that configuration, which is not a gap to track.
 //!
 //! The record directories (`design_rounds` and `research` under the mock directory) are not read,
-//! and `exclude`, a comma-separated list of globs from the repository root, names more paths to
-//! leave alone, such as a directory of fixture sources.
+//! and `exclude`, a comma-separated list of globs anchored at the repository root in the same way,
+//! names more paths to leave alone, such as a directory of fixture sources.
 
 use std::collections::{BTreeSet, HashMap};
 use std::fs;
