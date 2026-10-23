@@ -30,3 +30,6 @@ serde_json = "1"
 
 [dev-dependencies]
 tempfile = "3"
+# The engine's own config reader, so a test can load a `mockspace.toml` the way a run does.
+# The same URL spelling as above, for the reason given there.
+mockspace = { git = "https://github.com/hiisi-digital/mockspace.git", branch = "dev" }
