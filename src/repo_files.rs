@@ -31,17 +31,17 @@ pub(crate) struct RustFile {
 }
 
 /// Every readable `.rs` file under `root`, in path order, but for the record directories under
-/// `mock_dir` and the paths matching one of the `exclude` globs, each read from the root.
+/// `mock_dir` and the paths matching one of the `skip` globs, each read from the root.
 pub(crate) fn rust_files(
     root: &Path,
     mock_dir: &Path,
     all_crates: &BTreeSet<String>,
-    exclude: &[String],
+    skip: &[String],
 ) -> Vec<RustFile> {
     let record = record_dirs(root, mock_dir);
     let mut out = Vec::new();
     for rel in paths(root, &record, |name, rel| {
-        name.ends_with(".rs") && !exclude.iter().any(|g| glob_match_anchored(g, rel))
+        name.ends_with(".rs") && !skip.iter().any(|g| glob_match_anchored(g, rel))
     }) {
         let Ok(text) = fs::read_to_string(root.join(&rel)) else {
             continue;
@@ -140,8 +140,8 @@ mod tests {
         names.iter().map(|n| (*n).to_string()).collect()
     }
 
-    fn scan(root: &Path, all: &BTreeSet<String>, exclude: &[String]) -> Vec<RustFile> {
-        rust_files(root, &root.join("mock"), all, exclude)
+    fn scan(root: &Path, all: &BTreeSet<String>, skip: &[String]) -> Vec<RustFile> {
+        rust_files(root, &root.join("mock"), all, skip)
     }
 
     #[test]
@@ -185,12 +185,12 @@ mod tests {
     }
 
     #[test]
-    fn a_path_matching_an_exclude_glob_is_not_read() {
+    fn a_path_matching_a_skip_glob_is_not_read() {
         let d = tempfile::tempdir().unwrap();
         write(d.path(), "mock/crates/alpha/tests/fixtures/a.rs", "");
         write(d.path(), "mock/crates/alpha/tests/it.rs", "");
-        let exclude = ["**/fixtures/*.rs".to_string()];
-        let found = scan(d.path(), &crates(&["alpha"]), &exclude);
+        let skip = ["**/fixtures/*.rs".to_string()];
+        let found = scan(d.path(), &crates(&["alpha"]), &skip);
         let got: Vec<_> = found.iter().map(|f| f.rel.as_str()).collect();
         assert_eq!(got, ["mock/crates/alpha/tests/it.rs"]);
     }

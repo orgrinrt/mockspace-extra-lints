@@ -185,7 +185,7 @@ fn the_ledgers_come_from_the_config_and_an_unconfigured_lint_resolves_only_the_r
 }
 
 #[test]
-fn the_ledgers_key_takes_a_list_and_is_the_only_key() {
+fn the_ledgers_and_skip_keys_each_take_a_list_and_are_the_only_keys() {
     let lint = configured(" a.md , b/*.md ,, ");
     assert_eq!(lint.ledgers, ["a.md", "b/*.md"]);
     assert_eq!(lint.config_keys(), &["ledgers", "skip"]);
@@ -398,5 +398,6 @@ fn a_skip_reaches_a_file_at_the_root_and_a_bare_name_means_only_that_one() {
     let any_depth = run_with(&with_skip("**/scratch.rs"), &reg, d.path());
     assert!(any_depth.is_empty(), "{any_depth:?}");
     let question = run_with(&with_skip("scratch.r?"), &reg, d.path());
-    assert_eq!(question.len(), 1, "{question:?}");
+    let paths: Vec<_> = question.iter().map(|e| e.path.as_deref()).collect();
+    assert_eq!(paths, [Some("mock/scratch.rs")], "{question:?}");
 }

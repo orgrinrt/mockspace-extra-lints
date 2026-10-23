@@ -45,8 +45,8 @@ fn found_with(toml: &str) -> (Vec<String>, bool) {
     let mut paths: Vec<String> =
         lint.check_repo(&ctx).into_iter().filter_map(|e| e.path).collect();
     paths.sort();
-    // That the table survived the read at all: a table the engine could not deserialise is
-    // dropped whole, severity included.
+    // That the table survived the read at all: one the engine could not deserialise is gone from
+    // the result, severity included, or the read refuses it outright, by engine version.
     (paths, cfg.lint_overrides.base.contains_key("catalogue-ignore"))
 }
 
@@ -54,11 +54,11 @@ fn found_with(toml: &str) -> (Vec<String>, bool) {
 fn a_skip_in_mockspace_toml_reaches_the_lint_and_a_matching_path_is_left_alone() {
     let control = "[lints.catalogue-ignore]\nseverity = \"error\"\n";
     let (all, kept) = found_with(control);
-    assert!(kept, "the control table was dropped");
+    assert!(kept, "the control table did not survive the read");
     assert_eq!(all, ["kept.rs", "scratch.rs"], "the control must see both files");
 
     let skipped = "[lints.catalogue-ignore]\nseverity = \"error\"\nskip = \"scratch.rs\"\n";
     let (found, kept) = found_with(skipped);
-    assert!(kept, "setting `skip` dropped the table");
+    assert!(kept, "setting `skip` lost the table");
     assert_eq!(found, ["kept.rs"], "`skip` set in mockspace.toml did not reach the lint");
 }
