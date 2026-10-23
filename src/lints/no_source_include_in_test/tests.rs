@@ -359,3 +359,34 @@ fn the_default_blocks_every_gate_and_allow_is_the_only_key() {
     assert_eq!(lint.name(), "no-source-include-in-test");
     assert_eq!(lint.config_keys(), &["allow"]);
 }
+
+fn allowing(allow: &str) -> NoSourceIncludeInTest {
+    let mut lint = NoSourceIncludeInTest::default();
+    lint.configure(&HashMap::from([(ALLOW_KEY.to_string(), allow.to_string())]));
+    lint
+}
+
+#[test]
+fn an_allow_reaches_a_source_file_at_the_root_and_a_bare_name_means_only_that_one() {
+    let d = tempfile::tempdir().unwrap();
+    let body = "#[test]\nfn t() { include_str!(\"../../../../data.rs\"); include_str!(\"../fixtures/data.rs\"); }\n";
+    write(d.path(), "mock/crates/alpha/tests/it.rs", body);
+    let none = check(d.path());
+    assert_eq!(none.len(), 2, "{none:?}");
+    let root_only = check_with(&allowing("data.rs"), d.path());
+    assert_eq!(root_only.len(), 1, "{root_only:?}");
+    assert!(root_only[0].message.contains("fixtures/data.rs"), "{:?}", root_only[0].message);
+    assert!(check_with(&allowing("**/data.rs"), d.path()).is_empty());
+    assert!(check_with(&allowing("?ata.rs, mock/**/data.rs"), d.path()).is_empty());
+}
+
+#[test]
+fn a_test_file_at_the_root_is_read_and_its_include_is_allowed_by_its_resolved_path() {
+    let d = tempfile::tempdir().unwrap();
+    write(d.path(), "tests/it.rs", "#[test]\nfn t() { include_str!(\"../src/lib.rs\"); }\n");
+    let none = check(d.path());
+    assert_eq!(none.len(), 1, "{none:?}");
+    assert!(check_with(&allowing("src/**/*.rs"), d.path()).is_empty());
+    assert!(check_with(&allowing("src/**"), d.path()).is_empty());
+    assert_eq!(check_with(&allowing("lib.rs"), d.path()).len(), 1);
+}

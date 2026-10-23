@@ -358,3 +358,45 @@ fn the_ids_are_what_follows_the_last_tracked_so_a_gap_may_say_the_word() {
     let found = run("#[ignore = \"catalogue: it says; tracked #nowhere in prose; tracked #C1-001\"]\nfn t() {}\n");
     assert!(found.is_empty(), "{found:?}");
 }
+
+fn with_exclude(exclude: &str) -> CatalogueIgnore {
+    let mut lint = CatalogueIgnore::default();
+    lint.configure(&HashMap::from([(EXCLUDE_KEY.to_string(), exclude.to_string())]));
+    lint
+}
+
+#[test]
+fn a_ledger_at_the_root_is_named_from_the_root_and_a_namesake_below_is_not() {
+    let d = tempfile::tempdir().unwrap();
+    write(d.path(), "mock/crates/alpha/src/tests/a.rs", GOOD);
+    write(d.path(), "LEDGER.md", "- `C1-001` a row\n");
+    for ledgers in ["LEDGER.md", "./LEDGER.md", "**/LEDGER.md"] {
+        let found = run_with(&configured(ledgers), &registry(&[]), d.path());
+        assert!(found.is_empty(), "{ledgers}: {found:?}");
+    }
+    // The control: the same ledger one directory down is not the root's, so a bare name misses it.
+    let below = tempfile::tempdir().unwrap();
+    write(below.path(), "mock/crates/alpha/src/tests/a.rs", GOOD);
+    write(below.path(), "docs/LEDGER.md", "- `C1-001` a row\n");
+    let found = run_with(&configured("LEDGER.md"), &registry(&[]), below.path());
+    assert_eq!(kinds(&found), [Some(UNRESOLVED)], "{found:?}");
+    assert!(run_with(&configured("**/LEDGER.md"), &registry(&[]), below.path()).is_empty());
+}
+
+#[test]
+fn an_exclude_reaches_a_file_at_the_root_and_a_bare_name_means_only_that_one() {
+    let bare = "#[test]\n#[ignore]\nfn t() {}\n";
+    let d = tempfile::tempdir().unwrap();
+    write(d.path(), "scratch.rs", bare);
+    write(d.path(), "mock/scratch.rs", bare);
+    let reg = registry(&[]);
+    let none = run_with(&CatalogueIgnore::default(), &reg, d.path());
+    assert_eq!(none.len(), 2, "{none:?}");
+    let root_only = run_with(&with_exclude("scratch.rs"), &reg, d.path());
+    let paths: Vec<_> = root_only.iter().map(|e| e.path.as_deref()).collect();
+    assert_eq!(paths, [Some("mock/scratch.rs")], "{root_only:?}");
+    let any_depth = run_with(&with_exclude("**/scratch.rs"), &reg, d.path());
+    assert!(any_depth.is_empty(), "{any_depth:?}");
+    let question = run_with(&with_exclude("scratch.r?"), &reg, d.path());
+    assert_eq!(question.len(), 1, "{question:?}");
+}
