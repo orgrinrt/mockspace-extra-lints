@@ -125,10 +125,12 @@ t() {} }`, is read like any other. A conditional ignore,
 `#[cfg_attr(unix, ignore)]`, is not read: it keeps a test out of one
 configuration for a reason about that configuration, which is not a gap to
 track. The record directories (`design_rounds` and `research` under the mock
-directory) are not read, and `exclude`, a comma-separated list of globs from
+directory) are not read, and `skip`, a comma-separated list of globs from
 the repository root, leaves more paths alone, such as a directory of fixture
-sources. The findings carry a kind, `bare`, `malformed` or `unresolved`, which
-`[lints.catalogue-ignore.findings]` can give a severity of its own.
+sources. It is not called `exclude`, which the engine reads as its own path filter
+and never hands to a lint. The findings carry a kind, `bare`, `malformed` or
+`unresolved`, which `[lints.catalogue-ignore.findings]` can give a severity of
+its own.
 
 A ledger row is a list item, a numbered item, a table row or a heading whose
 first word is the id, with or without a `#` of its own, so `- #C1-188`,
@@ -152,11 +154,13 @@ path as written or as resolved.
 ### Path globs
 
 The path globs in this pack are matched against a path from the repository root,
-with `/` as the separator, and a leading `./` in a pattern is dropped. `*` and `?`
-match within one segment and never cross a `/`, and `?` stands for exactly one
+with `/` as the separator, and a leading `./` in a pattern is dropped. The one
+exception is `allow`, which is also matched against the path an include names, as
+written in the including file, and a match on either lets the include through.
+`*` and `?` match within one segment and never cross a `/`, and `?` stands for exactly one
 character. `**` as a whole segment matches zero or more segments, so `a/**/c.md`
 matches `a/c.md` and `a/b/c.md`, and inside a segment `**` acts as `*`. The keys
-`ledgers`, `exclude` and `allow` are anchored at the root: a bare name means the
+`ledgers`, `skip` and `allow` are anchored at the root: a bare name means the
 file at the root, and `**/name` means that name at any depth. The files
 `canon_paths` names are matched with mockspace's own rule, so a bare name there
 reaches any depth. What changed from earlier versions: a `?` used to be a literal

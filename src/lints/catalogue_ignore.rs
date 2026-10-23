@@ -33,8 +33,9 @@
 //! configuration for a reason about that configuration, which is not a gap to track.
 //!
 //! The record directories (`design_rounds` and `research` under the mock directory) are not read,
-//! and `exclude`, a comma-separated list of globs anchored at the repository root in the same way,
-//! names more paths to leave alone, such as a directory of fixture sources.
+//! and `skip`, a comma-separated list of globs anchored at the repository root in the same way,
+//! names more paths to leave alone, such as a directory of fixture sources. It is not called
+//! `exclude`, which the engine reads as its own path filter and never hands to a lint.
 
 use std::collections::{BTreeSet, HashMap};
 use std::fs;
@@ -62,13 +63,13 @@ const MALFORMED: &str = "malformed";
 const UNRESOLVED: &str = "unresolved";
 
 /// The key naming the paths no ignore is read in, as globs from the repository root.
-const EXCLUDE_KEY: &str = "exclude";
+const SKIP_KEY: &str = "skip";
 
 /// The configured lint. With no ledger named, only the registry can resolve an id.
 #[derive(Default)]
 pub struct CatalogueIgnore {
     ledgers: Vec<String>,
-    exclude: Vec<String>,
+    skip: Vec<String>,
 }
 
 /// A comma-separated config value as its non-empty items.
@@ -90,22 +91,22 @@ impl Lint for CatalogueIgnore {
     }
 
     fn config_keys(&self) -> &[&str] {
-        &[LEDGERS_KEY, EXCLUDE_KEY]
+        &[LEDGERS_KEY, SKIP_KEY]
     }
 
     fn configure(&mut self, params: &HashMap<String, String>) {
         if let Some(v) = params.get(LEDGERS_KEY) {
             self.ledgers = list(v);
         }
-        if let Some(v) = params.get(EXCLUDE_KEY) {
-            self.exclude = list(v);
+        if let Some(v) = params.get(SKIP_KEY) {
+            self.skip = list(v);
         }
     }
 }
 
 impl RepoLint for CatalogueIgnore {
     fn check_repo(&self, ctx: &RepoContext) -> Vec<LintError> {
-        let files = rust_files(ctx.repo_root, ctx.mock_dir, ctx.all_crates, &self.exclude);
+        let files = rust_files(ctx.repo_root, ctx.mock_dir, ctx.all_crates, &self.skip);
         let mut parser = Parser::new();
         if parser.set_language(&tree_sitter_rust::LANGUAGE.into()).is_err() {
             return Vec::new();
