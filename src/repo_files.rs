@@ -117,12 +117,15 @@ fn slashed(p: &Path) -> String {
         .join("/")
 }
 
-/// Whether `text` matches `pattern`, where `*` stands for any run of characters but a slash and
-/// `**` for any run at all.
+/// Whether `text` matches `pattern`, where `*` stands for any run of characters but a slash, `**`
+/// for any run at all, and `**/` for zero directories or more, so `a/**/*.toml` matches `a/x.toml`.
 pub(crate) fn glob(pattern: &str, text: &str) -> bool {
     fn go(p: &[u8], t: &[u8]) -> bool {
         match p {
             [] => t.is_empty(),
+            [b'*', b'*', b'/', rest @ ..] => {
+                go(rest, t) || (0..t.len()).any(|i| t[i] == b'/' && go(rest, &t[i + 1..]))
+            }
             [b'*', b'*', rest @ ..] => (0..=t.len()).any(|i| go(rest, &t[i..])),
             [b'*', rest @ ..] => {
                 let run = t.iter().take_while(|&&c| c != b'/').count();
@@ -221,7 +224,7 @@ mod tests {
         let one = matching(d.path(), &["mock/research/*/LEDGER.md".to_string()]);
         assert_eq!(one, ["mock/research/a/LEDGER.md"]);
         let deep = matching(d.path(), &["**/LEDGER.md".to_string()]);
-        assert_eq!(deep, ["mock/research/a/LEDGER.md"]);
+        assert_eq!(deep, ["LEDGER.md", "mock/research/a/LEDGER.md"]);
         let either = matching(d.path(), &["LEDGER.md".to_string(), "mock/**/NOTES.md".to_string()]);
         assert_eq!(either, ["LEDGER.md", "mock/research/a/NOTES.md"]);
     }
@@ -232,5 +235,23 @@ mod tests {
         assert!(!glob("a/*.md", "a/b/c.md"));
         assert!(glob("a/**/c.md", "a/b/d/c.md"));
         assert!(!glob("a/b", "a/bc"));
+    }
+
+    #[test]
+    fn a_double_star_slash_matches_zero_directories_one_and_several() {
+        assert!(glob("a/**/*.toml", "a/x.toml"));
+        assert!(glob("a/**/*.toml", "a/b/x.toml"));
+        assert!(glob("a/**/*.toml", "a/b/c/x.toml"));
+        let tenet = "mock/registry/tenet/**/*.toml";
+        assert!(glob(tenet, "mock/registry/tenet/x.toml"));
+        assert!(glob(tenet, "mock/registry/tenet/k/x.toml"));
+    }
+
+    #[test]
+    fn a_double_star_slash_still_refuses_what_its_suffix_refuses() {
+        assert!(!glob("a/**/*.toml", "b/x.toml"));
+        assert!(!glob("a/**/*.toml", "a/x.rs"));
+        assert!(!glob("a/**/*.toml", "ax.toml"));
+        assert!(!glob("a/**/*.toml", "a/x.toml/y"));
     }
 }

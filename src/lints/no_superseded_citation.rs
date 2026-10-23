@@ -31,6 +31,8 @@ use std::path::{Path, PathBuf};
 
 use mockspace_lint_rules::{Lint, LintError, RegistryView, RepoContext, RepoLint, Severity};
 
+use crate::repo_files::glob;
+
 /// The lint's name, as a project's `[lints.*]` table spells it.
 pub const NAME: &str = "no-superseded-citation";
 
@@ -302,23 +304,6 @@ fn walk(
 /// Whether a file of this name is one the lint reads.
 fn reads(name: &str) -> bool {
     name.rsplit_once('.').is_some_and(|(_, ext)| READ.contains(&ext))
-}
-
-/// Whether `text` matches `pattern`, where `*` stands for any run of characters but a slash and
-/// `**` for any run at all.
-fn glob(pattern: &str, text: &str) -> bool {
-    fn go(p: &[u8], t: &[u8]) -> bool {
-        match p {
-            [] => t.is_empty(),
-            [b'*', b'*', rest @ ..] => (0..=t.len()).any(|i| go(rest, &t[i..])),
-            [b'*', rest @ ..] => {
-                let run = t.iter().take_while(|&&c| c != b'/').count();
-                (0..=run).any(|i| go(rest, &t[i..]))
-            }
-            [c, rest @ ..] => t.first() == Some(c) && go(rest, &t[1..]),
-        }
-    }
-    go(pattern.as_bytes(), text.as_bytes())
 }
 
 /// Whether a character can sit inside a row's slug.
