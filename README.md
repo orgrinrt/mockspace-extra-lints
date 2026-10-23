@@ -98,6 +98,42 @@ source through `cargo metadata` to find them. It stops at the dependency's own
 declarations, and crates of the same workspace are not foreign, on the
 reasoning that a consumer names a kit's crates and nothing under them.
 
+### Test discipline
+
+`catalogue-ignore`. A repo lint for a project that writes tests ahead of the
+code. An ignored test is a catalogue entry, a contract the code does not meet
+yet, and the reason says so and says which row tracks it:
+
+```rust
+#[ignore = "catalogue: a creature at the opening zoom is a 3D body; tracked #C1-188"]
+```
+
+A bare `#[ignore]` is refused, and so is a reason of any other shape. Every
+`#<id>` has to resolve to a row of the project's registry, by its slug, or to a
+row of a ledger file, a list item or a table row whose first cell is the id. The
+ledger files are named by the project, as globs from the repository root.
+
+```toml
+[lints.catalogue-ignore]
+ledgers = "mock/research/*/LEDGER.md"
+```
+
+The attribute is found in the parse, in every `.rs` file of the repository
+including integration tests, so one inside a string or a comment is not an
+ignore. One in the tokens of a macro call, such as `proptest! { #[ignore] fn
+t() {} }`, is read like any other. A conditional ignore,
+`#[cfg_attr(unix, ignore)]`, is not read: it keeps a test out of one
+configuration for a reason about that configuration, which is not a gap to
+track. The record directories (`design_rounds` and `research` under the mock
+directory) are not read, and `exclude`, a comma-separated list of globs from
+the repository root, leaves more paths alone, such as a directory of fixture
+sources. The findings carry a kind, `bare`, `malformed` or `unresolved`, which
+`[lints.catalogue-ignore.findings]` can give a severity of its own.
+
+A ledger row is a list item, a numbered item, a table row or a heading whose
+first word is the id, with or without a `#` of its own, so `- #C1-188`,
+`1. C1-188` and `## C1-188` are rows and `## Map` is a title.
+
 ### Canon discipline
 
 `no-superseded-citation`. A repo lint for a project whose canon is typed rows that
