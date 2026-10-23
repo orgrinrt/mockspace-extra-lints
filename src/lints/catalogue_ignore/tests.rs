@@ -185,13 +185,13 @@ fn the_ledgers_come_from_the_config_and_an_unconfigured_lint_resolves_only_the_r
 }
 
 #[test]
-fn the_ledgers_key_takes_a_list_and_is_the_only_key() {
+fn the_ledgers_and_skip_keys_each_take_a_list_and_are_the_only_keys() {
     let lint = configured(" a.md , b/*.md ,, ");
     assert_eq!(lint.ledgers, ["a.md", "b/*.md"]);
-    assert_eq!(lint.config_keys(), &["ledgers", "exclude"]);
+    assert_eq!(lint.config_keys(), &["ledgers", "skip"]);
     let mut lint = lint;
-    lint.configure(&HashMap::from([("exclude".to_string(), " x/*.rs , ,y.rs ".to_string())]));
-    assert_eq!(lint.exclude, ["x/*.rs", "y.rs"]);
+    lint.configure(&HashMap::from([("skip".to_string(), " x/*.rs , ,y.rs ".to_string())]));
+    assert_eq!(lint.skip, ["x/*.rs", "y.rs"]);
     assert_eq!(lint.ledgers, ["a.md", "b/*.md"]);
 }
 
@@ -225,7 +225,7 @@ fn a_macro_call_with_other_attributes_and_loose_hashes_is_not_an_ignore() {
 }
 
 #[test]
-fn the_record_directories_and_the_excluded_paths_are_not_read() {
+fn the_record_directories_and_the_skipped_paths_are_not_read() {
     let d = tempfile::tempdir().unwrap();
     for rel in [
         "mock/research/sketches/x/probe.rs",
@@ -239,7 +239,7 @@ fn the_record_directories_and_the_excluded_paths_are_not_read() {
     let found = run_with(&lint, &registry(&[]), d.path());
     let at: Vec<_> = found.iter().map(|e| e.path.clone().unwrap()).collect();
     assert_eq!(at, ["mock/crates/alpha/tests/fixtures/a.rs", "mock/crates/alpha/tests/it.rs"]);
-    lint.configure(&HashMap::from([("exclude".to_string(), "**/fixtures/*.rs".to_string())]));
+    lint.configure(&HashMap::from([("skip".to_string(), "**/fixtures/*.rs".to_string())]));
     let found = run_with(&lint, &registry(&[]), d.path());
     let at: Vec<_> = found.iter().map(|e| e.path.clone().unwrap()).collect();
     assert_eq!(at, ["mock/crates/alpha/tests/it.rs"]);
@@ -357,4 +357,47 @@ fn the_default_blocks_every_gate_and_the_kinds_are_declared() {
 fn the_ids_are_what_follows_the_last_tracked_so_a_gap_may_say_the_word() {
     let found = run("#[ignore = \"catalogue: it says; tracked #nowhere in prose; tracked #C1-001\"]\nfn t() {}\n");
     assert!(found.is_empty(), "{found:?}");
+}
+
+fn with_skip(skip: &str) -> CatalogueIgnore {
+    let mut lint = CatalogueIgnore::default();
+    lint.configure(&HashMap::from([(SKIP_KEY.to_string(), skip.to_string())]));
+    lint
+}
+
+#[test]
+fn a_ledger_at_the_root_is_named_from_the_root_and_a_namesake_below_is_not() {
+    let d = tempfile::tempdir().unwrap();
+    write(d.path(), "mock/crates/alpha/src/tests/a.rs", GOOD);
+    write(d.path(), "LEDGER.md", "- `C1-001` a row\n");
+    for ledgers in ["LEDGER.md", "./LEDGER.md", "**/LEDGER.md"] {
+        let found = run_with(&configured(ledgers), &registry(&[]), d.path());
+        assert!(found.is_empty(), "{ledgers}: {found:?}");
+    }
+    // The control: the same ledger one directory down is not the root's, so a bare name misses it.
+    let below = tempfile::tempdir().unwrap();
+    write(below.path(), "mock/crates/alpha/src/tests/a.rs", GOOD);
+    write(below.path(), "docs/LEDGER.md", "- `C1-001` a row\n");
+    let found = run_with(&configured("LEDGER.md"), &registry(&[]), below.path());
+    assert_eq!(kinds(&found), [Some(UNRESOLVED)], "{found:?}");
+    assert!(run_with(&configured("**/LEDGER.md"), &registry(&[]), below.path()).is_empty());
+}
+
+#[test]
+fn a_skip_reaches_a_file_at_the_root_and_a_bare_name_means_only_that_one() {
+    let bare = "#[test]\n#[ignore]\nfn t() {}\n";
+    let d = tempfile::tempdir().unwrap();
+    write(d.path(), "scratch.rs", bare);
+    write(d.path(), "mock/scratch.rs", bare);
+    let reg = registry(&[]);
+    let none = run_with(&CatalogueIgnore::default(), &reg, d.path());
+    assert_eq!(none.len(), 2, "{none:?}");
+    let root_only = run_with(&with_skip("scratch.rs"), &reg, d.path());
+    let paths: Vec<_> = root_only.iter().map(|e| e.path.as_deref()).collect();
+    assert_eq!(paths, [Some("mock/scratch.rs")], "{root_only:?}");
+    let any_depth = run_with(&with_skip("**/scratch.rs"), &reg, d.path());
+    assert!(any_depth.is_empty(), "{any_depth:?}");
+    let question = run_with(&with_skip("scratch.r?"), &reg, d.path());
+    let paths: Vec<_> = question.iter().map(|e| e.path.as_deref()).collect();
+    assert_eq!(paths, [Some("mock/scratch.rs")], "{question:?}");
 }

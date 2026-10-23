@@ -14,7 +14,8 @@
 //! sentence that says the row is superseded, kept inside its block and, in a file that is not prose,
 //! inside its line, since a design may explain what a row was replaced by without relying on it. A
 //! slug that a live row of another namespace also carries is not read, since a text cannot tell them
-//! apart.
+//! apart. The canon files are the ones `canon_paths` names in `mockspace.toml`, matched with the same
+//! glob as the engine matches them with, so a bare name there reaches any depth.
 //!
 //! A project names the field in its `mockspace.toml`, under `[lints.no-superseded-citation]`,
 //! because what a registry calls its replacement edge is the project's own choice and nothing here
@@ -27,9 +28,10 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs;
-use std::path::{Path, PathBuf};
 
-use mockspace_lint_rules::{Lint, LintError, RegistryView, RepoContext, RepoLint, Severity};
+use mockspace_lint_rules::{glob_match, Lint, LintError, RegistryView, RepoContext, RepoLint, Severity};
+
+use crate::repo_files::{paths, record_dirs};
 
 /// The lint's name, as a project's `[lints.*]` table spells it.
 pub const NAME: &str = "no-superseded-citation";
@@ -47,12 +49,6 @@ const JOIN: &str = ", ";
 
 /// The extensions whose files are read.
 const READ: &[&str] = &["rs", "tmpl", "md", "toml", "slang"];
-
-/// Directory names never entered, wherever they sit.
-const SKIPPED: &[&str] = &["target", "vendor", "node_modules"];
-
-/// The directories under the mock directory that are the record of what was once true.
-const RECORD: &[&str] = &["design_rounds", "research"];
 
 /// What a generated file carries in its first lines.
 const GENERATED: &str = "AUTO-GENERATED";
@@ -102,13 +98,10 @@ impl RepoLint for NoSupersededCitation {
         if replaced.is_empty() {
             return Vec::new();
         }
-        let mut files = Vec::new();
-        let record = RECORD
-            .iter()
-            .filter_map(|d| ctx.mock_dir.join(d).strip_prefix(ctx.repo_root).ok().map(slashed))
-            .collect::<Vec<_>>();
-        walk(ctx.repo_root, ctx.repo_root, &record, ctx.canon_paths, &mut files);
-        files.sort();
+        let record = record_dirs(ctx.repo_root, ctx.mock_dir);
+        let files = paths(ctx.repo_root, &record, |name, rel| {
+            reads(name) && !ctx.canon_paths.iter().any(|g| glob_match(g, rel))
+        });
         let mut out = Vec::new();
         for rel in files {
             let Ok(text) = fs::read_to_string(ctx.repo_root.join(&rel)) else {
@@ -261,64 +254,9 @@ fn follow(
     }
 }
 
-/// A path with forward slashes, whatever the platform.
-fn slashed(p: &Path) -> String {
-    p.components()
-        .map(|c| c.as_os_str().to_string_lossy().into_owned())
-        .collect::<Vec<_>>()
-        .join("/")
-}
-
-/// The files to read under `dir`, relative to `root`.
-fn walk(
-    root: &Path,
-    dir: &Path,
-    record: &[String],
-    canon_paths: &[String],
-    out: &mut Vec<String>,
-) {
-    let Ok(entries) = fs::read_dir(dir) else {
-        return;
-    };
-    let mut entries: Vec<PathBuf> = entries.flatten().map(|e| e.path()).collect();
-    entries.sort();
-    for path in entries {
-        let Ok(rel) = path.strip_prefix(root) else {
-            continue;
-        };
-        let rel = slashed(rel);
-        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-        if path.is_dir() {
-            if name.starts_with('.') || SKIPPED.contains(&name) || record.contains(&rel) {
-                continue;
-            }
-            walk(root, &path, record, canon_paths, out);
-        } else if reads(name) && !canon_paths.iter().any(|g| glob(g, &rel)) {
-            out.push(rel);
-        }
-    }
-}
-
 /// Whether a file of this name is one the lint reads.
 fn reads(name: &str) -> bool {
     name.rsplit_once('.').is_some_and(|(_, ext)| READ.contains(&ext))
-}
-
-/// Whether `text` matches `pattern`, where `*` stands for any run of characters but a slash and
-/// `**` for any run at all.
-fn glob(pattern: &str, text: &str) -> bool {
-    fn go(p: &[u8], t: &[u8]) -> bool {
-        match p {
-            [] => t.is_empty(),
-            [b'*', b'*', rest @ ..] => (0..=t.len()).any(|i| go(rest, &t[i..])),
-            [b'*', rest @ ..] => {
-                let run = t.iter().take_while(|&&c| c != b'/').count();
-                (0..=run).any(|i| go(rest, &t[i..]))
-            }
-            [c, rest @ ..] => t.first() == Some(c) && go(rest, &t[1..]),
-        }
-    }
-    go(pattern.as_bytes(), text.as_bytes())
 }
 
 /// Whether a character can sit inside a row's slug.

@@ -23,7 +23,8 @@
 //! is not in a test, since a binary may carry its own source to print. A source file that really is
 //! test data is let through by `allow` under `[lints.no-source-include-in-test]`, a comma-separated
 //! list of globs, each matched against the path from the repository root of what is included, and
-//! against the literal as it is written.
+//! against the literal as it is written. A glob is read from the root, so a bare name is the file at
+//! the root and `**/name` is the file at any depth.
 //!
 //! The path is the last string literal in the macro's arguments, so `concat!(env!("DIR"),
 //! "/src/lib.rs")` is caught by its last piece, `concat!("a.rs", ".bak")` is not, and a path built
@@ -32,10 +33,10 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
-use mockspace_lint_rules::{Lint, LintError, RepoContext, RepoLint, Severity};
+use mockspace_lint_rules::{glob_match_anchored, Lint, LintError, RepoContext, RepoLint, Severity};
 use tree_sitter::{Node, Parser, Tree};
 
-use crate::repo_files::{glob, rust_files, RustFile};
+use crate::repo_files::{rust_files, RustFile};
 use crate::string_literal::literal;
 
 /// The lint's name, as a project's `[lints.*]` table spells it.
@@ -142,7 +143,10 @@ impl NoSourceIncludeInTest {
     /// Whether `allow` lets the file included from `includer` through.
     fn allowed(&self, includer: &str, included: &str) -> bool {
         let resolved = resolve(includer, included);
-        self.allow.iter().any(|g| glob(g, included) || resolved.as_deref().is_some_and(|r| glob(g, r)))
+        self.allow.iter().any(|g| {
+            glob_match_anchored(g, included)
+                || resolved.as_deref().is_some_and(|r| glob_match_anchored(g, r))
+        })
     }
 }
 

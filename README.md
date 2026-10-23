@@ -125,10 +125,12 @@ t() {} }`, is read like any other. A conditional ignore,
 `#[cfg_attr(unix, ignore)]`, is not read: it keeps a test out of one
 configuration for a reason about that configuration, which is not a gap to
 track. The record directories (`design_rounds` and `research` under the mock
-directory) are not read, and `exclude`, a comma-separated list of globs from
+directory) are not read, and `skip`, a comma-separated list of globs from
 the repository root, leaves more paths alone, such as a directory of fixture
-sources. The findings carry a kind, `bare`, `malformed` or `unresolved`, which
-`[lints.catalogue-ignore.findings]` can give a severity of its own.
+sources. It is not called `exclude`, which the engine reads as its own path filter
+and never hands to a lint. The findings carry a kind, `bare`, `malformed` or
+`unresolved`, which `[lints.catalogue-ignore.findings]` can give a severity of
+its own.
 
 A ledger row is a list item, a numbered item, a table row or a heading whose
 first word is the id, with or without a `#` of its own, so `- #C1-188`,
@@ -149,6 +151,24 @@ instead. The `allow` key under `[lints.no-source-include-in-test]` takes globs
 for the source fixtures that are meant to be included, matched against the
 path as written or as resolved.
 
+### Path globs
+
+The path globs in this pack are matched against a path from the repository root,
+with `/` as the separator, and a leading `./` in a pattern is dropped. The one
+exception is `allow`, which is also matched against the path an include names, as
+written in the including file, and a match on either lets the include through.
+`*` and `?` match within one segment and never cross a `/`, and `?` stands for exactly one
+character. `**` as a whole segment matches zero or more segments, so `a/**/c.md`
+matches `a/c.md` and `a/b/c.md`, and inside a segment `**` acts as `*`. The keys
+`ledgers`, `skip` and `allow` are anchored at the root: a bare name means the
+file at the root, and `**/name` means that name at any depth. The files
+`canon_paths` names are matched with mockspace's own rule, so a bare name there
+reaches any depth. What changed from earlier versions: a `?` used to be a literal
+question mark, `**` inside a segment used to cross a `/`, and `**/` used to need
+at least one directory, so `**/name` missed a file at the root. A bare name in
+`canon_paths` used to match only the root file, and a leading `./` used to be
+matched literally, so it matched nothing.
+
 ### Canon discipline
 
 `no-superseded-citation`. A repo lint for a project whose canon is typed rows that
@@ -160,7 +180,7 @@ backticked. A sentence that says the row is superseded may still name it, within
 its block, or its line in a file that is not prose. A slug a live row of another
 namespace also carries is not read. The canon files,
 the design rounds and research notes, generated files and build output are not
-read.
+read. How `canon_paths` is matched is set out under [Path globs](#path-globs).
 
 The project names the field, since what a registry calls that edge is its own
 choice, and the lint has no default for it. The edge runs one of two ways and

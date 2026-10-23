@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::path::Path;
 
 use super::*;
 
@@ -437,4 +438,49 @@ fn hidden_directories_and_files_of_other_extensions_are_not_read() {
     assert_eq!(found.len(), 1, "{found:?}");
     assert_eq!(found[0].path.as_deref(), Some("mock/x.slang"));
     assert_eq!(found[0].crate_name, "workspace");
+}
+
+/// The paths that `canon_paths` leaves unread among `files`, each holding a citation of `old-rule`.
+fn unread(canon_paths: &[&str], files: &[&str]) -> Vec<String> {
+    let d = dir("canonpaths");
+    for f in files {
+        write(d.path(), f, "what = \"old-rule\"\n");
+    }
+    let canon_paths: Vec<String> = canon_paths.iter().map(|g| (*g).to_string()).collect();
+    let read: Vec<String> = run(d.path(), &canon_paths).into_iter().filter_map(|e| e.path).collect();
+    files.iter().filter(|f| !read.iter().any(|r| r == **f)).map(|f| (*f).to_string()).collect()
+}
+
+#[test]
+fn a_double_star_under_tenet_reaches_a_row_directly_under_it_and_below() {
+    let files = ["mock/registry/tenet/a.toml", "mock/registry/tenet/k/b.toml", "mock/registry/other/c.toml"];
+    assert_eq!(
+        unread(&["mock/registry/tenet/**/*.toml"], &files),
+        ["mock/registry/tenet/a.toml", "mock/registry/tenet/k/b.toml"],
+    );
+    assert_eq!(unread(&["mock/registry/tenet/*.toml"], &files), ["mock/registry/tenet/a.toml"]);
+}
+
+#[test]
+fn canon_paths_are_read_the_way_the_engine_reads_them() {
+    // A bare name is any depth, as the engine lifts it.
+    assert_eq!(
+        unread(&["CANON.md"], &["CANON.md", "mock/deep/CANON.md", "mock/CANON.md.tmpl"]),
+        ["CANON.md", "mock/deep/CANON.md"],
+    );
+    // A question mark is one character.
+    assert_eq!(
+        unread(&["mock/canon/?.md"], &["mock/canon/a.md", "mock/canon/ab.md"]),
+        ["mock/canon/a.md"],
+    );
+    // A double star inside a segment is a star, and does not cross a slash.
+    assert_eq!(
+        unread(&["mock/c**/x.md"], &["mock/canon/x.md", "mock/canon/sub/x.md"]),
+        ["mock/canon/x.md"],
+    );
+    // A pattern with a slash is anchored at the root, and a trailing double star takes all below.
+    assert_eq!(
+        unread(&["tenet/**"], &["tenet/a.toml", "tenet/k/b.toml", "mock/tenet/c.toml"]),
+        ["tenet/a.toml", "tenet/k/b.toml"],
+    );
 }

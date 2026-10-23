@@ -9,6 +9,8 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use mockspace_lint_rules::glob_match_anchored;
+
 /// Directory names never entered, wherever they sit.
 const SKIPPED: &[&str] = &["target", "vendor", "node_modules"];
 
@@ -29,20 +31,17 @@ pub(crate) struct RustFile {
 }
 
 /// Every readable `.rs` file under `root`, in path order, but for the record directories under
-/// `mock_dir` and the paths matching one of the `exclude` globs.
+/// `mock_dir` and the paths matching one of the `skip` globs, each read from the root.
 pub(crate) fn rust_files(
     root: &Path,
     mock_dir: &Path,
     all_crates: &BTreeSet<String>,
-    exclude: &[String],
+    skip: &[String],
 ) -> Vec<RustFile> {
-    let record: Vec<String> = RECORD
-        .iter()
-        .filter_map(|d| mock_dir.join(d).strip_prefix(root).ok().map(slashed))
-        .collect();
+    let record = record_dirs(root, mock_dir);
     let mut out = Vec::new();
     for rel in paths(root, &record, |name, rel| {
-        name.ends_with(".rs") && !exclude.iter().any(|g| glob(g, rel))
+        name.ends_with(".rs") && !skip.iter().any(|g| glob_match_anchored(g, rel))
     }) {
         let Ok(text) = fs::read_to_string(root.join(&rel)) else {
             continue;
@@ -56,12 +55,21 @@ pub(crate) fn rust_files(
     out
 }
 
-/// Every file under `root` whose path from the root matches one of `globs`, in path order.
+/// Every file under `root` whose path from the root matches one of `globs`, each read from the
+/// root, in path order.
 pub(crate) fn matching(root: &Path, globs: &[String]) -> Vec<String> {
     if globs.is_empty() {
         return Vec::new();
     }
-    paths(root, &[], |_, rel| globs.iter().any(|g| glob(g, rel)))
+    paths(root, &[], |_, rel| globs.iter().any(|g| glob_match_anchored(g, rel)))
+}
+
+/// The record directories under `mock_dir`, as paths from `root`: the ones no walk enters.
+pub(crate) fn record_dirs(root: &Path, mock_dir: &Path) -> Vec<String> {
+    RECORD
+        .iter()
+        .filter_map(|d| mock_dir.join(d).strip_prefix(root).ok().map(slashed))
+        .collect()
 }
 
 /// The crate a repository-relative path sits in.
@@ -72,8 +80,9 @@ fn crate_of(rel: &str, all_crates: &BTreeSet<String>) -> String {
         .to_string()
 }
 
-/// The paths under `root` that `accept` takes, given the file name and the path from the root.
-fn paths(root: &Path, skip: &[String], accept: impl Fn(&str, &str) -> bool) -> Vec<String> {
+/// The paths under `root` that `accept` takes, given the file name and the path from the root, in
+/// path order, without entering a hidden or skipped directory or one of the `skip` paths.
+pub(crate) fn paths(root: &Path, skip: &[String], accept: impl Fn(&str, &str) -> bool) -> Vec<String> {
     let mut out = Vec::new();
     walk(root, root, skip, &accept, &mut out);
     out.sort();
@@ -117,23 +126,6 @@ fn slashed(p: &Path) -> String {
         .join("/")
 }
 
-/// Whether `text` matches `pattern`, where `*` stands for any run of characters but a slash and
-/// `**` for any run at all.
-pub(crate) fn glob(pattern: &str, text: &str) -> bool {
-    fn go(p: &[u8], t: &[u8]) -> bool {
-        match p {
-            [] => t.is_empty(),
-            [b'*', b'*', rest @ ..] => (0..=t.len()).any(|i| go(rest, &t[i..])),
-            [b'*', rest @ ..] => {
-                let run = t.iter().take_while(|&&c| c != b'/').count();
-                (0..=run).any(|i| go(rest, &t[i..]))
-            }
-            [c, rest @ ..] => t.first() == Some(c) && go(rest, &t[1..]),
-        }
-    }
-    go(pattern.as_bytes(), text.as_bytes())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -148,8 +140,8 @@ mod tests {
         names.iter().map(|n| (*n).to_string()).collect()
     }
 
-    fn scan(root: &Path, all: &BTreeSet<String>, exclude: &[String]) -> Vec<RustFile> {
-        rust_files(root, &root.join("mock"), all, exclude)
+    fn scan(root: &Path, all: &BTreeSet<String>, skip: &[String]) -> Vec<RustFile> {
+        rust_files(root, &root.join("mock"), all, skip)
     }
 
     #[test]
@@ -193,12 +185,12 @@ mod tests {
     }
 
     #[test]
-    fn a_path_matching_an_exclude_glob_is_not_read() {
+    fn a_path_matching_a_skip_glob_is_not_read() {
         let d = tempfile::tempdir().unwrap();
         write(d.path(), "mock/crates/alpha/tests/fixtures/a.rs", "");
         write(d.path(), "mock/crates/alpha/tests/it.rs", "");
-        let exclude = ["**/fixtures/*.rs".to_string()];
-        let found = scan(d.path(), &crates(&["alpha"]), &exclude);
+        let skip = ["**/fixtures/*.rs".to_string()];
+        let found = scan(d.path(), &crates(&["alpha"]), &skip);
         let got: Vec<_> = found.iter().map(|f| f.rel.as_str()).collect();
         assert_eq!(got, ["mock/crates/alpha/tests/it.rs"]);
     }
@@ -221,16 +213,66 @@ mod tests {
         let one = matching(d.path(), &["mock/research/*/LEDGER.md".to_string()]);
         assert_eq!(one, ["mock/research/a/LEDGER.md"]);
         let deep = matching(d.path(), &["**/LEDGER.md".to_string()]);
-        assert_eq!(deep, ["mock/research/a/LEDGER.md"]);
+        assert_eq!(deep, ["LEDGER.md", "mock/research/a/LEDGER.md"]);
         let either = matching(d.path(), &["LEDGER.md".to_string(), "mock/**/NOTES.md".to_string()]);
         assert_eq!(either, ["LEDGER.md", "mock/research/a/NOTES.md"]);
     }
 
+    /// The files among `files` that `pattern` reaches through [`matching`], as the lints see it.
+    fn reached(pattern: &str, files: &[&str]) -> Vec<String> {
+        let d = tempfile::tempdir().unwrap();
+        for f in files {
+            write(d.path(), f, "");
+        }
+        matching(d.path(), &[pattern.to_string()])
+    }
+
     #[test]
-    fn a_star_stops_at_a_slash_and_two_do_not() {
-        assert!(glob("a/*.md", "a/b.md"));
-        assert!(!glob("a/*.md", "a/b/c.md"));
-        assert!(glob("a/**/c.md", "a/b/d/c.md"));
-        assert!(!glob("a/b", "a/bc"));
+    fn a_star_stops_at_a_slash_and_a_double_star_segment_does_not() {
+        let files = ["a/b.md", "a/b/c.md", "a/b/d/c.md", "a/bc"];
+        assert_eq!(reached("a/*.md", &files), ["a/b.md"]);
+        assert_eq!(reached("a/**/c.md", &files), ["a/b/c.md", "a/b/d/c.md"]);
+        assert_eq!(reached("a/b", &files), Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_double_star_slash_matches_zero_directories_one_and_several() {
+        let files = ["a/b/c/x.toml", "a/b/x.toml", "a/x.toml"];
+        assert_eq!(reached("a/**/*.toml", &files), files);
+        let tenet = ["mock/registry/tenet/k/x.toml", "mock/registry/tenet/x.toml"];
+        assert_eq!(reached("mock/registry/tenet/**/*.toml", &tenet), tenet);
+    }
+
+    #[test]
+    fn a_double_star_slash_still_refuses_what_its_suffix_refuses() {
+        let files = ["b/x.toml", "a/x.rs", "ax.toml", "a/x.toml/y"];
+        assert_eq!(reached("a/**/*.toml", &files), Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_question_mark_is_one_character_and_never_a_slash() {
+        let files = ["mock/canon/a.md", "mock/canon/ab.md", "mock/canon/.md", "mock/cano/n.md"];
+        assert_eq!(reached("mock/canon/?.md", &files), ["mock/canon/a.md"]);
+        assert_eq!(reached("mock/cano?n.md", &files), Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_double_star_inside_a_segment_is_a_star_and_does_not_cross_a_slash() {
+        let files = ["mock/canon/x.md", "mock/canon/sub/x.md", "mock/c/x.md"];
+        assert_eq!(reached("mock/c**/x.md", &files), ["mock/c/x.md", "mock/canon/x.md"]);
+    }
+
+    #[test]
+    fn a_trailing_double_star_takes_everything_below_and_stays_anchored() {
+        let files = ["tenet/a.toml", "tenet/k/b.toml", "mock/tenet/c.toml"];
+        assert_eq!(reached("tenet/**", &files), ["tenet/a.toml", "tenet/k/b.toml"]);
+    }
+
+    #[test]
+    fn a_bare_name_means_the_file_at_the_root_and_a_leading_dot_slash_is_dropped() {
+        let files = ["LEDGER.md", "mock/LEDGER.md"];
+        assert_eq!(reached("LEDGER.md", &files), ["LEDGER.md"]);
+        assert_eq!(reached("./LEDGER.md", &files), ["LEDGER.md"]);
+        assert_eq!(reached("**/LEDGER.md", &files), files);
     }
 }
