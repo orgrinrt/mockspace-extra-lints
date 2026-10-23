@@ -42,6 +42,7 @@ use mockspace_lint_rules::{Lint, LintError, RepoContext, RepoLint, Severity};
 use tree_sitter::{Node, Parser};
 
 use crate::repo_files::{matching, rust_files};
+use crate::string_literal::literal;
 
 /// The lint's name, as a project's `[lints.*]` table spells it.
 pub const NAME: &str = "catalogue-ignore";
@@ -246,46 +247,6 @@ fn ignore_reason(source: &str, item: Node) -> Option<Reason> {
         Some(text) => Reason::Text(text),
         None => Reason::Opaque,
     })
-}
-
-/// The value of a string literal, raw or not. `None` for anything that is not one.
-fn literal(text: &str) -> Option<String> {
-    if let Some(rest) = text.strip_prefix('r') {
-        let hashes = rest.bytes().take_while(|&b| b == b'#').count();
-        let inner = rest[hashes..].strip_prefix('"')?;
-        let end = format!("\"{}", "#".repeat(hashes));
-        return inner.strip_suffix(end.as_str()).map(str::to_string);
-    }
-    text.strip_prefix('"')?.strip_suffix('"').map(unescape)
-}
-
-/// A string literal's body with its escapes read, a backslash at the end of a line taking the
-/// whitespace of the next with it.
-fn unescape(body: &str) -> String {
-    let mut out = String::with_capacity(body.len());
-    let mut chars = body.chars().peekable();
-    while let Some(c) = chars.next() {
-        if c != '\\' {
-            out.push(c);
-            continue;
-        }
-        match chars.next() {
-            Some('\n' | '\r') => {
-                while chars.next_if(|c| c.is_whitespace()).is_some() {}
-            }
-            Some('n') => out.push('\n'),
-            Some('t') => out.push('\t'),
-            Some('r') => out.push('\r'),
-            Some('0') => out.push('\0'),
-            Some(c @ ('"' | '\'' | '\\')) => out.push(c),
-            Some(other) => {
-                out.push('\\');
-                out.push(other);
-            }
-            None => out.push('\\'),
-        }
-    }
-    out
 }
 
 /// The ids a reason tracks, without their `#`, or what is wrong with its shape.

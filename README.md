@@ -134,6 +134,21 @@ A ledger row is a list item, a numbered item, a table row or a heading whose
 first word is the id, with or without a `#` of its own, so `- #C1-188`,
 `1. C1-188` and `## C1-188` are rows and `## Map` is a title.
 
+`no-source-include-in-test`. A repo lint against the test that reads a source
+file as text and searches it for a word, which is a check on spelling written
+where nothing runs it as one. An `include_str!` or `include_bytes!` whose path
+ends in `.rs` is refused inside a test: a function carrying `#[test]`,
+`#[rstest]`, `#[test_case]` or `#[quickcheck]`, an item under a `cfg` that
+cannot hold without `test` (`all(unix, test)` does, `any(test, unix)` does
+not), a file or module opened with `#![cfg(test)]`, any module a test module
+declares, or a file under a `tests` directory or named `tests.rs` or
+`*_tests.rs`. The `std::` and `core::` spellings of the macros are read too, and
+the path is the last literal in the call. A data fixture is included freely, and
+so is source outside a test. The check the test stood for is written as a lint
+instead. The `allow` key under `[lints.no-source-include-in-test]` takes globs
+for the source fixtures that are meant to be included, matched against the
+path as written or as resolved.
+
 ### Canon discipline
 
 `no-superseded-citation`. A repo lint for a project whose canon is typed rows that
