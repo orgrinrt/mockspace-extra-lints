@@ -19,13 +19,17 @@
 //! every consumer's `mockspace.toml` at once, which is the opposite of what
 //! this change is for.
 
-use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
+use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Reach, Severity};
 
 use crate::util::err;
 
 pub struct LintAllowRequiresTaskId;
 
 impl Lint for LintAllowRequiresTaskId {
+    fn reach(&self) -> Reach {
+        Reach::File
+    }
+
     fn name(&self) -> &'static str {
         "lint-allow-requires-task-id"
     }
@@ -71,6 +75,32 @@ fn has_reason(s: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::has_reason;
+    use mockspace_lint_rules::reach_check::{crate_lint, Roots};
+
+    /// The declared file reach holds: the findings follow from the file alone. The corpus carries a bare
+    /// allow, so the lint has something to say and a read past the file would show.
+    #[test]
+    fn the_declared_reach_holds() {
+        let dir = tempfile::tempdir().unwrap();
+        let populated = dir.path().join("populated");
+        std::fs::create_dir_all(populated.join("design_rounds")).unwrap();
+        std::fs::write(populated.join("mockspace.toml"), "project_name = \"x\"\n").unwrap();
+        let empty = dir.path().join("empty");
+        std::fs::create_dir_all(&empty).unwrap();
+        let corpus = [
+            ("src/lib.rs", "pub fn a() {}\n"),
+            ("src/bare.rs", "// lint:allow(no-std)\nfn b() {}\n"),
+            ("src/reasoned.rs", "// lint:allow(no-std) reason: a boundary\nfn c() {}\n"),
+        ];
+        let lint = super::LintAllowRequiresTaskId;
+        let found = {
+            let f = mockspace_lint_rules::testkit::LintFixture::new(corpus[1].1);
+            mockspace_lint_rules::CrateLint::check(&lint, &f.ctx())
+        };
+        assert_eq!(found.len(), 1, "the control: the bare allow is reported");
+        crate_lint(&lint, &corpus, &Roots { populated: &populated, empty: &empty }).unwrap();
+    }
+
 
     #[test]
     fn a_reason_is_accepted() {

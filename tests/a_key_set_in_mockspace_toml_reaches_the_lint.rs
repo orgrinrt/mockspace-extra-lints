@@ -41,6 +41,7 @@ fn found_with(toml: &str) -> (Vec<String>, bool) {
         canon_paths: &[],
         open_panels: &[],
         registry: &registry,
+        verdicts: None,
     };
     let mut paths: Vec<String> =
         lint.check_repo(&ctx).into_iter().filter_map(|e| e.path).collect();

@@ -25,6 +25,8 @@ mod dep_surface;
 mod paths;
 mod repo_files;
 mod string_literal;
+#[cfg(test)]
+mod test_support;
 pub mod tools;
 mod util;
 
