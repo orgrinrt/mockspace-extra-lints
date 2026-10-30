@@ -36,6 +36,7 @@ fn run_with(lint: &CatalogueIgnore, reg: &RegistryView, root: &Path) -> Vec<Lint
         canon_paths: &[],
         open_panels: &[],
         registry: reg,
+        verdicts: None,
     };
     lint.check_repo(&ctx)
 }

@@ -34,7 +34,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use mockspace_lint_rules::{glob_match_anchored, Lint, LintError, RepoContext, RepoLint, Severity};
-use tree_sitter::{Node, Parser, Tree};
+use tree_sitter::{Node, Parser};
 
 use crate::repo_files::{rust_files, RustFile};
 use crate::string_literal::literal;
@@ -85,14 +85,40 @@ impl Lint for NoSourceIncludeInTest {
 
 impl RepoLint for NoSourceIncludeInTest {
     fn check_repo(&self, ctx: &RepoContext) -> Vec<LintError> {
+        let files = rust_files(ctx.repo_root, ctx.mock_dir, ctx.all_crates, &[]);
+        // The verdict follows from every Rust file (a file a test module declares is test code, so no
+        // file is judged alone) and the allow list, so it replays when none of them moved.
+        let allow = self.allow.join(",");
+        let mut parts: Vec<&[u8]> = vec![allow.as_bytes()];
+        for f in &files {
+            parts.push(f.rel.as_bytes());
+            parts.push(f.crate_name.as_bytes());
+            parts.push(f.text.as_bytes());
+        }
+        ctx.remembered(NAME, &parts, || self.judge(ctx, &files))
+    }
+}
+
+impl NoSourceIncludeInTest {
+    fn judge(&self, ctx: &RepoContext, files: &[RustFile]) -> Vec<LintError> {
         let mut parser = Parser::new();
         if parser.set_language(&tree_sitter_rust::LANGUAGE.into()).is_err() {
             return Vec::new();
         }
-        let parsed: Vec<(RustFile, Tree)> = rust_files(ctx.repo_root, ctx.mock_dir, ctx.all_crates, &[])
-            .into_iter()
-            .filter_map(|f| parser.parse(&f.text, None).map(|t| (f, t)))
-            .collect();
+        // A file's facts follow from its text and whether it is test code, so each is saved under
+        // both and a file that did not move is neither parsed nor walked again.
+        let mut facts = |f: &RustFile, in_test: bool| -> Found {
+            let key = if in_test { FACTS_IN_TEST } else { FACTS };
+            let saved = ctx.remembered(key, &[f.text.as_bytes()], || {
+                let mut found = Found::default();
+                if let Some(tree) = parser.parse(&f.text, None) {
+                    find(&f.text, tree.root_node(), in_test, &mut found);
+                }
+                found.encode()
+            });
+            Found::decode(&saved)
+        };
+        let parsed: Vec<(&RustFile, ())> = files.iter().map(|f| (f, ())).collect();
         let by_path: BTreeMap<&str, usize> =
             parsed.iter().enumerate().map(|(i, (f, _))| (f.rel.as_str(), i)).collect();
         // A file a test module declares is test code, and so is every file that file declares, so
@@ -102,12 +128,7 @@ impl RepoLint for NoSourceIncludeInTest {
             let found: Vec<Found> = parsed
                 .iter()
                 .enumerate()
-                .map(|(i, (f, tree))| {
-                    let mut found = Found::default();
-                    let in_test = is_test_file(&f.rel) || test_files.contains(&i);
-                    find(&f.text, tree.root_node(), in_test, &mut found);
-                    found
-                })
+                .map(|(i, (f, _))| facts(f, is_test_file(&f.rel) || test_files.contains(&i)))
                 .collect();
             let before = test_files.len();
             for ((f, _), found) in parsed.iter().zip(&found) {
@@ -183,6 +204,35 @@ struct Hit {
 struct Found {
     hits: Vec<Hit>,
     modules: Vec<String>,
+}
+
+const FACTS: &str = "no-source-include-in-test.facts";
+const FACTS_IN_TEST: &str = "no-source-include-in-test.facts-in-test";
+
+impl Found {
+    /// The facts as findings, the one shape the store holds: a hit is `hit` at its line with the macro
+    /// and path, a declared module is `module` with its name.
+    fn encode(&self) -> Vec<LintError> {
+        let hits = self.hits.iter().map(|h| {
+            LintError::error(String::new(), h.line, "hit", format!("{}\t{}", h.mac, h.path))
+        });
+        let modules = self.modules.iter().map(|m| LintError::error(String::new(), 0, "module", m.clone()));
+        hits.chain(modules).collect()
+    }
+
+    fn decode(saved: &[LintError]) -> Self {
+        let mut found = Self::default();
+        for e in saved {
+            if e.lint_name == "module" {
+                found.modules.push(e.message.clone());
+            } else if let Some((mac, path)) = e.message.split_once('\t') {
+                if let Some(mac) = INCLUDES.iter().copied().find(|m| *m == mac) {
+                    found.hits.push(Hit { line: e.line, mac, path: path.to_string() });
+                }
+            }
+        }
+        found
+    }
 }
 
 /// Whether a path is test code by where it sits.

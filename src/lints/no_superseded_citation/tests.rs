@@ -59,6 +59,7 @@ fn run_with(
         canon_paths,
         open_panels: &[],
         registry: reg,
+        verdicts: None,
     };
     lint.check_repo(&ctx)
 }

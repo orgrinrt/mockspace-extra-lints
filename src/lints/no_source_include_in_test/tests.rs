@@ -24,6 +24,7 @@ fn check_with(lint: &NoSourceIncludeInTest, root: &Path) -> Vec<LintError> {
         canon_paths: &[],
         open_panels: &[],
         registry: &reg,
+        verdicts: None,
     };
     lint.check_repo(&ctx)
 }
@@ -389,4 +390,61 @@ fn a_test_file_at_the_root_is_read_and_its_include_is_allowed_by_its_resolved_pa
     assert!(check_with(&allowing("src/**/*.rs"), d.path()).is_empty());
     assert!(check_with(&allowing("src/**"), d.path()).is_empty());
     assert_eq!(check_with(&allowing("lib.rs"), d.path()).len(), 1);
+}
+
+/// A store that keeps what it is given, for the replay tests.
+#[derive(Default)]
+struct Kept(std::cell::RefCell<std::collections::HashMap<String, String>>);
+
+impl mockspace_lint_rules::verdict::VerdictCache for Kept {
+    fn digest(&self, parts: &[&[u8]]) -> String {
+        parts.iter().map(|p| format!("{}:{}|", p.len(), String::from_utf8_lossy(p))).collect()
+    }
+
+    fn replay(&self, key: &str) -> Option<String> {
+        self.0.borrow().get(key).cloned()
+    }
+
+    fn remember(&self, key: &str, encoded: &str) {
+        self.0.borrow_mut().insert(key.to_string(), encoded.to_string());
+    }
+}
+
+fn check_kept(root: &Path, store: &Kept) -> Vec<LintError> {
+    let crates = BTreeSet::from(["alpha".to_string()]);
+    let reg = RegistryView::new(BTreeMap::new(), BTreeMap::new());
+    let ctx = RepoContext {
+        mock_dir: &root.join("mock"),
+        repo_root: root,
+        all_crates: &crates,
+        src_dirs: &[],
+        invocation: None,
+        canon_paths: &[],
+        open_panels: &[],
+        registry: &reg,
+        verdicts: Some(store),
+    };
+    NoSourceIncludeInTest::default().check_repo(&ctx)
+}
+
+fn shown(found: &[LintError]) -> Vec<String> {
+    found.iter().map(|e| format!("{}:{}:{}:{:?}", e.crate_name, e.line, e.message, e.path)).collect()
+}
+
+#[test]
+fn a_saved_run_finds_what_an_unsaved_one_finds_across_an_edit_that_moves_a_test_module() {
+    let d = tempfile::tempdir().unwrap();
+    let store = Kept::default();
+    write(d.path(), "mock/crates/alpha/src/lib.rs", "#[cfg(test)]\nmod probe;\n");
+    write(d.path(), "mock/crates/alpha/src/probe.rs", "fn t() { let s = include_str!(\"lib.rs\"); }\n");
+    let full = check(d.path());
+    assert_eq!(full.len(), 1, "the control: the declared test module's include is reported");
+    assert_eq!(shown(&check_kept(d.path(), &store)), shown(&full), "cold");
+    assert_eq!(shown(&check_kept(d.path(), &store)), shown(&full), "warm");
+
+    // The module stops being a test module: the include in the untouched file stops being a finding.
+    write(d.path(), "mock/crates/alpha/src/lib.rs", "mod probe;\n");
+    let full = check(d.path());
+    assert!(full.is_empty(), "{full:?}");
+    assert_eq!(shown(&check_kept(d.path(), &store)), shown(&full), "after the declaring file moved");
 }
