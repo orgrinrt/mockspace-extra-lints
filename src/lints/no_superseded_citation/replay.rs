@@ -180,7 +180,7 @@ fn only_the_file_that_changed_is_judged_again() {
 }
 
 #[test]
-fn forty_files_judged_in_one_batch_find_fourteen_findings_as_an_unsaved_run_does_and_miss_forty_times_cold() {
+fn forty_files_find_fourteen_findings_and_miss_forty_times_cold() {
     let d = dir("many");
     let store = Kept::default();
     for n in 0 .. 40 {
@@ -193,25 +193,49 @@ fn forty_files_judged_in_one_batch_find_fourteen_findings_as_an_unsaved_run_does
     assert_eq!(store.misses(NAME), 40, "every file is judged once on a cold run");
 }
 
-#[test]
-fn findings_come_in_path_order_across_files_and_line_order_within_one() {
-    let d = dir("order");
-    write(d.path(), "mock/crates/alpha/b.md", "It cites `split` here.\n\nIt cites `old` here.\n");
-    write(d.path(), "mock/crates/alpha/a.md", "It cites `old` here.\n\nIt cites `split` here.\n");
+/// Two files whose own order is the reverse of their paths' and of their slugs', so none of those
+/// gives `ordered_findings`.
+fn ordered(root: &Path) {
+    write(root, "mock/crates/alpha/b.md", "It cites `split` here.\n\nIt cites `old` here.\n");
+    write(root, "mock/crates/alpha/a.md", "It cites `old` here.\n\nIt cites `split` here.\n");
+}
+
+/// What `ordered` yields: path order across files, line order within one. Unsorted on purpose, as
+/// the order is what is pinned.
+fn ordered_findings() -> [String; 4] {
     let old = "which `new` supersedes";
     let split = "which `left`, `right` supersede";
     let tail = "write to the successor, or say in the sentence that the row is superseded";
     let said = |line: usize, rel: &str, cited: &str, which: &str| {
         format!("alpha:{line}:Some(\"mock/crates/alpha/{rel}\"):`mock/crates/alpha/{rel}` cites `{cited}`, {which}; {tail}")
     };
-    // Unsorted on purpose: the order is what is pinned. `b.md` is written first and cites `split`
-    // before `old`, so neither the order the files were made in nor the order of the slugs gives
-    // this list.
-    let expected = [
+    [
         said(1, "a.md", "old", old),
         said(3, "a.md", "split", split),
         said(1, "b.md", "split", split),
         said(3, "b.md", "old", old),
-    ];
-    assert_eq!(run_in_order(&canon(), d.path(), &["alpha"], None), expected);
+    ]
+}
+
+#[test]
+fn findings_come_in_path_order_across_files_and_line_order_within_one() {
+    let d = dir("order");
+    ordered(d.path());
+    assert_eq!(run_in_order(&canon(), d.path(), &["alpha"], None), ordered_findings());
+}
+
+#[test]
+fn a_saved_run_keeps_that_order_when_the_first_file_is_judged_again_and_the_second_replayed() {
+    let d = dir("order-saved");
+    let store = Kept::default();
+    ordered(d.path());
+    let reg = canon();
+    assert_eq!(run_in_order(&reg, d.path(), &["alpha"], Some(&store)), ordered_findings(), "cold");
+    // Edited so its citations keep their lines: the first file in path order is a miss and the
+    // second a hit, the mix in which replayed verdicts could be put ahead of judged ones.
+    write(d.path(), "mock/crates/alpha/a.md", "It cites `old` here.\n\nIt cites `split` here.\n\nA closing line.\n");
+    store.clear_counts();
+    assert_eq!(run_in_order(&reg, d.path(), &["alpha"], Some(&store)), ordered_findings(), "after the edit");
+    assert_eq!(store.misses(NAME), 1, "the control: the edited file was judged again");
+    assert_eq!(store.hits(NAME), 1, "and the other replayed");
 }
