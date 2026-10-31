@@ -106,7 +106,7 @@ impl RepoLint for NoSupersededCitation {
         // findings follow from its own text and this, so a file unchanged under an unchanged table
         // is not read again.
         let table = format!("{replaced:?}");
-        let mut out = Vec::new();
+        let mut read: Vec<(String, String, String)> = Vec::new();
         for rel in files {
             let Ok(text) = fs::read_to_string(ctx.repo_root.join(&rel)) else {
                 continue;
@@ -119,10 +119,23 @@ impl RepoLint for NoSupersededCitation {
                 .find(|c| ctx.all_crates.contains(*c))
                 .unwrap_or("workspace")
                 .to_string();
-            let parts: [&[u8]; 4] = [rel.as_bytes(), crate_name.as_bytes(), table.as_bytes(), text.as_bytes()];
-            out.extend(ctx.remembered(NAME, &parts, || file_findings(&rel, &crate_name, &text, &replaced)));
+            read.push((rel, crate_name, text));
         }
-        out
+        // Every file is asked at once, so the ones that moved are judged together on the machine's
+        // threads. The keys are the ones asking per file made, so saved verdicts replay across.
+        let parts: Vec<Vec<&[u8]>> = read
+            .iter()
+            .map(|(rel, crate_name, text)| {
+                vec![rel.as_bytes(), crate_name.as_bytes(), table.as_bytes(), text.as_bytes()]
+            })
+            .collect();
+        ctx.remembered_batch(NAME, &parts, |n| {
+            let (rel, crate_name, text) = &read[n];
+            file_findings(rel, crate_name, text, &replaced)
+        })
+        .into_iter()
+        .flatten()
+        .collect()
     }
 }
 
