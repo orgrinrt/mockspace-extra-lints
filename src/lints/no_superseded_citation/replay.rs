@@ -7,9 +7,9 @@ use super::tests::{canon, configured, dir, registry, write};
 use super::*;
 use crate::test_support::Kept;
 
-/// The findings of one run over `root`, flattened to what a reader sees, saved through `store` when
-/// one is given.
-fn stored_run(reg: &RegistryView, root: &Path, crates: &[&str], store: Option<&Kept>) -> Vec<String> {
+/// The findings of one run over `root`, flattened to what a reader sees and left in the order the
+/// lint returned them, saved through `store` when one is given.
+fn run_in_order(reg: &RegistryView, root: &Path, crates: &[&str], store: Option<&Kept>) -> Vec<String> {
     let crates: BTreeSet<String> = crates.iter().map(|c| (*c).to_string()).collect();
     let ctx = RepoContext {
         mock_dir: &root.join("mock"),
@@ -22,11 +22,16 @@ fn stored_run(reg: &RegistryView, root: &Path, crates: &[&str], store: Option<&K
         registry: reg,
         verdicts: store.map(|s| s as &dyn VerdictCache),
     };
-    let mut shown: Vec<String> = configured("superseded_by")
+    configured("superseded_by")
         .check_repo(&ctx)
         .into_iter()
         .map(|e| format!("{}:{}:{:?}:{}", e.crate_name, e.line, e.path, e.message))
-        .collect();
+        .collect()
+}
+
+/// `run_in_order` sorted, for the tests that compare runs and not the order of what they find.
+fn stored_run(reg: &RegistryView, root: &Path, crates: &[&str], store: Option<&Kept>) -> Vec<String> {
+    let mut shown = run_in_order(reg, root, crates, store);
     shown.sort();
     shown
 }
@@ -175,7 +180,7 @@ fn only_the_file_that_changed_is_judged_again() {
 }
 
 #[test]
-fn many_files_judged_together_find_what_one_after_another_find() {
+fn forty_files_judged_in_one_batch_find_fourteen_findings_as_an_unsaved_run_does_and_miss_forty_times_cold() {
     let d = dir("many");
     let store = Kept::default();
     for n in 0 .. 40 {
@@ -186,4 +191,27 @@ fn many_files_judged_together_find_what_one_after_another_find() {
     let found = agree(&reg, d.path(), &["alpha"], &store, "cold");
     assert_eq!(found.len(), 14, "{found:?}");
     assert_eq!(store.misses(NAME), 40, "every file is judged once on a cold run");
+}
+
+#[test]
+fn findings_come_in_path_order_across_files_and_line_order_within_one() {
+    let d = dir("order");
+    write(d.path(), "mock/crates/alpha/b.md", "It cites `split` here.\n\nIt cites `old` here.\n");
+    write(d.path(), "mock/crates/alpha/a.md", "It cites `old` here.\n\nIt cites `split` here.\n");
+    let old = "which `new` supersedes";
+    let split = "which `left`, `right` supersede";
+    let tail = "write to the successor, or say in the sentence that the row is superseded";
+    let said = |line: usize, rel: &str, cited: &str, which: &str| {
+        format!("alpha:{line}:Some(\"mock/crates/alpha/{rel}\"):`mock/crates/alpha/{rel}` cites `{cited}`, {which}; {tail}")
+    };
+    // Unsorted on purpose: the order is what is pinned. `b.md` is written first and cites `split`
+    // before `old`, so neither the order the files were made in nor the order of the slugs gives
+    // this list.
+    let expected = [
+        said(1, "a.md", "old", old),
+        said(3, "a.md", "split", split),
+        said(1, "b.md", "split", split),
+        said(3, "b.md", "old", old),
+    ];
+    assert_eq!(run_in_order(&canon(), d.path(), &["alpha"], None), expected);
 }

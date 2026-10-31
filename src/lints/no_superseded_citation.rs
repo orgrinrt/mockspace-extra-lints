@@ -104,8 +104,10 @@ impl RepoLint for NoSupersededCitation {
         });
         // The one fact every file's verdict shares: which rows are replaced and by what. A file's
         // findings follow from its own text and this, so a file unchanged under an unchanged table
-        // is not read again.
+        // is still read, but not judged again: its saved verdict is replayed.
         let table = format!("{replaced:?}");
+        // Every file's text is held at once on purpose, so the files that moved can be judged
+        // together in one batch.
         let mut read: Vec<(String, String, String)> = Vec::new();
         for rel in files {
             let Ok(text) = fs::read_to_string(ctx.repo_root.join(&rel)) else {
