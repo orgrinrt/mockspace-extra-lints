@@ -151,6 +151,18 @@ instead. The `allow` key under `[lints.no-source-include-in-test]` takes globs
 for the source fixtures that are meant to be included, matched against the
 path as written or as resolved.
 
+`no-first-party-rev-pin`. A repo lint against a git dependency on a repository
+of the estate that names a fixed `rev` or `tag`, which stays at one commit while
+the repository moves on. A `Cargo.toml` or a `mockspace.toml` table whose `git`
+url names the `orgrinrt` or the `hiisi-digital` account on GitHub (https, ssh or
+scp spelling) is refused when it carries either key, whether it is an inline
+table or a table with a header of its own, and in a `[patch]` or a
+`[lint-crates]` entry as much as in a dependency. The dependency tracks the
+head of a branch (`branch = "dev"`) and the lockfile records the commit. A
+third-party repository is let through, and so is anything under a
+`research/sketches` directory, where a pin is the evidence of what the sketch
+measured.
+
 ### Path globs
 
 The path globs in this pack are matched against a path from the repository root,
