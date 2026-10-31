@@ -117,6 +117,8 @@ impl NoSourceIncludeInTest {
                     let f = &files[i];
                     let key = if in_test { FACTS_IN_TEST } else { FACTS };
                     let saved = ctx.remembered(key, &[f.text.as_bytes()], || {
+                        #[cfg(test)]
+                        PARSED.with(|p| p.set(p.get() + 1));
                         let mut found = Found::default();
                         if let Some(tree) = parser.parse(&f.text, None) {
                             find(&f.text, tree.root_node(), in_test, &mut found);
@@ -213,6 +215,12 @@ struct Hit {
 struct Found {
     hits: Vec<Hit>,
     modules: Vec<String>,
+}
+
+#[cfg(test)]
+thread_local! {
+    /// How many files this thread has parsed, for a test to say a file was parsed once and not again.
+    static PARSED: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
 const FACTS: &str = "no-source-include-in-test.facts";
@@ -402,5 +410,7 @@ fn split_terms(args: &str) -> Vec<&str> {
     terms
 }
 
+#[cfg(test)]
+mod replay;
 #[cfg(test)]
 mod tests;

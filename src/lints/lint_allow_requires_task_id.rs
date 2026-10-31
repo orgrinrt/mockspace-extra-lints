@@ -98,7 +98,8 @@ mod tests {
             mockspace_lint_rules::CrateLint::check(&lint, &f.ctx())
         };
         assert_eq!(found.len(), 1, "the control: the bare allow is reported");
-        crate_lint(&lint, &corpus, &Roots { populated: &populated, empty: &empty }).unwrap();
+        let witness = crate_lint(&lint, &corpus, &Roots { populated: &populated, empty: &empty }).unwrap();
+        assert!(witness > 0, "the comparison saw no finding, so it proved nothing");
     }
 
 

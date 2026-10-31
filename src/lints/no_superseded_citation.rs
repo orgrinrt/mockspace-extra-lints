@@ -29,15 +29,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs;
 
-use mockspace_lint_rules::{
-    Lint,
-    LintError,
-    RegistryView,
-    RepoContext,
-    RepoLint,
-    Severity,
-    glob_match,
-};
+use mockspace_lint_rules::{glob_match, Lint, LintError, RegistryView, RepoContext, RepoLint, Severity};
 
 use crate::repo_files::{paths, record_dirs};
 
@@ -70,7 +62,7 @@ const HEADER: usize = 12;
 /// with one finding at the config.
 #[derive(Default)]
 pub struct NoSupersededCitation {
-    field:      String,
+    field: String,
     supersedes: String,
 }
 
@@ -127,11 +119,8 @@ impl RepoLint for NoSupersededCitation {
                 .find(|c| ctx.all_crates.contains(*c))
                 .unwrap_or("workspace")
                 .to_string();
-            let parts: [&[u8]; 4] =
-                [rel.as_bytes(), crate_name.as_bytes(), table.as_bytes(), text.as_bytes()];
-            out.extend(ctx.remembered(NAME, &parts, || {
-                file_findings(&rel, &crate_name, &text, &replaced)
-            }));
+            let parts: [&[u8]; 4] = [rel.as_bytes(), crate_name.as_bytes(), table.as_bytes(), text.as_bytes()];
+            out.extend(ctx.remembered(NAME, &parts, || file_findings(&rel, &crate_name, &text, &replaced)));
         }
         out
     }
@@ -214,8 +203,7 @@ fn replaced(reg: &RegistryView, forward: &str, backward: &str) -> BTreeMap<Strin
                 }
             }
             for old in listed(reg, q, backward) {
-                let old_q =
-                    if old.contains("::") { old.to_string() } else { format!("{ns}::{old}") };
+                let old_q = if old.contains("::") { old.to_string() } else { format!("{ns}::{old}") };
                 gone.insert(old_q);
                 edge(&mut direct, slug_of(old), slug);
             }
@@ -276,17 +264,16 @@ fn follow(
     for next in &direct[slug] {
         match direct.get(next) {
             Some(_) if seen.insert(next.clone()) => follow(direct, next, seen, live),
-            Some(_) => {},
+            Some(_) => {}
             None if !live.contains(next) => live.push(next.clone()),
-            None => {},
+            None => {}
         }
     }
 }
 
 /// Whether a file of this name is one the lint reads.
 fn reads(name: &str) -> bool {
-    name.rsplit_once('.')
-        .is_some_and(|(_, ext)| READ.contains(&ext))
+    name.rsplit_once('.').is_some_and(|(_, ext)| READ.contains(&ext))
 }
 
 /// Whether a character can sit inside a row's slug.
@@ -314,8 +301,8 @@ fn citations(
     for (i, line) in lines.iter().enumerate() {
         for (slug, live) in replaced {
             for (at, _) in line.match_indices(slug.as_str()) {
-                let before = line[.. at].chars().next_back();
-                let after = line[at + slug.len() ..].chars().next();
+                let before = line[..at].chars().next_back();
+                let after = line[at + slug.len()..].chars().next();
                 if before.is_some_and(id_char) || after.is_some_and(id_char) {
                     continue;
                 }
@@ -335,7 +322,8 @@ fn citations(
 /// Whether a line opens a block of its own: a heading, a table row or a list item.
 fn block_start(line: &str) -> bool {
     let t = line.trim_start();
-    t.starts_with(['#', '|']) || ["- ", "* ", "+ "].iter().any(|m| t.starts_with(m))
+    t.starts_with(['#', '|'])
+        || ["- ", "* ", "+ "].iter().any(|m| t.starts_with(m))
 }
 
 /// Whether a line is a block by itself: a heading or a table row.
@@ -347,40 +335,25 @@ fn alone(line: &str) -> bool {
 fn says_superseded(lines: &[&str], line: usize, at: usize, len: usize, per_line: bool) -> bool {
     let (mut first, mut last) = (line, line);
     if !per_line {
-        while first > 0
-            && !lines[first - 1].trim().is_empty()
-            && !block_start(lines[first])
-            && !alone(lines[first - 1])
-        {
+        while first > 0 && !lines[first - 1].trim().is_empty() && !block_start(lines[first]) && !alone(lines[first - 1]) {
             first -= 1;
         }
-        while last + 1 < lines.len()
-            && !lines[last + 1].trim().is_empty()
-            && !block_start(lines[last + 1])
-            && !alone(lines[last])
-        {
+        while last + 1 < lines.len() && !lines[last + 1].trim().is_empty() && !block_start(lines[last + 1]) && !alone(lines[last]) {
             last += 1;
         }
     }
-    let para = lines[first ..= last].join("\n");
-    let off = lines[first .. line]
-        .iter()
-        .map(|l| l.len() + 1)
-        .sum::<usize>()
-        + at;
+    let para = lines[first..=last].join("\n");
+    let off = lines[first..line].iter().map(|l| l.len() + 1).sum::<usize>() + at;
     let stop = |i: usize| {
         matches!(para.as_bytes()[i], b'.' | b'!' | b'?')
-            && para
-                .as_bytes()
-                .get(i + 1)
-                .is_none_or(|c| c.is_ascii_whitespace())
+            && para.as_bytes().get(i + 1).is_none_or(|c| c.is_ascii_whitespace())
     };
-    let from = (0 .. off).rev().find(|&i| stop(i)).map_or(0, |i| i + 1);
-    let to = (off + len .. para.len())
-        .find(|&i| stop(i))
-        .unwrap_or(para.len());
-    para[from .. to].to_ascii_lowercase().contains("supersed")
+    let from = (0..off).rev().find(|&i| stop(i)).map_or(0, |i| i + 1);
+    let to = (off + len..para.len()).find(|&i| stop(i)).unwrap_or(para.len());
+    para[from..to].to_ascii_lowercase().contains("supersed")
 }
 
+#[cfg(test)]
+mod replay;
 #[cfg(test)]
 mod tests;
