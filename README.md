@@ -151,6 +151,13 @@ instead. The `allow` key under `[lints.no-source-include-in-test]` takes globs
 for the source fixtures that are meant to be included, matched against the
 path as written or as resolved.
 
+`a-lint-admits-no-crate-list`. A repo lint over the consuming repository's
+`mockspace.toml`: a `[lints.*]` table that holds the key `crates` is refused, at
+the line of the key. A lint binds every crate, so what it cannot yet hold is
+named in `exempt_crates`, which is short and temporary. A table whose commit,
+build and push are all `off` is left alone, since it runs nowhere. It is a hard
+error at every gate by default.
+
 ### Path globs
 
 The path globs in this pack are matched against a path from the repository root,
