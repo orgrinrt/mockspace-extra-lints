@@ -295,9 +295,9 @@ or to none.
 
 ### Tools
 
-A tool rides the same cdylib a lint does, so depending on this pack gives you
-its tools too and your repo needs no `mock/tools/` of its own. `mock tools`
-lists them beside the builtins and your own, and does not distinguish where one
+A tool rides the same cdylib a lint does, so depending on this pack brings
+its tools along, and a repo needs no `mock/tools/` of its own. `mock tools`
+lists them beside the builtins and the repo's own, and does not distinguish where one
 came from, because at the point of running one it does not matter.
 
 `rulings-with-no-verbatim` reports every `ruling` row that sets `says` and
