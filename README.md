@@ -337,20 +337,22 @@ listed as outstanding.
 the same, and types that share a name over different declarations. The lint
 `single-source` gates the exact copy and leaves both of these alone, because a
 gate cannot tell a reinvention from two concepts that happen to share a word.
-The report has two lists, each ranked by closeness, the share of members that line up: a member
-counts whole when its name and type agree and half when only the type does, a
-renamed field. With no arguments it reads the crates the branch touched against
-`origin/dev` (`--against`) and compares them with every other crate, so a type
-written beside one another crate owns is found even when the author never named
-the owner. Crate names given as arguments are compared with each other, and
-`--named` narrows the default to the crates a touched crate names a type from, and one
-crate name alone is compared with every other crate.
+The report has two lists, each ranked by closeness, the share of members that
+line up. A member counts whole when its name and type agree and half when only
+the type does, a renamed field. With no arguments the tool reads the crates the
+branch touched against `origin/dev` (`--against`) and compares them with every
+other crate, so a type written beside one another crate owns is found even when
+the author never named the owner. `--named` narrows that to the crates a touched
+crate names a type from. Crate names given as arguments are compared with each
+other, and one name alone is compared with every other crate.
+
 `--min` sets the closeness a near-copy is listed from, `--limit` caps each list
-and `--pub-only` leaves private types out. Nothing gates and the exit is 0 whenever
-it can answer, since where a near-copy ends and an unrelated type begins has no settled
-value. A named crate with no source, a bad flag and a git failure are inconclusive,
-never clean. It reads a crate the way `single-source` does, through the same
-declaration reader, so the two cannot disagree about what a crate declares.
+and `--pub-only` leaves private types out. Nothing gates, and the exit is 0
+whenever the tool can answer, since where a near-copy ends and an unrelated type
+begins has no settled value. A named crate with no source, a bad flag and a git
+failure are inconclusive, never clean. Both this tool and `single-source` read a
+crate through one declaration reader, so they count the same files and compare
+the same canonical form.
 
 What belongs here rather than in one repository is the same question a lint
 answers. A check only one repo will ever want stays in that repo. A check

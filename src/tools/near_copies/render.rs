@@ -54,7 +54,7 @@ fn finding(out: &mut String, pair: &Pair<'_>) {
     }
     for (a, b, body) in &close.renamed {
         let word = if a.chars().all(|c| c.is_ascii_digit()) { "moved" } else { "renamed" };
-        out.push_str(&format!("        {word}: {a} -> {b} ({body})\n"));
+        out.push_str(&format!("        {word}: {a} -> {b} of {body}\n"));
     }
     if !close.only_first.is_empty() {
         out.push_str(&format!(
@@ -76,8 +76,10 @@ fn finding(out: &mut String, pair: &Pair<'_>) {
             pair.first.kind, pair.second.kind
         ));
     }
-    if close.frame_differs {
-        out.push_str("        differs beside the members: supertraits, kind of body, or the order of a numbered enum\n");
+    if let Some((first, second)) = &close.frame {
+        out.push_str(&format!(
+            "        declared differently beside the members: `{first}` against `{second}`\n"
+        ));
     }
     if close.generics_differ {
         out.push_str(&format!(

@@ -391,6 +391,51 @@ fn a_reordered_tuple_field_is_said_to_have_moved_and_not_to_be_renamed() {
         "pub struct B(pub u8, pub u32, pub u16);",
     );
     let text = render::report(&found(&types), 30);
-    assert!(text.contains("moved: 1 -> 2 (u16)"), "{text}");
+    assert!(text.contains("moved: 1 -> 2 of u16"), "{text}");
     assert!(!text.contains("renamed: 1"), "{text}");
+}
+
+#[test]
+fn every_same_named_pair_prints_what_differs_and_not_only_that_something_does() {
+    // Mutation: the frame left out of the rendering, so a supertrait or a unit against a braced body
+    // prints a pair at a hundred percent and nothing that tells them apart.
+    const SHAPES: &[&str] = &[
+        "pub struct X { pub a: u8 }",
+        "pub struct X;",
+        "pub struct X {}",
+        "pub struct X(pub u8);",
+        "pub enum X { A, B }",
+        "#[repr(u8)] pub enum X { A, B }",
+        "#[repr(u8)] pub enum X { B, A }",
+        "pub trait X { fn put(&self); }",
+        "pub trait X: Copy { fn put(&self); }",
+        "pub trait X: Clone { fn put(&self); }",
+        "pub struct X<T> { pub a: T }",
+    ];
+    for (i, a) in SHAPES.iter().enumerate() {
+        for b in &SHAPES[i + 1 ..] {
+            let types = both(a, b);
+            if types[0].shape == types[1].shape {
+                continue;
+            }
+            let found = found(&types);
+            assert_eq!(found.same_named.len(), 1, "`{a}` against `{b}`");
+            let text = render::report(&found, 30);
+            let (x, y) = (&types[0].parts, &types[1].parts);
+            let said = |s: &str| text.contains(s);
+            let told = if types[0].kind != types[1].kind {
+                said("keywords differ")
+            } else if x.frame != y.frame {
+                said(&x.frame) && said(&y.frame)
+            } else if x.generics != y.generics {
+                said(&x.generics) && said(&y.generics)
+            } else {
+                said("only in") || said("renamed") || said("moved")
+            };
+            assert!(
+                told,
+                "`{a}` against `{b}` does not print what differs:\n{text}"
+            );
+        }
+    }
 }

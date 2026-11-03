@@ -179,47 +179,6 @@ fn an_unknown_trunk_is_inconclusive_and_not_clean() {
 }
 
 #[test]
-fn every_same_named_pair_prints_at_least_one_difference() {
-    const SHAPES: &[&str] = &[
-        "pub struct X { pub a: u8 }",
-        "pub struct X;",
-        "pub struct X {}",
-        "pub struct X(pub u8);",
-        "pub enum X { A, B }",
-        "#[repr(u8)] pub enum X { A, B }",
-        "#[repr(u8)] pub enum X { B, A }",
-        "pub trait X { fn put(&self); }",
-        "pub trait X: Copy { fn put(&self); }",
-        "pub struct X<T> { pub a: T }",
-    ];
-    for (i, a) in SHAPES.iter().enumerate() {
-        for b in &SHAPES[i + 1 ..] {
-            let types = both(a, b);
-            let found = found(&types);
-            if types[0].shape == types[1].shape {
-                continue;
-            }
-            assert_eq!(found.same_named.len(), 1, "`{a}` against `{b}`");
-            let text = render::report(&found, 30);
-            let detail = text
-                .lines()
-                .skip(1)
-                .filter(|l| !l.trim_start().starts_with(char::is_numeric))
-                .count();
-            assert!(
-                text.contains("only in")
-                    || text.contains("renamed")
-                    || text.contains("keywords differ")
-                    || text.contains("differs beside")
-                    || text.contains("generics differ")
-                    || text.contains("moved"),
-                "`{a}` against `{b}` prints no difference ({detail} detail lines):\n{text}"
-            );
-        }
-    }
-}
-
-#[test]
 fn one_crate_argument_is_compared_with_every_other_crate_and_not_read_alone() {
     let repo = Repo::new();
     let report = repo.run(&["alpha"]);
