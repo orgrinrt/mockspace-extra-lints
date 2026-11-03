@@ -153,10 +153,13 @@ path as written or as resolved.
 
 `a-lint-admits-no-crate-list`. A repo lint over the consuming repository's
 `mockspace.toml`: a `[lints.*]` table that holds the key `crates` is refused, at
-the line of the key. A lint binds every crate, so what it cannot yet hold is
-named in `exempt_crates`, which is short and temporary. A table whose commit,
-build and push are all `off` is left alone, since it runs nowhere. It is a hard
-error at every gate by default.
+the line of the key, whether the lint is written as a table of its own, an
+inline table or a dotted key. A lint binds every crate, so what it cannot yet
+hold is named in `exempt_crates`, which is short and temporary. A lint that is
+off at the commit, the build and the push is left alone, since it runs nowhere;
+each gate is the gate's own key, else the `severity` preset, else off when
+another gate is set, as the engine reads it. It is a hard error at every gate by
+default.
 
 ### Path globs
 

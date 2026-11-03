@@ -27,6 +27,9 @@ tree-sitter-rust = "0.23.3"
 # dependency's source is: a git revision, a path and a `[patch]` all end at a
 # manifest path there and nowhere else reliably.
 serde_json = "1"
+# The engine reads `mockspace.toml` and the manifests with this parser, and a lint that reads the same files
+# has to read them as it does.
+toml_edit = "0.25"
 
 [dev-dependencies]
 tempfile = "3"
