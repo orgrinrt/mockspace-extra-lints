@@ -152,8 +152,9 @@ for the source fixtures that are meant to be included, matched against the
 path as written or as resolved.
 
 `a-lint-admits-no-crate-list`. A repo lint over the consuming repository's
-`mockspace.toml`: a `[lints.*]` table that holds the key `crates` is refused, at
-the line of the key, whether the lint is written as a table of its own, an
+`mockspace.toml`, the one in the mock directory when there is one and else the
+one at the root, as the engine reads it: a `[lints.*]` table that holds the key
+`crates` is refused, at the line of the key, whether the lint is written as a table of its own, an
 inline table or a dotted key. A lint binds every crate, so what it cannot yet
 hold is named in `exempt_crates`, which is short and temporary. A lint that is
 off at the commit, the build and the push is left alone, since it runs nowhere;
