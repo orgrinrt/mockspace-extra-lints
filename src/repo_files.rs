@@ -24,10 +24,10 @@ pub(crate) const WORKSPACE: &str = "workspace";
 /// A `.rs` file of the repository, read.
 pub(crate) struct RustFile {
     /// The path from the repository root, with forward slashes.
-    pub rel: String,
+    pub rel:        String,
     /// The crate the file sits in, or [`WORKSPACE`].
     pub crate_name: String,
-    pub text: String,
+    pub text:       String,
 }
 
 /// Every readable `.rs` file under `root`, in path order, but for the record directories under
@@ -61,7 +61,9 @@ pub(crate) fn matching(root: &Path, globs: &[String]) -> Vec<String> {
     if globs.is_empty() {
         return Vec::new();
     }
-    paths(root, &[], |_, rel| globs.iter().any(|g| glob_match_anchored(g, rel)))
+    paths(root, &[], |_, rel| {
+        globs.iter().any(|g| glob_match_anchored(g, rel))
+    })
 }
 
 /// The record directories under `mock_dir`, as paths from `root`: the ones no walk enters.
@@ -82,7 +84,11 @@ pub(crate) fn crate_of(rel: &str, all_crates: &BTreeSet<String>) -> String {
 
 /// The paths under `root` that `accept` takes, given the file name and the path from the root, in
 /// path order, without entering a hidden or skipped directory or one of the `skip` paths.
-pub(crate) fn paths(root: &Path, skip: &[String], accept: impl Fn(&str, &str) -> bool) -> Vec<String> {
+pub(crate) fn paths(
+    root: &Path,
+    skip: &[String],
+    accept: impl Fn(&str, &str) -> bool,
+) -> Vec<String> {
     let mut out = Vec::new();
     walk(root, root, skip, &accept, &mut out);
     out.sort();
@@ -152,15 +158,15 @@ mod tests {
         write(d.path(), "mock/tools/x.rs", "");
         write(d.path(), "mock/crates/alpha/README.md", "");
         let found = scan(d.path(), &crates(&["alpha"]), &[]);
-        let got: Vec<_> = found.iter().map(|f| (f.rel.as_str(), f.crate_name.as_str())).collect();
-        assert_eq!(
-            got,
-            [
-                ("mock/crates/alpha/src/lib.rs", "alpha"),
-                ("mock/crates/alpha/tests/it.rs", "alpha"),
-                ("mock/tools/x.rs", WORKSPACE),
-            ]
-        );
+        let got: Vec<_> = found
+            .iter()
+            .map(|f| (f.rel.as_str(), f.crate_name.as_str()))
+            .collect();
+        assert_eq!(got, [
+            ("mock/crates/alpha/src/lib.rs", "alpha"),
+            ("mock/crates/alpha/tests/it.rs", "alpha"),
+            ("mock/tools/x.rs", WORKSPACE),
+        ]);
     }
 
     #[test]
@@ -181,7 +187,10 @@ mod tests {
         write(d.path(), "other/research/real.rs", "");
         let found = scan(d.path(), &crates(&["alpha"]), &[]);
         let got: Vec<_> = found.iter().map(|f| f.rel.as_str()).collect();
-        assert_eq!(got, ["mock/crates/alpha/research/real.rs", "other/research/real.rs"]);
+        assert_eq!(got, [
+            "mock/crates/alpha/research/real.rs",
+            "other/research/real.rs"
+        ]);
     }
 
     #[test]
@@ -214,7 +223,10 @@ mod tests {
         assert_eq!(one, ["mock/research/a/LEDGER.md"]);
         let deep = matching(d.path(), &["**/LEDGER.md".to_string()]);
         assert_eq!(deep, ["LEDGER.md", "mock/research/a/LEDGER.md"]);
-        let either = matching(d.path(), &["LEDGER.md".to_string(), "mock/**/NOTES.md".to_string()]);
+        let either = matching(d.path(), &[
+            "LEDGER.md".to_string(),
+            "mock/**/NOTES.md".to_string(),
+        ]);
         assert_eq!(either, ["LEDGER.md", "mock/research/a/NOTES.md"]);
     }
 
@@ -259,13 +271,19 @@ mod tests {
     #[test]
     fn a_double_star_inside_a_segment_is_a_star_and_does_not_cross_a_slash() {
         let files = ["mock/canon/x.md", "mock/canon/sub/x.md", "mock/c/x.md"];
-        assert_eq!(reached("mock/c**/x.md", &files), ["mock/c/x.md", "mock/canon/x.md"]);
+        assert_eq!(reached("mock/c**/x.md", &files), [
+            "mock/c/x.md",
+            "mock/canon/x.md"
+        ]);
     }
 
     #[test]
     fn a_trailing_double_star_takes_everything_below_and_stays_anchored() {
         let files = ["tenet/a.toml", "tenet/k/b.toml", "mock/tenet/c.toml"];
-        assert_eq!(reached("tenet/**", &files), ["tenet/a.toml", "tenet/k/b.toml"]);
+        assert_eq!(reached("tenet/**", &files), [
+            "tenet/a.toml",
+            "tenet/k/b.toml"
+        ]);
     }
 
     #[test]

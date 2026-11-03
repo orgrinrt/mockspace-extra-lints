@@ -10,12 +10,12 @@
 //! near-copy: the same members under a renamed field, one variant more. `single-source` gates the
 //! exact copy, a name over one canonical declaration in two crates, and by design leaves both of
 //! these alone, since a gate cannot tell a reinvention from two concepts that share a word. This is
-//! the question asked instead, as a report in two lists, each ranked by how many members line up.
+//! the question asked instead, as a report in two lists, each ranked by closeness, the share of members that line up.
 //!
 //! # A tool and not a lint
 //!
 //! Where the line between a near-copy and an unrelated type falls has no settled value, and a gate
-//! on one would invent it. So nothing here blocks: the findings are `info`, the exit is always 0, and
+//! on one would invent it. So nothing here blocks: it reports text and no finding, it exits 0 whenever it can answer, and
 //! `--min` is a knob on what is listed and not a threshold on what fails.
 //!
 //! # Where it lives
@@ -125,7 +125,7 @@ impl Tool for NearCopies {
     }
 
     fn help(&self) -> &'static str {
-        "Two lists, each ranked by how many members line up, closest first.\n\n\
+        "Two lists, each ranked by closeness, the share of members that line up, closest first.\n\n\
          near-copies: types of one keyword under different names whose members largely agree. A member \
          agrees when it is the same name over the same type, or half when only the type is the same \
          (a renamed field). Listed from `--min` percent (default 60) and at least two members lined \
@@ -137,7 +137,7 @@ impl Tool for NearCopies {
          origin/dev) are compared with every other crate; `--named` compares them only with the crates \
          whose types they name. With crate arguments, those crates are compared with each other. \
          `--pub-only` reads only types that are `pub` without restriction. `--limit` caps each list \
-         (default 30). Nothing here gates and the exit is always 0."
+         (default 30). Nothing here gates and the exit is 0 whenever it can answer; a crate it cannot read, a bad flag or a git failure is inconclusive, never clean."
     }
 
     fn run(&self, ctx: &ToolContext<'_>) -> ToolReport {
@@ -145,7 +145,7 @@ impl Tool for NearCopies {
             Ok(args) => args,
             Err(why) => return ToolReport::inconclusive(why),
         };
-        let all = scope::sources(ctx.repo_root, ctx.mock_dir, ctx.all_crates, None);
+        let all = scope::sources(ctx.repo_root, ctx.mock_dir, ctx.all_crates);
         let types = scope::declarations(&all);
         let (scoped, vs): (BTreeSet<String>, Option<BTreeSet<String>>) = if args.crates.is_empty() {
             let touched = match scope::touched(ctx.repo_root, ctx.all_crates, &args.against) {
@@ -174,6 +174,10 @@ impl Tool for NearCopies {
             pub_only:    args.pub_only,
         };
         let found = compare(&population, &|t| scoped.contains(&t.crate_name), &options);
-        ToolReport::reported(render::report(&found, args.limit), population.len())
+        let examined = population
+            .iter()
+            .filter(|t| scoped.contains(&t.crate_name))
+            .count();
+        ToolReport::reported(render::report(&found, args.limit), examined)
     }
 }

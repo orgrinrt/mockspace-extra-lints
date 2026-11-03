@@ -53,7 +53,8 @@ fn finding(out: &mut String, pair: &Pair<'_>) {
         out.push_str(&format!("        shared: {}\n", close.shared.join(", ")));
     }
     for (a, b, body) in &close.renamed {
-        out.push_str(&format!("        renamed: {a} -> {b} ({body})\n"));
+        let word = if a.chars().all(|c| c.is_ascii_digit()) { "moved" } else { "renamed" };
+        out.push_str(&format!("        {word}: {a} -> {b} ({body})\n"));
     }
     if !close.only_first.is_empty() {
         out.push_str(&format!(
@@ -68,6 +69,15 @@ fn finding(out: &mut String, pair: &Pair<'_>) {
             pair.second.crate_name,
             close.only_second.join(", ")
         ));
+    }
+    if close.kinds_differ {
+        out.push_str(&format!(
+            "        keywords differ: {} against {}\n",
+            pair.first.kind, pair.second.kind
+        ));
+    }
+    if close.frame_differs {
+        out.push_str("        differs beside the members: supertraits, kind of body, or the order of a numbered enum\n");
     }
     if close.generics_differ {
         out.push_str(&format!(
