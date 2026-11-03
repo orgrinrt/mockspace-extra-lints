@@ -22,6 +22,7 @@
 
 mod const_generic_parameters;
 mod dep_surface;
+mod manifest_toml;
 mod paths;
 mod repo_files;
 mod string_literal;
@@ -37,6 +38,7 @@ pub mod lints {
     //! with its sources, the workspace as a whole, or one commit message or
     //! forge body.
 
+    pub mod a_lint_admits_no_crate_list;
     pub(crate) mod agent_identity;
     pub mod arvo_types_only;
     pub(crate) mod authored_message;
@@ -67,6 +69,7 @@ pub mod lints {
     pub mod writing_style;
 }
 
+use lints::a_lint_admits_no_crate_list::ALintAdmitsNoCrateList;
 use lints::arvo_types_only::ArvoTypesOnly;
 use lints::catalogue_ignore::CatalogueIgnore;
 use lints::commit_style::CommitStyle;
@@ -122,6 +125,7 @@ mockspace_lint_rules::lint_pack! {
         WritingStyle,
     ],
     repo_lints: [
+        ALintAdmitsNoCrateList,
         CatalogueIgnore::default(),
         NoFirstPartyRevPin,
         NoSourceIncludeInTest::default(),

@@ -151,17 +151,29 @@ instead. The `allow` key under `[lints.no-source-include-in-test]` takes globs
 for the source fixtures that are meant to be included, matched against the
 path as written or as resolved.
 
-`no-first-party-rev-pin`. A repo lint against a git dependency on a repository
-of the estate that names a fixed `rev` or `tag`, which stays at one commit while
-the repository moves on. A `Cargo.toml` or a `mockspace.toml` table whose `git`
-url names the `orgrinrt` or the `hiisi-digital` account on GitHub (https, ssh or
-scp spelling) is refused when it carries either key, whether it is an inline
-table or a table with a header of its own, and in a `[patch]` or a
-`[lint-crates]` entry as much as in a dependency. The dependency tracks the
-head of a branch (`branch = "dev"`) and the lockfile records the commit. A
-third-party repository is let through, and so is anything under a
-`research/sketches` directory, where a pin is the evidence of what the sketch
-measured.
+`no-first-party-rev-pin`. A repo lint against a git dependency on a first-party
+repository that names a fixed `rev`, which stays at one commit while the
+repository moves on and is lost when the repository is moved to a new home. A
+`Cargo.toml` or a `mockspace.toml` table whose `git` url has the host
+`github.com` and the `orgrinrt` or the `hiisi-digital` account (https, ssh or
+scp spelling) is refused when it carries a `rev`, at the line of the key,
+whether the table is inline, has a header of its own or is written with dotted
+keys, and in a `[patch]` or a `[lint-crates]` entry as much as in a dependency.
+The dependency tracks the head of a branch (`branch = "dev"`) and the lockfile
+records the commit. A third-party repository is let through. So are the
+directories under the mock directory that keep the record of earlier work,
+`design_rounds` and `research`, and anything under a `research/sketches`
+directory elsewhere, where a pin is the evidence of what a sketch measured.
+
+`a-lint-admits-no-crate-list`. A repo lint over the consuming repository's
+`mockspace.toml`: a `[lints.*]` table that holds the key `crates` is refused, at
+the line of the key, whether the lint is written as a table of its own, an
+inline table or a dotted key. A lint binds every crate, so what it cannot yet
+hold is named in `exempt_crates`, which is short and temporary. A lint that is
+off at the commit, the build and the push is left alone, since it runs nowhere;
+each gate is the gate's own key, else the `severity` preset, else off when
+another gate is set, as the engine reads it. It is a hard error at every gate by
+default.
 
 ### Path globs
 
