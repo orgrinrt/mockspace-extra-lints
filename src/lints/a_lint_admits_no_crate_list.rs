@@ -15,6 +15,8 @@
 //! `severity` preset, else off when some other gate is set, and a name is read without regard to case. A lint
 //! with a gate that still runs is not left alone.
 
+use std::path::PathBuf;
+
 use mockspace_lint_rules::{
     Level,
     Lint,
@@ -31,6 +33,9 @@ use crate::repo_files::WORKSPACE;
 
 /// The lint's name, as a project's `[lints.*]` table spells it.
 pub const NAME: &str = "a-lint-admits-no-crate-list";
+
+/// The name of the config file.
+const CONFIG: &str = "mockspace.toml";
 
 /// The key that admits crates.
 const ADMIT: &str = "crates";
@@ -50,10 +55,18 @@ impl Lint for ALintAdmitsNoCrateList {
 
 impl RepoLint for ALintAdmitsNoCrateList {
     fn check_repo(&self, ctx: &RepoContext) -> Vec<LintError> {
-        let text =
-            std::fs::read_to_string(ctx.repo_root.join("mockspace.toml")).unwrap_or_default();
-        check(&text)
+        let path = config_path(ctx);
+        let text = std::fs::read_to_string(&path).unwrap_or_default();
+        let rel = path.strip_prefix(ctx.repo_root).unwrap_or(&path);
+        check_file(&text, &rel.to_string_lossy().replace('\\', "/"))
     }
+}
+
+/// The config the engine reads: `mockspace.toml` in the mock directory when it is there, else the one at
+/// the repository root.
+fn config_path(ctx: &RepoContext) -> PathBuf {
+    let in_mock = ctx.mock_dir.join(CONFIG);
+    if in_mock.is_file() { in_mock } else { ctx.repo_root.join(CONFIG) }
 }
 
 /// The level a gate has: its own key, else what the `severity` preset says, else off when another gate
@@ -87,7 +100,8 @@ fn is_off(table: &dyn TableLike) -> bool {
     gates(table).is_some_and(|levels| levels.iter().all(|level| *level == Level::Pass))
 }
 
-fn check(text: &str) -> Vec<LintError> {
+/// The findings in the text of the config at `rel`, a path from the repository root.
+fn check_file(text: &str, rel: &str) -> Vec<LintError> {
     let Some(doc) = parse(text) else {
         return Vec::new();
     };
@@ -108,7 +122,7 @@ fn check(text: &str) -> Vec<LintError> {
                      yet in `exempt_crates` instead, each for a while and for a ticket"
                 ),
             );
-            e.path = Some("mockspace.toml".to_owned());
+            e.path = Some(rel.to_owned());
             Some(e)
         })
         .collect()
@@ -123,6 +137,10 @@ mod tests {
     use super::*;
 
     const ADMITTING: &str = "[lints.file-size]\ncommit = \"error\"\nbuild = \"error\"\npush = \"error\"\ncrates = [\n    \"a\",\n]\n";
+
+    fn check(text: &str) -> Vec<LintError> {
+        check_file(text, CONFIG)
+    }
 
     fn lines(text: &str) -> Vec<usize> {
         check(text).iter().map(|e| e.line).collect()
@@ -276,16 +294,13 @@ mod tests {
         assert!(check("[lints.a\ncrates = [").is_empty());
     }
 
-    #[test]
-    fn the_lint_reads_the_mockspace_toml_of_the_repository() {
-        // Mutation: `check_repo` reading some other path or no file.
-        let dir = tempfile::tempdir().unwrap();
-        std::fs::write(dir.path().join("mockspace.toml"), ADMITTING).unwrap();
+    /// The lint run over a repository whose mock directory is `<root>/mock`.
+    fn run(root: &std::path::Path) -> Vec<LintError> {
         let crates = BTreeSet::new();
         let reg = RegistryView::new(BTreeMap::new(), BTreeMap::new());
         let ctx = RepoContext {
-            mock_dir:    &dir.path().join("mock"),
-            repo_root:   dir.path(),
+            mock_dir:    &root.join("mock"),
+            repo_root:   root,
             all_crates:  &crates,
             src_dirs:    &[],
             invocation:  None,
@@ -294,14 +309,57 @@ mod tests {
             registry:    &reg,
             verdicts:    None,
         };
-        let f = ALintAdmitsNoCrateList.check_repo(&ctx);
+        ALintAdmitsNoCrateList.check_repo(&ctx)
+    }
+
+    fn write(root: &std::path::Path, rel: &str, text: &str) {
+        let path = root.join(rel);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, text).unwrap();
+    }
+
+    #[test]
+    fn the_lint_reads_the_mockspace_toml_at_the_root_of_the_repository() {
+        // Mutation: `check_repo` reading some other path or no file.
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "mockspace.toml", ADMITTING);
+        let f = run(dir.path());
         assert_eq!(f.len(), 1, "{f:?}");
         assert_eq!(f[0].line, 5);
+        assert_eq!(f[0].path.as_deref(), Some("mockspace.toml"));
         let empty = tempfile::tempdir().unwrap();
-        let ctx = RepoContext {
-            repo_root: empty.path(),
-            ..ctx
-        };
-        assert!(ALintAdmitsNoCrateList.check_repo(&ctx).is_empty());
+        assert!(run(empty.path()).is_empty());
+    }
+
+    #[test]
+    fn the_lint_reads_the_mockspace_toml_in_the_mock_directory_when_there_is_one() {
+        // The engine reads the config in the mock directory first and falls back to the root.
+        // Mutation: only the root read.
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "mock/mockspace.toml", ADMITTING);
+        let f = run(dir.path());
+        assert_eq!(f.len(), 1, "{f:?}");
+        assert_eq!(f[0].path.as_deref(), Some("mock/mockspace.toml"));
+    }
+
+    #[test]
+    fn a_config_in_the_mock_directory_is_the_one_read_and_the_one_at_the_root_is_not() {
+        // Mutation: the root preferred, or both read.
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "mockspace.toml", ADMITTING);
+        write(
+            dir.path(),
+            "mock/mockspace.toml",
+            "[lints.file-size]\ncommit = \"error\"\n",
+        );
+        assert!(run(dir.path()).is_empty());
+        let dir = tempfile::tempdir().unwrap();
+        write(
+            dir.path(),
+            "mock/mockspace.toml",
+            "[lints.file-size]\ncommit = \"error\"\n",
+        );
+        write(dir.path(), "mockspace.toml", ADMITTING);
+        assert!(run(dir.path()).is_empty(), "whichever is written first");
     }
 }
