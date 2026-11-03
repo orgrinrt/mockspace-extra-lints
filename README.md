@@ -16,7 +16,7 @@ and source agreement, file size, dead crates. This pack holds the ones that only
 make sense once a project has committed to a particular set of foundations,
 where the right answer for one codebase is noise for another.
 
-## Installation
+## Usage
 
 Not on crates.io, and it is not meant to be: a lint pack is reached through
 mockspace rather than through a dependency graph, so a project opts in from its
@@ -26,8 +26,6 @@ mockspace rather than through a dependency graph, so a project opts in from its
 [lint-crates]
 mockspace-extra-lints = { git = "ssh://git@github.com/orgrinrt/mockspace-extra-lints.git", branch = "dev" }
 ```
-
-## Usage
 
 Every lint is then configured, or silenced, per project in the same file. The
 pack registers names; it does not decide severities, which is what lets one
@@ -49,7 +47,11 @@ commit = "off"
 A lint nobody names does whatever its own default says, so the file is a set of
 deliberate departures rather than a full listing.
 
-## What is in it
+## Extras
+
+### Status
+
+Pre-1.0 and not published to a registry, so a project pins it by git and the lints and their keys may move. It builds on the nightly pinned in `rust-toolchain.toml`.
 
 ### Primitive discipline
 
@@ -105,7 +107,7 @@ code. An ignored test is a catalogue entry, a contract the code does not meet
 yet, and the reason says so and says which row tracks it:
 
 ```rust
-#[ignore = "catalogue: a creature at the opening zoom is a 3D body; tracked #C1-188"]
+#[ignore = "catalogue: a gradient at its endpoint is not exact yet; tracked #T-12"]
 ```
 
 A bare `#[ignore]` is refused, and so is a reason of any other shape. Every
@@ -133,7 +135,7 @@ and never hands to a lint. The findings carry a kind, `bare`, `malformed` or
 its own.
 
 A ledger row is a list item, a numbered item, a table row or a heading whose
-first word is the id, with or without a `#` of its own, so `- #C1-188`,
+first word is the id, with or without a `#` of its own, so `- #T-12`,
 `1. C1-188` and `## C1-188` are rows and `## Map` is a title.
 
 `no-source-include-in-test`. A repo lint against the test that reads a source
@@ -352,7 +354,7 @@ merging them would change what one of them does.
 So the test is the contract rather than the noun. Where a check is genuinely one
 repository's, it stays there.
 
-## Per-file and per-crate dispatch
+### Per-file and per-crate dispatch
 
 Worth knowing before adding a lint here, because getting it wrong is invisible
 in the lint's own output.
@@ -368,7 +370,7 @@ it. Both defects report a plausible-looking number and neither fails a test that
 only calls the lint once, so `tests/per_file_dispatch.rs` asserts the dispatch
 axis directly.
 
-## Presets
+### Presets
 
 `presets/` holds severity sets written to be extended rather than restated, and
 nothing reads the directory yet. The lints here are hand-written Rust carrying
@@ -377,7 +379,7 @@ was never built, so a preset key mostly names a knob its lint declares nothing
 for. `tests/pack_entry_points.rs` holds the assertion that closes it, red and
 catalogued until those primitives land. See `presets/README.md`.
 
-## Building
+### Building
 
 ```
 cargo build --release
@@ -392,25 +394,9 @@ Iterating on both at once, redirect it with a `[patch]` section in
 a commit. A path dependency works the same way where the two sit beside each
 other in one workspace.
 
-## A note on coding agents
-
-We do not recommend using coding agents with this codebase.
-
-If you still choose to use a coding agent:
-
-- Be aware of the environmental and social impact of large-scale model
-  inference. Minimise agent use where it is not needed. Be responsible.
-- Only use an agent if you yourself understand the architecture. Do not use an
-  agent because you do not understand; you will waste time and energy, both
-  yours and the planet's.
-- A lint is a rule about a codebase that a reader will trust without rereading
-  it. Getting one subtly wrong is worse than not having it, because the gate
-  then reports clean over the thing it was added to catch.
-
-The recommendation stands: do this work yourself unless you know what you are
-doing and why.
-
 ## Support
+
+Feel free to contribute! If unsure about wasting work, the best practice is to throw in an issue describing what you'd do, and only then commit to writing a big PR, because chances are, it might not be something that belongs here. However, forks are always a valid choice and we'd encourage everyone to experiment and have their own takes on this. When doing this, do mind the license(s) though!
 
 Whether you use this project, have learned something from it, or just like it, please consider supporting it by buying me a coffee, so I can dedicate more time on open-source projects like this :)
 
