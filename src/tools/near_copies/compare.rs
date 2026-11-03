@@ -23,7 +23,7 @@ pub struct Close {
     pub generics_differ: bool,
     /// Whether what the declaration keeps beside its members differs: supertrait bounds, the kind of
     /// body, the order of a numbered enum.
-    pub frame_differs:   bool,
+    pub frame:           Option<(String, String)>,
     /// Set when the two are of different keywords, where nothing lines up.
     pub kinds_differ:    bool,
 }
@@ -59,7 +59,8 @@ pub fn close(a: &DeclaredType, b: &DeclaredType) -> Option<Close> {
     let mut right: Vec<&DeclaredMember> = b.parts.members.iter().collect();
     let mut out = Close {
         generics_differ: a.parts.generics != b.parts.generics,
-        frame_differs: a.parts.frame != b.parts.frame,
+        frame: (a.parts.frame != b.parts.frame)
+            .then(|| (a.parts.frame.clone(), b.parts.frame.clone())),
         ..Close::default()
     };
     take_pairs(
