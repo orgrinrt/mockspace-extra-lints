@@ -333,6 +333,23 @@ would have shown, a struck proposal names any live ruling still stamping it, and
 a demand row carrying `retired` itself is marked as owed nothing rather than
 listed as outstanding.
 
+`near-copies` reports types in different crates that are close without being
+the same, and types that share a name over different declarations. The lint
+`single-source` gates the exact copy and leaves both of these alone, because a
+gate cannot tell a reinvention from two concepts that happen to share a word.
+The report has two lists, each ranked by how many members line up: a member
+counts whole when its name and type agree and half when only the type does, a
+renamed field. With no arguments it reads the crates the branch touched against
+`origin/dev` (`--against`) and compares them with every other crate, so a type
+written beside one another crate owns is found even when the author never named
+the owner. Crate names given as arguments are compared with each other, and
+`--named` narrows the default to the crates a touched crate names a type from.
+`--min` sets the closeness a near-copy is listed from, `--limit` caps each list
+and `--pub-only` leaves private types out. Nothing gates and the exit is always
+0, since where a near-copy ends and an unrelated type begins has no settled
+value. It reads a crate the way `single-source` does, through the same
+declaration reader, so the two cannot disagree about what a crate declares.
+
 What belongs here rather than in one repository is the same question a lint
 answers. A check only one repo will ever want stays in that repo. A check
 several want is one implementation here instead of one per consumer, drifting
