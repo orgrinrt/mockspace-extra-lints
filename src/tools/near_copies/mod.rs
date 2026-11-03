@@ -38,6 +38,8 @@ mod render;
 mod scope;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_git;
 
 use std::collections::BTreeSet;
 
@@ -162,13 +164,19 @@ impl Tool for NearCopies {
             if !unknown.is_empty() {
                 return ToolReport::inconclusive(format!("no source read for crate {unknown:?}"));
             }
-            (named.clone(), Some(named))
+            // One crate alone has no pair to read, so it is compared with every other crate.
+            let vs = (named.len() > 1).then(|| named.clone());
+            (named, vs)
         };
         let reads = |t: &mockspace_lint_rules::DeclaredType| {
             vs.as_ref()
                 .is_none_or(|set| set.contains(&t.crate_name) || scoped.contains(&t.crate_name))
         };
-        let population: Vec<_> = types.iter().filter(|t| reads(t)).cloned().collect();
+        let population: Vec<_> = types
+            .iter()
+            .filter(|t| reads(t) && (!args.pub_only || t.fully_pub()))
+            .cloned()
+            .collect();
         let options = Options {
             min_percent: args.min,
             pub_only:    args.pub_only,
