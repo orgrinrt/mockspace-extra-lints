@@ -8,17 +8,12 @@ use mockspace_lint_rules::{CrateSourceFile, DeclaredType, declared_types};
 
 use crate::repo_files::{WORKSPACE, crate_of, rust_files};
 
-/// The source of every named crate (or of every crate, when `only` is `None`), as the crate-relative
+/// The source of every crate, as the crate-relative
 /// files `declared_types` reads: what sits under the crate's own `src/`.
-pub fn sources(
-    root: &Path,
-    mock_dir: &Path,
-    all_crates: &BTreeSet<String>,
-    only: Option<&BTreeSet<String>>,
-) -> Sources {
+pub fn sources(root: &Path, mock_dir: &Path, all_crates: &BTreeSet<String>) -> Sources {
     let mut by_crate: BTreeMap<String, Vec<CrateSourceFile>> = BTreeMap::new();
     for file in rust_files(root, mock_dir, all_crates, &[]) {
-        if file.crate_name == WORKSPACE || only.is_some_and(|set| !set.contains(&file.crate_name)) {
+        if file.crate_name == WORKSPACE {
             continue;
         }
         let mut parts = file.rel.split('/');
@@ -57,11 +52,14 @@ pub fn touched(
     against: &str,
 ) -> Result<BTreeSet<String>, String> {
     let mut crates = BTreeSet::new();
-    for args in [vec!["diff", "--name-only", &format!("{against}...HEAD")], vec![
-        "diff",
-        "--name-only",
-        "HEAD",
-    ]] {
+    // Committed since the branch left the trunk, changed in the tree now, and written and not yet
+    // added: a crate a helper has just made is touched before git tracks it.
+    let range = format!("{against}...HEAD");
+    for args in [
+        vec!["diff", "--name-only", range.as_str()],
+        vec!["diff", "--name-only", "HEAD"],
+        vec!["ls-files", "--others", "--exclude-standard"],
+    ] {
         let out = Command::new("git")
             .arg("-C")
             .arg(root)

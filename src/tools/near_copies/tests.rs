@@ -47,7 +47,7 @@ fn a_copy_with_one_member_more_is_a_near_copy_with_what_differs() {
     let found = found(&types);
     assert_eq!(found.near_copies.len(), 1);
     let pair = &found.near_copies[0];
-    assert_eq!(pair.close.shared, ["index", "at"]);
+    assert_eq!(pair.close.shared, ["at", "index"]);
     assert_eq!(pair.close.only_first.len(), 1);
     assert!(pair.close.only_first[0].starts_with("extra"));
     assert_eq!(pair.close.percent(), 66);
@@ -251,7 +251,7 @@ fn a_finding_prints_both_places_and_what_differs() {
         text.contains("struct Tick (crate-b src/lib.rs:1)"),
         "{text}"
     );
-    assert!(text.contains("shared: index, at"), "{text}");
+    assert!(text.contains("shared: at, index"), "{text}");
     assert!(text.contains("only in crate-a: extra"), "{text}");
 }
 
@@ -374,4 +374,209 @@ fn a_single_member_in_common_is_not_a_copy_even_at_a_hundred_percent() {
         ),
         0
     );
+}
+
+/// A repository of two crates on a trunk branch `base`, and a work branch cut from it.
+struct Repo {
+    dir:    tempfile::TempDir,
+    crates: BTreeSet<String>,
+}
+
+impl Repo {
+    fn git(&self, args: &[&str]) {
+        let status = std::process::Command::new("git")
+            .arg("-C")
+            .arg(self.dir.path())
+            .args([
+                "-c",
+                "user.name=t",
+                "-c",
+                "user.email=t@example.com",
+                "-c",
+                "commit.gpgsign=false",
+            ])
+            .args(args)
+            .status()
+            .unwrap();
+        assert!(status.success(), "git {args:?}");
+    }
+
+    fn new() -> Self {
+        let repo = Self {
+            dir:    tempfile::tempdir().unwrap(),
+            crates: ["alpha", "beta", "gamma"]
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+        };
+        write(
+            repo.dir.path(),
+            "mock/crates/alpha/src/lib.rs",
+            "pub struct Frame { pub index: u64, pub at: u32 }",
+        );
+        write(
+            repo.dir.path(),
+            "mock/crates/beta/src/lib.rs",
+            "pub struct Unrelated { pub name: String }",
+        );
+        repo.git(&["init", "-q", "-b", "base"]);
+        repo.git(&["add", "."]);
+        repo.git(&["commit", "-q", "-m", "base"]);
+        repo.git(&["switch", "-q", "-c", "work"]);
+        repo
+    }
+
+    fn run(&self, args: &[&str]) -> mockspace_lint_rules::tool::ToolReport {
+        let registry = RegistryView::default();
+        let mock = self.dir.path().join("mock");
+        let ctx = ToolContext {
+            mock_dir: &mock,
+            repo_root: self.dir.path(),
+            all_crates: &self.crates,
+            src_dirs: &[],
+            args,
+            stdin: None,
+            registry: &registry,
+        };
+        NearCopies.run(&ctx)
+    }
+}
+
+#[test]
+fn a_branch_that_touched_nothing_examines_nothing_and_says_so() {
+    let repo = Repo::new();
+    let report = repo.run(&["--against", "base"]);
+    assert!(
+        matches!(report.outcome, Outcome::Clean {
+            examined: 0,
+        }),
+        "{:?}",
+        report.outcome
+    );
+    assert_eq!(report.output, "");
+}
+
+#[test]
+fn a_crate_the_branch_committed_is_compared_with_every_other_crate() {
+    let repo = Repo::new();
+    write(
+        repo.dir.path(),
+        "mock/crates/beta/src/lib.rs",
+        "pub struct Tick { pub index: u64, pub at: u32 }",
+    );
+    repo.git(&["add", "."]);
+    repo.git(&["commit", "-q", "-m", "work"]);
+    let report = repo.run(&["--against", "base"]);
+    assert!(
+        report.output.contains("struct Tick") && report.output.contains("struct Frame"),
+        "{}",
+        report.output
+    );
+    assert!(
+        matches!(report.outcome, Outcome::Clean {
+            examined: 1,
+        }),
+        "{:?}",
+        report.outcome
+    );
+}
+
+#[test]
+fn a_crate_written_and_not_yet_added_is_touched() {
+    let repo = Repo::new();
+    write(
+        repo.dir.path(),
+        "mock/crates/gamma/src/lib.rs",
+        "pub struct Tick { pub index: u64, pub at: u32 }",
+    );
+    let report = repo.run(&["--against", "base"]);
+    assert!(
+        report.output.contains("struct Tick (gamma"),
+        "an untracked crate is the new one: {}",
+        report.output
+    );
+}
+
+#[test]
+fn a_change_in_the_tree_not_yet_committed_is_touched() {
+    let repo = Repo::new();
+    write(
+        repo.dir.path(),
+        "mock/crates/beta/src/lib.rs",
+        "pub struct Tick { pub index: u64, pub at: u32 }",
+    );
+    let report = repo.run(&["--against", "base"]);
+    assert!(report.output.contains("struct Tick"), "{}", report.output);
+}
+
+#[test]
+fn named_narrows_the_comparison_to_the_crates_a_touched_crate_names() {
+    let repo = Repo::new();
+    write(
+        repo.dir.path(),
+        "mock/crates/gamma/src/lib.rs",
+        "pub struct Tick { pub index: u64, pub at: u32 }\nfn uses(_: Unrelated) {}",
+    );
+    let wide = repo.run(&["--against", "base"]);
+    assert!(
+        wide.output.contains("struct Frame"),
+        "every other crate is read: {}",
+        wide.output
+    );
+    let narrow = repo.run(&["--against", "base", "--named"]);
+    assert!(
+        !narrow.output.contains("struct Frame"),
+        "alpha is not named by gamma: {}",
+        narrow.output
+    );
+}
+
+#[test]
+fn an_unknown_trunk_is_inconclusive_and_not_clean() {
+    let repo = Repo::new();
+    assert!(matches!(
+        repo.run(&["--against", "no-such-ref"]).outcome,
+        Outcome::Inconclusive { .. }
+    ));
+}
+
+#[test]
+fn every_same_named_pair_prints_at_least_one_difference() {
+    const SHAPES: &[&str] = &[
+        "pub struct X { pub a: u8 }",
+        "pub struct X;",
+        "pub struct X {}",
+        "pub struct X(pub u8);",
+        "pub enum X { A, B }",
+        "#[repr(u8)] pub enum X { A, B }",
+        "#[repr(u8)] pub enum X { B, A }",
+        "pub trait X { fn put(&self); }",
+        "pub trait X: Copy { fn put(&self); }",
+        "pub struct X<T> { pub a: T }",
+    ];
+    for (i, a) in SHAPES.iter().enumerate() {
+        for b in &SHAPES[i + 1 ..] {
+            let types = both(a, b);
+            let found = found(&types);
+            if types[0].shape == types[1].shape {
+                continue;
+            }
+            assert_eq!(found.same_named.len(), 1, "`{a}` against `{b}`");
+            let text = render::report(&found, 30);
+            let detail = text
+                .lines()
+                .skip(1)
+                .filter(|l| !l.trim_start().starts_with(char::is_numeric))
+                .count();
+            assert!(
+                text.contains("only in")
+                    || text.contains("renamed")
+                    || text.contains("keywords differ")
+                    || text.contains("differs beside")
+                    || text.contains("generics differ")
+                    || text.contains("moved"),
+                "`{a}` against `{b}` prints no difference ({detail} detail lines):\n{text}"
+            );
+        }
+    }
 }
