@@ -159,6 +159,12 @@ impl Tool for NearCopies {
                 Ok(touched) => touched,
                 Err(why) => return ToolReport::inconclusive(why),
             };
+            let unread: Vec<&String> = touched.iter().filter(|c| !all.contains_key(*c)).collect();
+            if !unread.is_empty() {
+                return ToolReport::inconclusive(format!(
+                    "no source read for the touched crate {unread:?}, so it was not compared"
+                ));
+            }
             let vs = args
                 .named
                 .then(|| scope::named_from(&types, &all, &touched));

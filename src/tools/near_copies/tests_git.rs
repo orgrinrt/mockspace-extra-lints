@@ -215,3 +215,17 @@ fn examined_counts_only_the_types_pub_only_leaves_in() {
         only.outcome
     );
 }
+
+#[test]
+fn a_touched_crate_with_no_readable_source_is_inconclusive_and_not_clean() {
+    // `gamma` is a crate of the workspace; the branch wrote a file in it that is no source
+    let repo = Repo::new();
+    write(repo.dir.path(), "mock/crates/gamma/README.md", "a crate with no source yet");
+    let report = repo.run(&["--against", "base"]);
+    match report.outcome {
+        Outcome::Inconclusive { reason } => {
+            assert!(reason.contains("gamma"), "{reason}");
+        }
+        other => panic!("a crate nothing was read of is not clean: {other:?}"),
+    }
+}
