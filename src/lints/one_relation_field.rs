@@ -8,7 +8,8 @@
 //!
 //! A namespace is held to it when it declares the relation field, named by `relation` and `related`
 //! by default, with the type `ref[]`. In such a namespace a field typed as a list of another
-//! namespace's slugs (`bevy[]`, `tenet[]`) is a finding, unless its name is one of the structural
+//! namespace's slugs, the namespace's own included (`bevy[]`, `tenet[]`, `ticket[]` in `ticket`), is a
+//! finding, unless its name is one of the structural
 //! fields, which say what the row itself is rather than what it relates to: `superseded_by`,
 //! `migrated_from`, `qualified_by`, `cites`, `needs` and `part_of` by default, replaced by the
 //! `structural` list where a project names one.
@@ -34,6 +35,9 @@ const STRUCTURAL_KEY: &str = "structural";
 const DEFAULT_RELATION: &str = "related";
 const DEFAULT_STRUCTURAL: &[&str] =
     &["superseded_by", "migrated_from", "qualified_by", "cites", "needs", "part_of"];
+
+/// The namespaces the engine adds to a schema of its own.
+const BUILTIN: &[&str] = &["vocab", "reference"];
 
 const PER_TARGET: &str = "per-target";
 
@@ -95,10 +99,9 @@ impl RepoLint for OneRelationField {
         else {
             return Vec::new();
         };
-        let names: BTreeSet<&str> = spaces
-            .iter()
-            .filter_map(|n| n.get("key").and_then(toml::Value::as_str))
-            .collect();
+        // the engine adds `vocab` and `reference` to every schema, so a list of their slugs is a target too
+        let mut names: BTreeSet<&str> = BUILTIN.iter().copied().collect();
+        names.extend(spaces.iter().filter_map(|n| n.get("key").and_then(toml::Value::as_str)));
         let mut out = Vec::new();
         for space in spaces {
             let Some(key) = space.get("key").and_then(toml::Value::as_str) else {

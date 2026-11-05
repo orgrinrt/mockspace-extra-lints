@@ -114,3 +114,32 @@ fn a_repository_with_no_schema_or_an_unreadable_one_gets_no_finding() {
     assert!(run_with(&OneRelationField::default(), d.path()).is_empty());
     assert!(run("this is = not [ toml").is_empty());
 }
+
+#[test]
+fn a_list_of_a_builtin_namespace_is_a_target_too() {
+    let found = run(&schema("\n[[registry.namespace.field]]\nname = \"sources\"\ntype = \"reference[]\"\n"));
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert!(found[0].message.contains("`reference`"), "{}", found[0].message);
+}
+
+#[test]
+fn a_list_of_the_namespaces_own_slugs_is_refused_unless_it_is_structural() {
+    let found = run(&schema("\n[[registry.namespace.field]]\nname = \"blocks\"\ntype = \"ticket[]\"\n"));
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert!(found[0].message.contains("`blocks`"), "{}", found[0].message);
+}
+
+#[test]
+fn the_relation_field_is_the_one_the_project_names() {
+    let d = tempfile::tempdir().unwrap();
+    fs::write(
+        d.path().join("mockspace.toml"),
+        schema("\n[[registry.namespace.field]]\nname = \"bevy\"\ntype = \"bevy[]\"\n").replace("\"related\"", "\"links\""),
+    )
+    .unwrap();
+    // with the default name, the namespace declares no relation field and is not read
+    assert!(run_with(&OneRelationField::default(), d.path()).is_empty());
+    let mut lint = OneRelationField::default();
+    lint.configure(&HashMap::from([(RELATION_KEY.to_string(), "links".to_string())]));
+    assert_eq!(run_with(&lint, d.path()).len(), 1);
+}
