@@ -147,7 +147,12 @@ impl Tool for NearCopies {
             Ok(args) => args,
             Err(why) => return ToolReport::inconclusive(why),
         };
-        let all = scope::sources(ctx.repo_root, ctx.mock_dir, ctx.all_crates);
+        if ctx.src_dirs.is_empty() && !ctx.all_crates.is_empty() {
+            return ToolReport::inconclusive(
+                "the engine gave no source directory, so no crate could be read".to_string(),
+            );
+        }
+        let all = scope::sources(ctx.src_dirs, ctx.all_crates);
         let types = scope::declarations(&all);
         let (scoped, vs): (BTreeSet<String>, Option<BTreeSet<String>>) = if args.crates.is_empty() {
             let touched = match scope::touched(ctx.repo_root, ctx.all_crates, &args.against) {
