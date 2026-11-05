@@ -59,6 +59,7 @@ pub mod lints {
     pub mod no_std;
     pub mod no_superseded_citation;
     pub mod no_vec_in_trait_sig;
+    pub mod one_relation_field;
     pub mod re_export_foreign_names;
     pub mod semantic_alias_nudge;
     pub mod strategy_marker_required;
@@ -86,6 +87,7 @@ use lints::no_source_include_in_test::NoSourceIncludeInTest;
 use lints::no_std::NoStd;
 use lints::no_superseded_citation::NoSupersededCitation;
 use lints::no_vec_in_trait_sig::NoVecInTraitSig;
+use lints::one_relation_field::OneRelationField;
 use lints::re_export_foreign_names::ReExportForeignNames;
 use lints::semantic_alias_nudge::SemanticAliasNudge;
 use lints::strategy_marker_required::StrategyMarkerRequired;
@@ -123,6 +125,7 @@ mockspace_lint_rules::lint_pack! {
         CatalogueIgnore::default(),
         NoSourceIncludeInTest::default(),
         NoSupersededCitation::default(),
+        OneRelationField::default(),
     ],
     // Both carry configuration, so they are constructed rather than named as
     // unit structs. The macro takes expressions for exactly this case.
