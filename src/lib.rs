@@ -95,6 +95,7 @@ use lints::trait_first_signatures::TraitFirstSignatures;
 use lints::writing_style::WritingStyle;
 
 use crate::tools::coverage::Coverage;
+use crate::tools::near_copies::NearCopies;
 use crate::tools::rulings_with_no_verbatim::RulingsWithNoVerbatim;
 
 mockspace_lint_rules::lint_pack! {
@@ -140,6 +141,7 @@ mockspace_lint_rules::lint_pack! {
     // belong here rather than in one repository.
     tools: [
         Coverage,
+        NearCopies,
         RulingsWithNoVerbatim,
     ],
 }

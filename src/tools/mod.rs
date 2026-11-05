@@ -35,4 +35,5 @@
 //! wrong in one direction only, which is the direction nobody checks.
 
 pub mod coverage;
+pub mod near_copies;
 pub mod rulings_with_no_verbatim;
