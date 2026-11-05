@@ -313,11 +313,12 @@ fn run_over_named_crates_reports_them_and_exits_clean() {
     let args = ["alpha", "beta"];
     let registry = RegistryView::default();
     let mock = dir.path().join("mock");
+    let src_dirs = [mock.join("crates")];
     let ctx = ToolContext {
         mock_dir:   &mock,
         repo_root:  dir.path(),
         all_crates: &crates,
-        src_dirs:   &[],
+        src_dirs:   &src_dirs,
         args:       &args,
         stdin:      None,
         registry:   &registry,
@@ -438,4 +439,32 @@ fn every_same_named_pair_prints_what_differs_and_not_only_that_something_does() 
             );
         }
     }
+}
+
+#[test]
+fn crates_with_no_source_directory_to_read_them_from_are_inconclusive_and_not_clean() {
+    let dir = tempfile::tempdir().unwrap();
+    write(
+        dir.path(),
+        "mock/crates/alpha/src/lib.rs",
+        "pub struct Frame { pub index: u64, pub at: u32 }",
+    );
+    let crates: BTreeSet<String> = ["alpha"].iter().map(|s| s.to_string()).collect();
+    let args: [&str; 0] = [];
+    let registry = RegistryView::default();
+    let mock = dir.path().join("mock");
+    let ctx = ToolContext {
+        mock_dir:   &mock,
+        repo_root:  dir.path(),
+        all_crates: &crates,
+        src_dirs:   &[],
+        args:       &args,
+        stdin:      None,
+        registry:   &registry,
+    };
+    let outcome = NearCopies.run(&ctx).outcome;
+    assert!(
+        matches!(&outcome, Outcome::Inconclusive { reason } if reason.contains("no source directory")),
+        "{outcome:?}: a repository with crates and no source directory has read nothing, and nothing read is not clean"
+    );
 }

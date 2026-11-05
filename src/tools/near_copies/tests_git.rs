@@ -62,11 +62,12 @@ impl Repo {
     fn run(&self, args: &[&str]) -> mockspace_lint_rules::tool::ToolReport {
         let registry = RegistryView::default();
         let mock = self.dir.path().join("mock");
+        let src_dirs = [mock.join("crates")];
         let ctx = ToolContext {
             mock_dir: &mock,
             repo_root: self.dir.path(),
             all_crates: &self.crates,
-            src_dirs: &[],
+            src_dirs: &src_dirs,
             args,
             stdin: None,
             registry: &registry,

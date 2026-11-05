@@ -4,31 +4,26 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use mockspace_lint_rules::{CrateSourceFile, DeclaredType, declared_types};
+use mockspace_lint_rules::{CrateSourceFile, DeclaredType, collect_crate_sources, declared_types};
 
-use crate::repo_files::{WORKSPACE, crate_of, rust_files};
+use crate::repo_files::{WORKSPACE, crate_of};
 
-/// The source of every crate, as the crate-relative
-/// files `declared_types` reads: what sits under the crate's own `src/`.
-pub fn sources(root: &Path, mock_dir: &Path, all_crates: &BTreeSet<String>) -> Sources {
+/// The source of every crate, read from the directories the engine holds source packages in and
+/// the way its lints read a crate, as the crate-relative files `declared_types` reads: what sits
+/// under the crate's own `src/`. A crate found under two of the directories is read from the
+/// first.
+pub fn sources(src_dirs: &[PathBuf], all_crates: &BTreeSet<String>) -> Sources {
     let mut by_crate: BTreeMap<String, Vec<CrateSourceFile>> = BTreeMap::new();
-    for file in rust_files(root, mock_dir, all_crates, &[]) {
-        if file.crate_name == WORKSPACE {
-            continue;
+    for dir in src_dirs {
+        for name in all_crates {
+            if by_crate.contains_key(name) {
+                continue;
+            }
+            let files = collect_crate_sources(&dir.join(name));
+            if !files.is_empty() {
+                by_crate.insert(name.clone(), files);
+            }
         }
-        let mut parts = file.rel.split('/');
-        parts.find(|part| *part == file.crate_name);
-        let inside: Vec<&str> = parts.collect();
-        if inside.first() != Some(&"src") {
-            continue;
-        }
-        by_crate
-            .entry(file.crate_name)
-            .or_default()
-            .push(CrateSourceFile {
-                rel_path: PathBuf::from(inside.join("/")),
-                text:     file.text,
-            });
     }
     by_crate
 }
