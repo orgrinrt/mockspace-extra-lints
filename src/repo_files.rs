@@ -73,7 +73,7 @@ pub(crate) fn record_dirs(root: &Path, mock_dir: &Path) -> Vec<String> {
 }
 
 /// The crate a repository-relative path sits in.
-fn crate_of(rel: &str, all_crates: &BTreeSet<String>) -> String {
+pub(crate) fn crate_of(rel: &str, all_crates: &BTreeSet<String>) -> String {
     rel.split('/')
         .find(|c| all_crates.contains(*c))
         .unwrap_or(WORKSPACE)
