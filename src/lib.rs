@@ -55,6 +55,7 @@ pub mod lints {
     pub mod no_public_raw_field;
     pub mod no_runtime_registration;
     pub mod no_runtime_spawn;
+    pub mod one_relation_field;
     pub mod no_source_include_in_test;
     pub mod no_std;
     pub mod no_superseded_citation;
@@ -82,6 +83,7 @@ use lints::no_dyn_dispatch::NoDynDispatch;
 use lints::no_public_raw_field::NoPublicRawField;
 use lints::no_runtime_registration::NoRuntimeRegistration;
 use lints::no_runtime_spawn::NoRuntimeSpawn;
+use lints::one_relation_field::OneRelationField;
 use lints::no_source_include_in_test::NoSourceIncludeInTest;
 use lints::no_std::NoStd;
 use lints::no_superseded_citation::NoSupersededCitation;
@@ -123,6 +125,7 @@ mockspace_lint_rules::lint_pack! {
         CatalogueIgnore::default(),
         NoSourceIncludeInTest::default(),
         NoSupersededCitation::default(),
+        OneRelationField::default(),
     ],
     // Both carry configuration, so they are constructed rather than named as
     // unit structs. The macro takes expressions for exactly this case.
