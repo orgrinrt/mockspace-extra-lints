@@ -24,6 +24,7 @@ mod const_generic_parameters;
 mod dep_surface;
 mod paths;
 mod repo_files;
+pub mod slang;
 mod string_literal;
 #[cfg(test)]
 mod test_support;
