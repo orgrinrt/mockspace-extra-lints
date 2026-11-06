@@ -27,15 +27,14 @@ use std::collections::HashMap;
 use std::fs;
 use std::ops::Range;
 
-use mockspace_lint_rules::{Lint, LintError, RepoContext, RepoLint, Severity};
+use mockspace_lint_rules::{glob_match_anchored, Lint, LintError, RepoContext, RepoLint, Severity};
 use toml_edit::{Item, TableLike};
 
 use crate::manifest_toml::{line_of, parse};
 use crate::repo_files::{WORKSPACE, paths};
-use crate::util::glob_matches;
 
 /// The lint's name, as a project's `[lints.*]` table spells it.
-pub const NAME: &str = "no-first-party-rev-pin";
+pub const NAME: &str = "a-git-dependency-is-not-pinned";
 
 /// The files whose tables are read.
 const MANIFESTS: &[&str] = &["Cargo.toml", "mockspace.toml"];
@@ -49,9 +48,12 @@ const EXEMPT_KEY: &str = "exempt";
 
 /// The configured lint.
 #[derive(Default)]
-pub struct NoFirstPartyRevPin {
+pub struct AGitDependencyIsNotPinned {
     /// Lowercase `(host, account)` pairs.
     accounts: Vec<(String, String)>,
+    /// The `accounts` entries that are not `host/account`, each reported, since a typo would
+    /// otherwise leave the lint looking unconfigured.
+    bad:      Vec<String>,
     /// The branch a dependency tracks, when the consumer names one.
     branch:   Option<String>,
     /// Path globs from the repository root.
@@ -67,7 +69,7 @@ fn list(value: &str) -> Vec<String> {
         .collect()
 }
 
-impl Lint for NoFirstPartyRevPin {
+impl Lint for AGitDependencyIsNotPinned {
     fn name(&self) -> &'static str {
         NAME
     }
@@ -82,13 +84,16 @@ impl Lint for NoFirstPartyRevPin {
 
     fn configure(&mut self, params: &HashMap<String, String>) {
         if let Some(v) = params.get(ACCOUNTS_KEY) {
-            self.accounts = list(v)
-                .into_iter()
-                .filter_map(|entry| {
-                    let (host, account) = entry.split_once('/')?;
-                    Some((host.to_ascii_lowercase(), account.to_ascii_lowercase()))
-                })
-                .collect();
+            self.accounts.clear();
+            self.bad.clear();
+            for entry in list(v) {
+                match entry.split_once('/') {
+                    Some((host, account)) if !host.is_empty() && !account.is_empty() => self
+                        .accounts
+                        .push((host.to_ascii_lowercase(), account.to_ascii_lowercase())),
+                    _ => self.bad.push(entry),
+                }
+            }
         }
         if let Some(v) = params.get(BRANCH_KEY) {
             self.branch = Some(v.trim().to_string()).filter(|b| !b.is_empty());
@@ -99,13 +104,27 @@ impl Lint for NoFirstPartyRevPin {
     }
 }
 
-impl RepoLint for NoFirstPartyRevPin {
+impl RepoLint for AGitDependencyIsNotPinned {
     fn check_repo(&self, ctx: &RepoContext) -> Vec<LintError> {
+        if !self.bad.is_empty() {
+            return self
+                .bad
+                .iter()
+                .map(|entry| {
+                    LintError::error(
+                        WORKSPACE.to_string(),
+                        0,
+                        NAME,
+                        format!("the `accounts` entry `{entry}` is not `host/account`, so the lint reads nothing for it"),
+                    )
+                })
+                .collect();
+        }
         if self.accounts.is_empty() {
             return Vec::new();
         }
         let found = paths(ctx.repo_root, &[], |name, rel| {
-            MANIFESTS.contains(&name) && !self.exempt.iter().any(|g| glob_matches(g, rel))
+            MANIFESTS.contains(&name) && !self.exempt.iter().any(|g| glob_match_anchored(g, rel))
         });
         let files: Vec<(String, String)> = found
             .into_iter()
@@ -147,7 +166,7 @@ struct Pin {
     span:  Option<Range<usize>>,
 }
 
-impl NoFirstPartyRevPin {
+impl AGitDependencyIsNotPinned {
     fn judge(&self, files: &[(String, String)]) -> Vec<LintError> {
         let mut out = Vec::new();
         for (rel, text) in files {
@@ -235,6 +254,7 @@ impl NoFirstPartyRevPin {
     /// `ssh://`, with or without a user, a password or a port) and the scp spelling
     /// (`git@host:account/repo`).
     fn first_party(&self, url: &str) -> bool {
+        let has_scheme = url.contains("://");
         let rest = url
             .trim()
             .split_once("://")
@@ -244,8 +264,11 @@ impl NoFirstPartyRevPin {
             .rsplit_once('@')
             .map_or(authority, |(_, host)| host);
         let (host, account) = match host_part.split_once(':') {
-            // After the colon is a port when it is all digits, and the account in the scp spelling.
-            Some((host, tail)) if !tail.is_empty() && !tail.bytes().all(|b| b.is_ascii_digit()) => {
+            // With a scheme, after the colon is a port when it is all digits; without one, the
+            // scp spelling has no port and what follows is the account, whatever its characters.
+            Some((host, tail))
+                if !tail.is_empty() && (!has_scheme || !tail.bytes().all(|b| b.is_ascii_digit())) =>
+            {
                 (host, tail)
             },
             Some((host, _)) => (host, path.split('/').next().unwrap_or("")),
@@ -274,8 +297,8 @@ mod tests {
         fs::write(p, text).unwrap();
     }
 
-    fn lint(params: &[(&str, &str)]) -> NoFirstPartyRevPin {
-        let mut lint = NoFirstPartyRevPin::default();
+    fn lint(params: &[(&str, &str)]) -> AGitDependencyIsNotPinned {
+        let mut lint = AGitDependencyIsNotPinned::default();
         let map: HashMap<String, String> = params
             .iter()
             .map(|(k, v)| (k.to_string(), v.to_string()))
@@ -285,7 +308,7 @@ mod tests {
     }
 
     fn check_with(
-        lint: &NoFirstPartyRevPin,
+        lint: &AGitDependencyIsNotPinned,
         root: &Path,
         store: Option<&Kept>,
     ) -> Vec<LintError> {
@@ -305,7 +328,7 @@ mod tests {
         lint.check_repo(&ctx)
     }
 
-    fn at(lint: &NoFirstPartyRevPin, rel: &str, body: &str) -> Vec<LintError> {
+    fn at(lint: &AGitDependencyIsNotPinned, rel: &str, body: &str) -> Vec<LintError> {
         let d = tempfile::tempdir().unwrap();
         write(d.path(), rel, body);
         check_with(lint, d.path(), None)
@@ -334,7 +357,7 @@ mod tests {
         let body = "[dependencies]\na = { git = \"https://github.com/acme/a\", rev = \"1\" }\n";
         let d = tempfile::tempdir().unwrap();
         write(d.path(), "mock/crates/alpha/Cargo.toml", body);
-        let found = check_with(&NoFirstPartyRevPin::default(), d.path(), None);
+        let found = check_with(&AGitDependencyIsNotPinned::default(), d.path(), None);
         assert!(found.is_empty(), "{found:?}");
         let found = check_with(&lint(&[("branch", "main")]), d.path(), None);
         assert!(found.is_empty(), "a branch alone names no repository: {found:?}");
@@ -500,9 +523,63 @@ mod tests {
         write(d.path(), "mock/design_rounds/old/Cargo.toml", body);
         let none = lint(&[("accounts", OURS)]);
         assert_eq!(check_with(&none, d.path(), None).len(), 2, "no default exemption");
+        write(d.path(), "mock/crates/alpha/Cargo.toml", body);
         let some = lint(&[("accounts", OURS), ("exempt", "mock/research/**, mock/design_rounds/**")]);
         let found = check_with(&some, d.path(), None);
-        assert!(found.is_empty(), "{found:?}");
+        // Mutation: any exempt config silences the whole repository.
+        assert_eq!(
+            found.iter().filter_map(|e| e.path.as_deref()).collect::<Vec<_>>(),
+            ["mock/crates/alpha/Cargo.toml"],
+            "a manifest outside the globs is still read: {found:?}"
+        );
+    }
+
+    #[test]
+    fn exempt_globs_are_anchored_at_the_root_with_a_star_that_stops_at_a_slash_and_keep_case() {
+        // Mutation: the pack's other glob dialect, which folds case and lets `*` cross `/`.
+        let body = "[dependencies]\na = { git = \"https://github.com/acme/a\", rev = \"1\" }\n";
+        let d = tempfile::tempdir().unwrap();
+        write(d.path(), "mock/crates/alpha/Cargo.toml", body);
+        let cross = lint(&[("accounts", OURS), ("exempt", "mock/*/Cargo.toml")]);
+        assert_eq!(check_with(&cross, d.path(), None).len(), 1, "`*` stops at a slash");
+        let cased = lint(&[("accounts", OURS), ("exempt", "MOCK/**")]);
+        assert_eq!(check_with(&cased, d.path(), None).len(), 1, "the case is kept");
+        let right = lint(&[("accounts", OURS), ("exempt", "mock/*/*/Cargo.toml")]);
+        assert!(check_with(&right, d.path(), None).is_empty(), "the control: the right glob exempts it");
+    }
+
+    #[test]
+    fn an_all_digit_account_is_an_account_in_the_scp_spelling_and_a_port_with_a_scheme() {
+        // Mutation: the port guess runs without a scheme.
+        let digits = lint(&[("accounts", "github.com/1234")]);
+        let scp = at(
+            &digits,
+            "mock/crates/alpha/Cargo.toml",
+            "[dependencies]\na = { git = \"git@github.com:1234/a.git\", rev = \"1\" }\n",
+        );
+        assert_eq!(scp.len(), 1, "{scp:?}");
+        let ported = at(
+            &lint(&[("accounts", "github.com/acme")]),
+            "mock/crates/alpha/Cargo.toml",
+            "[dependencies]\na = { git = \"ssh://git@github.com:1234/acme/a.git\", rev = \"1\" }\n",
+        );
+        assert_eq!(ported.len(), 1, "a port with a scheme is still skipped: {ported:?}");
+    }
+
+    #[test]
+    fn an_accounts_entry_that_is_not_host_slash_account_is_reported() {
+        // Mutation: the entry is dropped and the lint looks unconfigured.
+        let found = at(
+            &lint(&[("accounts", "acme")]),
+            "mock/crates/alpha/Cargo.toml",
+            "[dependencies]\na = { path = \"../a\" }\n",
+        );
+        assert_eq!(found.len(), 1, "{found:?}");
+        assert!(found[0].message.contains("`acme`"), "{found:?}");
+        let both = lint(&[("accounts", "github.com/acme,acme,/x")]);
+        let d = tempfile::tempdir().unwrap();
+        write(d.path(), "mock/crates/alpha/Cargo.toml", "[dependencies]\n");
+        assert_eq!(check_with(&both, d.path(), None).len(), 2, "each bad entry once");
     }
 
     #[test]
