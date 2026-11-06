@@ -49,7 +49,7 @@ impl CrateLint for NoRuntimeSpawn {
                         ctx,
                         idx + 1,
                         "no-runtime-spawn",
-                        format!("`{p}` forbidden; concurrency is scheduler-managed in this stack"),
+                        format!("`{p}` forbidden; the scheduler owns concurrency"),
                     ));
                     break;
                 }

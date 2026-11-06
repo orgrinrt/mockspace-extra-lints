@@ -92,22 +92,10 @@ impl Tool for RulingsWithNoVerbatim {
         }]
     }
 
+
     fn help(&self) -> &'static str {
-        "With no argument: every `ruling` row that carries no `quote`, so what \
-         stands behind it is somebody's restatement rather \
-         than the words themselves. A row here is not a defect. Sometimes the \
-         corpus genuinely holds no verbatim and the row is the best available \
-         record of a real call, and the reason for that sits in `note` where a \
-         reader has to go and read it.\n\n\
-         What the list is for is knowing where the holes are. Two repairs close \
-         one: quote the source, or write into `note` that the corpus holds no \
-         verbatim and what it holds instead. Which of the two applies is a \
-         judgement about what the corpus holds, which is why nothing here \
-         gates.\n\n\
-         Where the corpus records a `ratified_by` of `experts`, that row is out \
-         of scope: the experts propose and a coordinator gates, so there is no \
-         verbatim to have lost. A corpus that declares no such field makes no \
-         such distinction and every ruling in it is in scope."
+        "With no argument: every `ruling` row with no `quote`, resting on a restatement rather than the words themselves. A row here is not a defect. Repair it by quoting the source, or by writing into `note` that the corpus holds no verbatim and what it holds instead. Nothing gates.\n\n\
+         A row whose `ratified_by` is `experts` is out of scope. A corpus declaring no such field has every ruling in scope."
     }
 
     fn run(&self, ctx: &ToolContext<'_>) -> ToolReport {

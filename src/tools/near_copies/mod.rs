@@ -126,20 +126,13 @@ impl Tool for NearCopies {
         &["--against", "--min", "--limit"]
     }
 
+
     fn help(&self) -> &'static str {
-        "Two lists, each ranked by closeness, the share of members that line up, closest first.\n\n\
-         near-copies: types of one keyword under different names whose members largely agree. A member \
-         agrees when it is the same name over the same type, or half when only the type is the same \
-         (a renamed field). Listed from `--min` percent (default 60) and at least two members lined \
-         up.\n\n\
-         same name, different shape: one name over two declarations, which `single-source` leaves \
-         alone. Every such pair is listed, with its closeness, so an unrelated pair sits at the bottom \
-         and a drifted copy near the top.\n\n\
-         With no crate arguments, the crates the branch touched against `--against` (default \
-         origin/dev) are compared with every other crate; `--named` compares them only with the crates \
-         whose types they name. With crate arguments, those crates are compared with each other. \
-         `--pub-only` reads only types that are `pub` without restriction. `--limit` caps each list \
-         (default 30). Nothing here gates and the exit is 0 whenever it can answer; a crate it cannot read, a bad flag or a git failure is inconclusive, never clean."
+        "Two lists, each ranked by the share of members that line up, closest first.\n\n\
+         near-copies: types of one keyword under different names. A member agrees when name and type match, or half when only the type matches. Listed from `--min` percent (default 60) with at least two members lined up.\n\n\
+         same name, different shape: one name over two declarations, which `single-source` leaves alone. Every such pair is listed with its closeness.\n\n\
+         No crate arguments: the crates the branch touched against `--against` (default origin/dev) are compared with every other crate; `--named` compares them only with the crates whose types they name. With crate arguments: those crates are compared with each other. `--pub-only` reads only unrestricted `pub` types. `--limit` caps each list (default 30).\n\n\
+         Never gates; exit 0 whenever it can answer. An unreadable crate, bad flag or git failure is inconclusive, never clean."
     }
 
     fn run(&self, ctx: &ToolContext<'_>) -> ToolReport {

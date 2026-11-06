@@ -268,9 +268,7 @@ fn own_signatures(
                     line,
                     NAME,
                     format!(
-                        "`{original}` from `{root}` is in the public signature of `{label}` and \
-                         is not re-exported; a consumer cannot name it without depending on \
-                         `{root}`, so add `pub use {root}::...::{original}` here, under any name"
+                        "`{original}` from `{root}` is in the public signature of `{label}` but not re-exported; add `pub use {root}::...::{original}`"
                     ),
                 ));
             }
@@ -468,10 +466,7 @@ fn carried_surfaces(
                 *line,
                 NAME,
                 format!(
-                    "`{item}` is re-exported from `{root}` and its public surface names \
-                     `{}` through {}, which is not re-exported; a consumer holding a `{item}` \
-                     cannot name it without depending on `{root}`, so add `pub use \
-                     {root}::...::{}` beside `{item}`, under any name",
+                    "`{item}` re-exported from `{root}` exposes `{}` through {}, which is not re-exported; add `pub use {root}::...::{}` beside it",
                     exposure.name, exposure.through, exposure.name
                 ),
             ));

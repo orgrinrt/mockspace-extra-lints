@@ -125,8 +125,8 @@ impl MessageLint for ForgeBody {
         for (pattern, reason) in &self.forbidden {
             if everything.contains(&pattern.to_ascii_lowercase()) {
                 out.push(finding(ctx, "forbidden-pattern", &match reason {
-                    Some(r) => format!("`{pattern}` is not permitted here: {r}"),
-                    None => format!("`{pattern}` is not permitted here"),
+                    Some(r) => format!("`{pattern}` not permitted: {r}"),
+                    None => format!("`{pattern}` not permitted"),
                 }));
             }
         }
@@ -141,7 +141,7 @@ impl MessageLint for ForgeBody {
                 out.push(finding(
                     ctx,
                     "missing-section",
-                    &format!("the body should contain a `{section}` section"),
+                    &format!("body lacks a `{section}` section"),
                 ));
             }
         }
@@ -153,7 +153,7 @@ impl MessageLint for ForgeBody {
                     ctx,
                     "too-short",
                     &format!(
-                        "the body is {len} characters, under the configured minimum of {}",
+                        "body is {len} characters, under the minimum of {}",
                         self.min_length
                     ),
                 ));

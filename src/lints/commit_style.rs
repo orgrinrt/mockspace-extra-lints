@@ -5,10 +5,10 @@
 //! universal nor obviously shared between projects. A project declares its style,
 //! or declares none and this lint does nothing.
 //!
-//! Two presets ship: `commit-conventional` for Conventional Commits as written,
-//! and `commit-hiisi` for the stricter variant (no parenthesised scope, lowercase
-//! subject, no trailing period, under 72). Either is a starting point that every
-//! individual knob then overrides.
+//! Two presets in `presets/` list the knobs: `commit-conventional` for
+//! Conventional Commits as written, and `commit-hiisi` for the stricter variant
+//! (no parenthesised scope, lowercase subject, no trailing period, under 72).
+//! Nothing loads them yet; set the keys under `[lints.commit-style]`.
 //!
 //! Shape only. Authorship trailers are [`super::message_attribution`]'s job,
 //! because they apply to pull-request bodies too and this lint does not.
@@ -206,7 +206,7 @@ impl MessageLint for CommitStyle {
                 ctx,
                 "subject-length",
                 &format!(
-                    "the subject is {} characters, over the configured {}",
+                    "subject is {} characters, over the limit of {}",
                     subject.chars().count(),
                     self.max_subject
                 ),
@@ -219,14 +219,14 @@ impl MessageLint for CommitStyle {
                     out.push(finding(
                         ctx,
                         "subject-case",
-                        "the subject should begin lowercase",
+                        "subject must start lowercase",
                     ));
                 },
                 SubjectCase::Sentence if first.is_lowercase() => {
                     out.push(finding(
                         ctx,
                         "subject-case",
-                        "the subject should begin uppercase",
+                        "subject must start uppercase",
                     ));
                 },
                 _ => {},
@@ -237,7 +237,7 @@ impl MessageLint for CommitStyle {
             out.push(finding(
                 ctx,
                 "trailing-period",
-                "the subject should not end with a period",
+                "drop the trailing period",
             ));
         }
 
@@ -249,7 +249,7 @@ impl MessageLint for CommitStyle {
                     out.push(finding(
                         ctx,
                         "missing-blank-line",
-                        "the subject and body should be separated by a blank line",
+                        "separate subject and body with a blank line",
                     ));
                 }
             }
@@ -276,7 +276,7 @@ impl CommitStyle {
                     ctx,
                     "missing-type",
                     &format!(
-                        "the subject should begin with a type and `{}`, one of: {}",
+                        "subject must start with a type then `{}`; types: {}",
                         self.separator,
                         self.types.join(", ")
                     ),
@@ -304,13 +304,13 @@ impl CommitStyle {
                     out.push(finding(
                         ctx,
                         "scope-forbidden",
-                        "a parenthesised scope is not permitted; drop the parentheses",
+                        "drop the parenthesised scope",
                     ));
                 } else if !closed {
                     out.push(finding(
                         ctx,
                         "unknown-type",
-                        "the scope's opening parenthesis is unclosed",
+                        "unclosed scope parenthesis",
                     ));
                 }
                 base
@@ -323,7 +323,7 @@ impl CommitStyle {
                 ctx,
                 "unknown-type",
                 &format!(
-                    "`{base}` is not one of the configured types: {}",
+                    "unknown type `{base}`; types: {}",
                     self.types.join(", ")
                 ),
             ));

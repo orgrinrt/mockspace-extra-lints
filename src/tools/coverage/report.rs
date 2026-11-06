@@ -89,46 +89,20 @@ impl Tool for Coverage {
         ]
     }
 
+
     fn help(&self) -> &'static str {
-        "With a namespace: every row of it, by the tier the typed edges and the \
-         rung put it at, with the rows that got it there. With a slug after it: \
-         that row alone, in full.\n\n\
-         The tier is the authority of what reaches it, never the namespace the \
-         row sits in. `ratified` is the one tier that is met: a ruling at that \
-         rung governs, and so does a proposal such a ruling stamped through \
-         `ratifies`, which is what a stamp is for. `in_force` is enforced \
-         without having gone through convergence. `stated` is direction and an \
-         ack rather than a ruling. `proposed` is a proposal nobody has stamped, \
-         which is proposed rather than met. `unsettled` is a ruling at a rung \
-         that settles nothing, or one whose rung could not be read. \
-         `route-closed` means only a retirement names it: a way to it was tried \
-         and is known not to work, which is not the same as nobody having \
-         looked.\n\n\
-         A rung vocabulary belongs to the corpus, so a tier no rung here spells \
-         simply holds nobody, and a namespace this corpus does not declare \
-         contributes nothing. A ruling's rung is printed beside it and a stamped \
-         proposal names the ruling that stamped it, so a `ratified` line reached \
-         through the stamp can be checked rather than taken.\n\n\
-         A row named from a namespace whose authority cannot be read is printed \
-         under it and sets no tier, because tiering it would invent an authority \
-         nobody declared. Preconditions are reported beside the tiers and never \
-         folded into them: a precondition names something a row cannot be met \
-         without, and the field does not say whether that is an obstacle still \
-         standing or a dependency already in place, so it moves no row nearer met \
-         and a row with four of them and no answer is still answered by nothing.\n\n\
-         A row carrying `retired` has been struck. It sets no tier, stamps \
-         nothing and establishes no precondition, and each edge it carried is \
-         printed under the row it names, so a row whose only namers were struck \
-         does not read as one nobody has looked at. A struck ruling's stamp is \
-         printed under each row the proposal it stamped names, and a struck \
-         proposal's line names any live ruling still stamping it. A demand row \
-         carrying `retired` itself is marked as owed nothing, and is still \
-         tallied at the tier its edges reach. A retirement of kind `withdrawn` \
-         is a strike taken back, so it closes no route and is printed under the \
-         row it names, and a row naming it in `retired` is read as live.\n\n\
-         Nothing here fails. An unanswered row is the state of unfinished work \
-         rather than a defect, and gating on a count would invent a deadline \
-         nobody set."
+        "With a namespace: every row of it, by tier, with the rows that put it there. With a slug after it: that row alone, in full.\n\n\
+         Tier is the authority of what reaches the row, not its namespace:\n\
+         - `ratified`: a ruling at a ratifying rung, or a proposal such a ruling stamped through `ratifies`. The only met tier.\n\
+         - `in_force`: enforced without convergence.\n\
+         - `stated`: direction or an ack, not a ruling.\n\
+         - `proposed`: a proposal nobody stamped.\n\
+         - `unsettled`: a ruling at a rung that settles nothing, or an unreadable rung.\n\
+         - `route-closed`: only a retirement names it.\n\n\
+         Rung vocabulary is the corpus's: a tier no rung spells holds nobody, and an undeclared namespace contributes nothing. A ruling's rung prints beside it, and a stamped proposal names its stamping ruling. A row from a namespace whose authority cannot be read prints under it and sets no tier.\n\n\
+         Preconditions print beside the tiers and move no row nearer met.\n\n\
+         A row carrying `retired` is struck: it sets no tier, stamps nothing, establishes no precondition. Its edges print under the rows they name. A struck ruling's stamp prints under each row the proposal names; a struck proposal's line names any live ruling still stamping it. A demand row carrying `retired` is marked owed nothing and still tallied at the tier its edges reach. A retirement of kind `withdrawn` closes no route, prints under its row, and a row naming it in `retired` reads as live.\n\n\
+         Nothing here fails or gates."
     }
 
     fn run(&self, ctx: &ToolContext<'_>) -> ToolReport {

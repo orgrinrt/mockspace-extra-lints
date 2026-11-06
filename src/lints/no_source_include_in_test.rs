@@ -158,7 +158,7 @@ impl NoSourceIncludeInTest {
                     hit.line,
                     NAME,
                     format!(
-                        "`{}!` reads the source file `{}` inside a test; a check on source text belongs in a lint, which runs on every commit and reads the parse, and a data fixture may be included instead",
+                        "`{}!` reads source file `{}` in a test; move the check to a lint, or include a data fixture",
                         hit.mac, hit.path
                     ),
                 );

@@ -51,7 +51,7 @@ impl CrateLint for LintAllowRequiresTaskId {
                     ctx,
                     idx + 1,
                     "lint-allow-requires-task-id",
-                    "lint:allow(...) missing `reason: <why>`; an escape says what it is escaping"
+                    "`lint:allow(...)` lacks `reason: <why>`"
                         .to_string(),
                 ));
             }

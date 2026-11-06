@@ -76,11 +76,7 @@ impl CrateLint for NoBareString {
                         &rel_path,
                         idx + 1,
                         "no-bare-string",
-                        format!(
-                            "bare `String` in {} line {}. Use hilavitkutin_str::Str. String is heap-allocated and does not exist in this stack",
-                            rel_path,
-                            idx + 1,
-                        ),
+                        "bare `String`; use `hilavitkutin_str::Str`".to_string(),
                     ));
                     continue;
                 }
@@ -90,11 +86,7 @@ impl CrateLint for NoBareString {
                         &rel_path,
                         idx + 1,
                         "no-bare-string",
-                        format!(
-                            "non-static `&str` in {} line {}. Use `&'static str` or hilavitkutin_str::Str. Unowned borrowed strings do not cross API boundaries",
-                            rel_path,
-                            idx + 1,
-                        ),
+                        "non-static `&str`; use `&'static str` or `hilavitkutin_str::Str`".to_string(),
                     ));
                 }
             }

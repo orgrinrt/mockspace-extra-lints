@@ -1,16 +1,15 @@
 //! Writing-style heuristics for public-facing docs.
 //!
-//! Source: `.shared/writing-style-fragment.md` in clause-dev. Threshold-based,
+//! Threshold-based,
 //! not per-occurrence strict: single uses pass, runaway usage blocks.
 //!
-//! Scope:
-//! - `{mock}/PRINCIPLES.md.tmpl`, `{mock}/DESIGN.md.tmpl`, `{mock}/WORKFLOW.md.tmpl`
-//! - `{repo_root}/README.md`
-//! - `{mock}/crates/**/*.md.tmpl`
-//! - `{mock}/agent/**/*.md.tmpl`
-//! - Rust `///` / `//!` / `//` comments in every file of `{mock}/crates/**/src`
+//! Scope, under the workspace root (the mock dir):
+//! - `PRINCIPLES.md.tmpl`, `DESIGN.md.tmpl`, `WORKFLOW.md.tmpl`
+//! - `crates/<crate>/{README,DESIGN,BACKLOG}.md.tmpl`
+//! - `agent/**/*.md.tmpl`
+//! - Rust `///`, `//!` and `//` comments in every source file of each crate
 //!
-//! Out of scope (discipline, not gated): `mock/design_rounds/**`.
+//! Design rounds are not read.
 
 use std::path::Path;
 
@@ -209,7 +208,7 @@ fn check_text(content: &str, crate_name: &str, body: Body, out: &mut Vec<LintErr
             crate_name.to_string(),
             1,
             "writing-style",
-            format!("em-dash density {em_dash_count} in {total_lines} lines exceeds threshold (1 per {EM_DASH_PER_LINES}); replace most with periods, commas, or parens"),
+            format!("em-dash density {em_dash_count} in {total_lines} lines, over 1 per {EM_DASH_PER_LINES}; use periods, commas or parens"),
             Severity::PUSH_GATE,
         ));
     }
@@ -229,8 +228,7 @@ fn check_text(content: &str, crate_name: &str, body: Body, out: &mut Vec<LintErr
             number,
             "writing-style",
             format!(
-                "inline emphasis `{marker}`. No bold, italic or underline in prose a human reads; \
-                 say it in the words. Backticks on an identifier or a path stay"
+                "inline emphasis `{marker}`; say it in the words (backticks on identifiers and paths stay)"
             ),
             Severity::PUSH_GATE,
         ));
@@ -252,7 +250,7 @@ fn check_text(content: &str, crate_name: &str, body: Body, out: &mut Vec<LintErr
                 line,
                 "writing-style",
                 format!(
-                    "`{word}` ({category}) used {count}x; see .shared/writing-style-fragment.md"
+                    "`{word}` ({category}) used {count}x"
                 ),
                 Severity::PUSH_GATE,
             ));
@@ -265,7 +263,7 @@ fn check_text(content: &str, crate_name: &str, body: Body, out: &mut Vec<LintErr
                 crate_name.to_string(),
                 line,
                 "writing-style",
-                format!("greeting opener `{opener}`. State the first fact instead"),
+                format!("greeting opener `{opener}`; state the first fact"),
                 Severity::PUSH_GATE,
             ));
         }
@@ -288,7 +286,7 @@ fn check_text(content: &str, crate_name: &str, body: Body, out: &mut Vec<LintErr
             crate_name.to_string(),
             1,
             "writing-style",
-            format!("{excl_count} exclamation marks in prose; drop them"),
+            format!("{excl_count} exclamation marks; drop them"),
             Severity::PUSH_GATE,
         ));
     }
@@ -299,7 +297,7 @@ fn check_text(content: &str, crate_name: &str, body: Body, out: &mut Vec<LintErr
             crate_name.to_string(),
             1,
             "writing-style",
-            "opens with a flat bulleted list (no hierarchy) in the first 3-4 sections; frame with prose first".into(),
+            "flat bulleted list in the first 3-4 sections; open with prose".into(),
             Severity::PUSH_GATE,
         ));
     }
@@ -311,7 +309,7 @@ fn check_text(content: &str, crate_name: &str, body: Body, out: &mut Vec<LintErr
             crate_name.to_string(),
             1,
             "writing-style",
-            format!("{label_colon_count} `- <label>: <short description>` bullets; use a glossary table or prose"),
+            format!("{label_colon_count} `- <label>: <text>` bullets; use a table or prose"),
             Severity::PUSH_GATE,
         ));
     }

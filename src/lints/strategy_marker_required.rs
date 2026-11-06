@@ -70,7 +70,7 @@ fn check_fn(node: Node, ctx: &LintContext, out: &mut Vec<LintError>) {
                     ctx,
                     line,
                     "strategy-marker-required",
-                    format!("`{name}` uses `{ty}<...>` without a Strategy marker. Require `S: Strategy` or use Hot/Warm/Cold/Precise explicitly"),
+                    format!("`{name}` uses `{ty}<...>` without a Strategy marker; bound `S: Strategy` or name Hot, Warm, Cold or Precise"),
                 ));
                 return;
             }

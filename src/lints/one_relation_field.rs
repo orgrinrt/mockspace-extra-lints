@@ -134,7 +134,7 @@ impl RepoLint for OneRelationField {
                     0,
                     NAME,
                     format!(
-                        "the namespace `{key}` has the field `{name}`, typed as a list of `{target}`, beside its `{}` relation field; write the link in `{}` as `{target}::<slug>`, or name `{name}` in `structural` if it says what the row is rather than what it relates to",
+                        "namespace `{key}` field `{name}` lists `{target}` beside its `{}` field; write the link in `{}` as `{target}::<slug>`, or name `{name}` in `structural`",
                         self.relation, self.relation
                     ),
                 );
