@@ -330,8 +330,8 @@ fn arvo_types_only_fires_in_module_file_not_lib_rs() {
     let hits = ArvoTypesOnly.check(&ctx);
     assert!(!hits.is_empty(), "drift in src/bits.rs must be flagged");
     assert!(
-        hits.iter().any(|e| e.message.contains("src/bits.rs")),
-        "error message should name the offending file"
+        hits.iter().any(|e| e.path.as_deref() == Some("src/bits.rs")),
+        "the finding should carry the offending file as its path"
     );
 }
 
@@ -344,8 +344,8 @@ fn no_bare_option_fires_in_module_file_not_lib_rs() {
     let hits = NoBareOption.check(&ctx);
     assert!(!hits.is_empty(), "Option in src/resolve.rs must be flagged");
     assert!(
-        hits.iter().any(|e| e.message.contains("src/resolve.rs")),
-        "error message should name the offending file"
+        hits.iter().any(|e| e.path.as_deref() == Some("src/resolve.rs")),
+        "the finding should carry the offending file as its path"
     );
 }
 
@@ -533,7 +533,31 @@ fn no_public_raw_field_fires_in_module_file_not_lib_rs() {
         "tuple-struct raw u32 in src/handle.rs must be flagged"
     );
     assert!(
-        hits.iter().any(|e| e.message.contains("src/handle.rs")),
-        "error message should name the offending file"
+        hits.iter().any(|e| e.path.as_deref() == Some("src/handle.rs")),
+        "the finding should carry the offending file as its path"
     );
+}
+
+/// The finding carries its file in `path` and its line in `line`, so the
+/// message repeats neither.
+#[test]
+fn a_bare_primitive_message_does_not_repeat_its_path() {
+    let files = |module: &'static str, text: &'static str| {
+        ctx_with_files(vec![("src/lib.rs", "pub mod m;\n"), (module, text)])
+    };
+    let cases: Vec<(&str, Vec<mockspace_lint_rules::LintError>)> = vec![
+        ("arvo-types-only", ArvoTypesOnly.check(&files("src/m.rs", "pub struct B(u64);\n"))),
+        ("no-bare-option", NoBareOption.check(&files("src/m.rs", "fn f() -> Option<u8> { None }\n"))),
+        ("no-bare-result", NoBareResult.check(&files("src/m.rs", "fn f() -> Result<u8, u8> { Ok(1) }\n"))),
+        ("no-bare-string", NoBareString.check(&files("src/m.rs", "fn f(s: String) {}\n"))),
+        ("no-public-raw-field", NoPublicRawField.check(&files("src/m.rs", "pub struct S(pub u32);\n"))),
+    ];
+    for (lint, hits) in cases {
+        assert!(!hits.is_empty(), "{lint} must flag src/m.rs");
+        for e in &hits {
+            assert_eq!(e.path.as_deref(), Some("src/m.rs"), "{lint}");
+            assert!(!e.message.contains("src/m.rs"), "{lint}: {}", e.message);
+            assert!(!e.message.contains(" line "), "{lint}: {}", e.message);
+        }
+    }
 }

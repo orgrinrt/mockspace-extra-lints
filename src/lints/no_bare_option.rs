@@ -72,11 +72,7 @@ impl CrateLint for NoBareOption {
                         &rel_path,
                         idx + 1,
                         "no-bare-option",
-                        format!(
-                            "bare `Option` in {} line {}. Use notko::Maybe<T>. Option does not exist in this stack",
-                            rel_path,
-                            idx + 1,
-                        ),
+                        "bare `Option`; use `notko::Maybe<T>`".to_string(),
                     ));
                 }
             }

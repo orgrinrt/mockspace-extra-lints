@@ -1,4 +1,4 @@
-//! An opt-in mockspace lint pack, shared lints and presets a project imports
+//! An opt-in mockspace lint pack, shared lints a project opts into
 //! because it wants them rather than anything mockspace ships by default.
 //!
 //! Some of it is narrow, the bare-primitive family and the arvo and

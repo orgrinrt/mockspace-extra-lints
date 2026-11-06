@@ -76,7 +76,7 @@ fn check_trait(node: Node, ctx: &LintContext, out: &mut Vec<LintError>) {
                     ctx,
                     line,
                     "no-vec-in-trait-sig",
-                    format!("trait method `{name}` signature contains `{forbidden}`; use &[T] / impl Iterator / &mut impl Collector<T> / &mut impl Sink"),
+                    format!("trait method `{name}` signature contains `{forbidden}`; use `&[T]`, `impl Iterator`, `&mut impl Collector<T>` or `&mut impl Sink`"),
                 ));
                 break;
             }
