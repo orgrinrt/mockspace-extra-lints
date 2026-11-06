@@ -18,11 +18,13 @@
 mod files;
 mod items;
 mod lex;
+mod members;
+mod text;
 #[cfg(test)]
 mod tests;
 
 pub use files::{SlangSource, sources};
-pub use items::{Import, ImportForm, Item, ItemKind, Visibility};
+pub use items::{Import, ImportForm, Item, ItemKind, Member, Visibility};
 pub use lex::{Comment, Directive};
 
 /// One Slang source, read.

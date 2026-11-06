@@ -127,6 +127,44 @@ fn types_interfaces_enums_aliases_and_namespaces_are_read() {
     );
 }
 
+fn members(file: &SlangFile, name: &str) -> Vec<(String, String)> {
+    item(file, name).members.iter().map(|m| (m.name.clone(), m.body.clone())).collect()
+}
+
+#[test]
+fn a_struct_gives_its_fields_and_methods_an_enum_its_variants_and_an_interface_its_methods() {
+    let f = read(
+        "public struct P<T : IShade> : IShade\n{\n    public float4 colour : SV_Target;\n    static const uint N = 4u;\n    float2 uv;\n    float shade(float3 n, in float k) { float a = n.x; return a * k; }\n    __init(float a) { }\n    float after;\n};\nenum Mode : uint { A = 1, B, C = 4 }\ninterface IShade { float4 shade(float3 n); void bump(); }\n",
+    );
+    assert_eq!(
+        members(&f, "P"),
+        [
+            ("colour".to_string(), "float4".to_string()),
+            ("N".to_string(), "uint".to_string()),
+            ("uv".to_string(), "float2".to_string()),
+            ("shade".to_string(), "(float3, in float) float".to_string()),
+            ("__init".to_string(), "(float)".to_string()),
+            ("after".to_string(), "float".to_string()),
+        ]
+    );
+    assert_eq!(item(&f, "P").generics, "T:IShade");
+    assert_eq!(
+        members(&f, "Mode"),
+        [
+            ("A".to_string(), "1".to_string()),
+            ("B".to_string(), String::new()),
+            ("C".to_string(), "4".to_string()),
+        ]
+    );
+    assert_eq!(
+        members(&f, "IShade"),
+        [
+            ("shade".to_string(), "(float3) float4".to_string()),
+            ("bump".to_string(), "() void".to_string()),
+        ]
+    );
+}
+
 #[test]
 fn a_generic_function_is_named_by_its_name_and_not_its_parameter_list() {
     let f = read("public T pick<T : IShade>(T a, T b) { return a; }\n");

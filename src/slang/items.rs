@@ -12,6 +12,8 @@
 //! (a resource, a groupshared array). The contents of a `namespace` are read as top-level.
 
 use super::lex::{Kind, Token};
+use super::members::members;
+use super::text::{render, split_params};
 
 /// How a declaration may be reached from another module.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -56,6 +58,18 @@ pub struct Item {
     pub params:     Vec<String>,
     /// For a function, the return type as written. Empty for anything else.
     pub ret:        String,
+    /// For a struct, its fields; for an enum, its variants; for an interface, its methods.
+    pub members:    Vec<Member>,
+    /// For a type, the generic parameters as written between its angle brackets, empty without.
+    pub generics:   String,
+}
+
+/// One member of a type, as `name` over `body`: a field's type, a variant's value, a method's
+/// signature.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Member {
+    pub name: String,
+    pub body: String,
 }
 
 impl Item {
@@ -128,9 +142,9 @@ const MODIFIERS: &[&str] = &[
     "__generic",
 ];
 
-struct Scan<'a> {
-    t: &'a [Token],
-    i: usize,
+pub(super) struct Scan<'a> {
+    pub(super) t: &'a [Token],
+    pub(super) i: usize,
 }
 
 /// Reads the top level of a token stream.
@@ -173,7 +187,7 @@ impl<'a> Scan<'a> {
     }
 
     /// An attribute run `[a] [b(1)]`, each as the text between its brackets.
-    fn attributes(&mut self) -> Vec<String> {
+    pub(super) fn attributes(&mut self) -> Vec<String> {
         let mut out = Vec::new();
         while self.at('[') {
             let start = self.i + 1;
@@ -247,6 +261,8 @@ impl<'a> Scan<'a> {
             attributes: attributes.clone(),
             params: Vec::new(),
             ret: String::new(),
+            members: Vec::new(),
+            generics: String::new(),
         };
         match word {
             "module" | "implementing" | "import" | "__include" => self.reference(word, out),
@@ -272,8 +288,9 @@ impl<'a> Scan<'a> {
                 };
                 self.i += 1;
                 let (name, name_line) = self.type_name();
-                out.items.push(make(kind, name, name_line));
-                self.skip_body();
+                let mut item = make(kind, name, name_line);
+                self.skip_body(&mut item);
+                out.items.push(item);
             },
             "typealias" | "typedef" => {
                 self.i += 1;
@@ -326,7 +343,7 @@ impl<'a> Scan<'a> {
     fn type_name(&mut self) -> (String, usize) {
         let line = self.peek().map_or(0, |t| t.line);
         let start = self.i;
-        while self.peek().is_some_and(|t| !t.is('{') && !t.is(';') && !t.is(':')) {
+        while self.peek().is_some_and(|t| !t.is('{') && !t.is(';') && !t.is(':') && !t.is('<')) {
             self.i += 1;
         }
         let span = &self.t[start .. self.i];
@@ -338,13 +355,29 @@ impl<'a> Scan<'a> {
         (name, line)
     }
 
-    /// Past the bases and the braces of a type declaration, and the `;` or declarators after it.
-    fn skip_body(&mut self) {
+    /// Past the bases and the braces of a type declaration, and the `;` or declarators after it,
+    /// giving the item its generics and its members on the way.
+    fn skip_body(&mut self, item: &mut Item) {
+        let header = self.i;
         while self.peek().is_some_and(|t| !t.is('{') && !t.is(';')) {
             self.i += 1;
         }
+        if self.t.get(header).is_some_and(|t| t.is('<')) {
+            let mut depth = 0usize;
+            let close = self.t[header .. self.i]
+                .iter()
+                .position(|t| {
+                    depth += usize::from(t.is('<'));
+                    depth -= usize::from(t.is('>'));
+                    depth == 0
+                })
+                .map_or(self.i, |c| header + c);
+            item.generics = render(&self.t[header + 1 .. close]);
+        }
         if self.at('{') {
+            let body = self.i + 1;
             self.skip_group('{', '}');
+            item.members = members(item.kind, &self.t[body .. self.i.saturating_sub(1).max(body)]);
         }
         while self.peek().is_some_and(|t| !t.is(';') && !t.is('}') && t.ident().is_none()) {
             self.i += 1;
@@ -424,6 +457,8 @@ impl<'a> Scan<'a> {
                     attributes,
                     params: Vec::new(),
                     ret: String::new(),
+                    members: Vec::new(),
+                    generics: String::new(),
                 })
             },
         };
@@ -435,7 +470,7 @@ impl<'a> Scan<'a> {
         }
     }
 
-    fn function(
+    pub(super) fn function(
         &self,
         start: usize,
         open: usize,
@@ -471,6 +506,8 @@ impl<'a> Scan<'a> {
             attributes,
             params,
             ret,
+            members: Vec::new(),
+            generics: String::new(),
         })
     }
 
@@ -489,82 +526,4 @@ impl<'a> Scan<'a> {
         }
         self.t.len()
     }
-}
-
-/// The type of each parameter in the tokens between a function's parentheses.
-fn split_params(tokens: &[Token]) -> Vec<String> {
-    let mut out = Vec::new();
-    let mut depth = 0i32;
-    let mut from = 0usize;
-    for (n, t) in tokens.iter().enumerate() {
-        match &t.kind {
-            Kind::Punct('(' | '[' | '<') => depth += 1,
-            Kind::Punct(')' | ']' | '>') => depth -= 1,
-            Kind::Punct(',') if depth == 0 => {
-                out.push(param_type(&tokens[from .. n]));
-                from = n + 1;
-            },
-            _ => {},
-        }
-    }
-    if from < tokens.len() {
-        out.push(param_type(&tokens[from ..]));
-    }
-    out.retain(|p| !p.is_empty());
-    out
-}
-
-/// One parameter without its name, its semantic and its default.
-fn param_type(tokens: &[Token]) -> String {
-    let mut end = tokens.len();
-    for (n, t) in tokens.iter().enumerate() {
-        let lone_colon = t.is(':')
-            && !tokens.get(n + 1).is_some_and(|x| x.is(':'))
-            && !n.checked_sub(1).and_then(|p| tokens.get(p)).is_some_and(|x| x.is(':'));
-        if lone_colon || t.is('=') {
-            end = n;
-            break;
-        }
-    }
-    let span = &tokens[.. end];
-    let named = span.len() > 1 && span.last().is_some_and(|t| t.ident().is_some());
-    render(if named { &span[.. span.len() - 1] } else { span })
-}
-
-/// Tokens as text: words apart by a space, punctuation against what it follows.
-fn render(tokens: &[Token]) -> String {
-    let mut out = String::new();
-    let mut word_before = false;
-    for t in tokens {
-        match &t.kind {
-            Kind::Ident(s) => {
-                if word_before {
-                    out.push(' ');
-                }
-                out.push_str(s);
-                word_before = true;
-            },
-            Kind::Str(s) => {
-                if word_before {
-                    out.push(' ');
-                }
-                out.push('"');
-                out.push_str(s);
-                out.push('"');
-                word_before = true;
-            },
-            Kind::Number(s) => {
-                if word_before {
-                    out.push(' ');
-                }
-                out.push_str(s);
-                word_before = true;
-            },
-            Kind::Punct(c) => {
-                out.push(*c);
-                word_before = false;
-            },
-        }
-    }
-    out
 }
