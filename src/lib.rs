@@ -22,6 +22,7 @@
 
 mod const_generic_parameters;
 mod dep_surface;
+mod manifest_toml;
 mod paths;
 mod repo_files;
 mod string_literal;
@@ -52,6 +53,7 @@ pub mod lints {
     pub mod no_bare_static_str;
     pub mod no_bare_string;
     pub mod no_dyn_dispatch;
+    pub mod a_git_dependency_is_not_pinned;
     pub mod no_public_raw_field;
     pub mod no_runtime_registration;
     pub mod no_runtime_spawn;
@@ -80,6 +82,7 @@ use lints::no_bare_result::NoBareResult;
 use lints::no_bare_static_str::NoBareStaticStr;
 use lints::no_bare_string::NoBareString;
 use lints::no_dyn_dispatch::NoDynDispatch;
+use lints::a_git_dependency_is_not_pinned::AGitDependencyIsNotPinned;
 use lints::no_public_raw_field::NoPublicRawField;
 use lints::no_runtime_registration::NoRuntimeRegistration;
 use lints::no_runtime_spawn::NoRuntimeSpawn;
@@ -124,6 +127,7 @@ mockspace_lint_rules::lint_pack! {
     ],
     repo_lints: [
         CatalogueIgnore::default(),
+        AGitDependencyIsNotPinned::default(),
         NoSourceIncludeInTest::default(),
         NoSupersededCitation::default(),
         OneRelationField::default(),
