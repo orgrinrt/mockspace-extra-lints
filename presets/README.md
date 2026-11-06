@@ -1,6 +1,6 @@
 # Presets
 
-TOML overlays naming one policy for a lint: its tokens, severities and path scopes. Nothing loads them yet. The mockspace that consumers run reads no `presets/` directory, and the loader for external hosts (`mock://ext/`) is not shipped, so a consumer configures a lint under `[lints.<name>]` in its own `mockspace.toml`. The only reader is a test that takes the glob out of `attribution-claude.toml` and `attribution-copilot.toml`.
+TOML overlays naming one policy for a lint: its tokens, severities and path scopes. Nothing loads them yet. The mockspace that consumers run reads no `presets/` directory, and the loader for external hosts (`mock://ext/`) is not shipped, so a consumer configures a lint under `[lints.<name>]` in its own `mockspace.toml`. Two tests read the directory: one takes the glob out of `attribution-claude.toml` and `attribution-copilot.toml`, the other (ignored) checks preset keys against lint keys.
 
 ## What a preset file holds
 
