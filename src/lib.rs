@@ -130,7 +130,7 @@ mockspace_lint_rules::lint_pack! {
     repo_lints: [
         ALintAdmitsNoCrateList,
         CatalogueIgnore::default(),
-        NoFirstPartyRevPin,
+        NoFirstPartyRevPin::default(),
         NoSourceIncludeInTest::default(),
         NoSupersededCitation::default(),
         OneRelationField::default(),
