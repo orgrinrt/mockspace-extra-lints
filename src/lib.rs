@@ -65,6 +65,7 @@ pub mod lints {
     pub mod semantic_alias_nudge;
     pub mod slang_file_size;
     pub mod slang_no_duplicate_fn;
+    pub mod slang_single_source;
     pub mod slang_writing_style;
     pub mod strategy_marker_required;
     pub mod trait_first_signatures;
@@ -96,6 +97,7 @@ use lints::re_export_foreign_names::ReExportForeignNames;
 use lints::semantic_alias_nudge::SemanticAliasNudge;
 use lints::slang_file_size::SlangFileSize;
 use lints::slang_no_duplicate_fn::SlangNoDuplicateFn;
+use lints::slang_single_source::SlangSingleSource;
 use lints::slang_writing_style::SlangWritingStyle;
 use lints::strategy_marker_required::StrategyMarkerRequired;
 use lints::trait_first_signatures::TraitFirstSignatures;
@@ -136,6 +138,7 @@ mockspace_lint_rules::lint_pack! {
         OneRelationField::default(),
         SlangFileSize::default(),
         SlangNoDuplicateFn::default(),
+        SlangSingleSource::default(),
         SlangWritingStyle::default(),
     ],
     // Both carry configuration, so they are constructed rather than named as
