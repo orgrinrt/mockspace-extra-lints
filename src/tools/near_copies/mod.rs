@@ -40,6 +40,8 @@ mod scope;
 mod tests;
 #[cfg(test)]
 mod tests_git;
+#[cfg(test)]
+mod tests_slang;
 
 use std::collections::BTreeSet;
 
@@ -146,7 +148,13 @@ impl Tool for NearCopies {
             );
         }
         let all = scope::sources(ctx.src_dirs, ctx.all_crates);
-        let types = scope::declarations(&all);
+        let mut types = scope::declarations(&all);
+        // The shaders of the crates declare types of the same kinds, compared in the same pass.
+        types.extend(crate::slang::declared_types(&crate::slang::sources(
+            ctx.repo_root,
+            ctx.mock_dir,
+            ctx.all_crates,
+        )));
         let (scoped, vs): (BTreeSet<String>, Option<BTreeSet<String>>) = if args.crates.is_empty() {
             let touched = match scope::touched(ctx.repo_root, ctx.all_crates, &args.against) {
                 Ok(touched) => touched,

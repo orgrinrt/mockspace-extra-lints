@@ -360,15 +360,28 @@ fn comment_corpus(source: &str) -> (String, Vec<usize>) {
 /// be comments.
 fn check_rust_comments(rel_path: &str, source: &str, crate_name: &str, out: &mut Vec<LintError>) {
     let (corpus, map) = comment_corpus(source);
+    check_comment_corpus(rel_path, &corpus, &map, source.lines().count(), crate_name, out);
+}
+
+/// Check a comment corpus read from a source of any language, `map` giving the source line each
+/// corpus line came from and `source_lines` the length of the source it was read from.
+pub(crate) fn check_comment_corpus(
+    rel_path: &str,
+    corpus: &str,
+    map: &[usize],
+    source_lines: usize,
+    crate_name: &str,
+    out: &mut Vec<LintError>,
+) {
     if corpus.trim().is_empty() {
         return;
     }
     let mut found = Vec::new();
     check_text(
-        &corpus,
+        corpus,
         crate_name,
         Body::Comments {
-            lines: source.lines().count(),
+            lines: source_lines,
         },
         &mut found,
     );
