@@ -309,7 +309,7 @@ fn check_text(content: &str, crate_name: &str, body: Body, out: &mut Vec<LintErr
             crate_name.to_string(),
             1,
             "writing-style",
-            format!("{label_colon_count} `- <label>: <text>` bullets; use a table or prose"),
+            format!("{label_colon_count} `- <label>: <text>` bullets; use a glossary table or prose"),
             Severity::PUSH_GATE,
         ));
     }
