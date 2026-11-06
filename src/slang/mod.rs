@@ -17,6 +17,7 @@
 
 mod declared;
 mod files;
+mod graph;
 mod items;
 mod lex;
 mod members;
@@ -26,6 +27,7 @@ mod tests;
 
 pub use declared::declared_types;
 pub use files::{SlangSource, sources};
+pub use graph::{Graph, Module, Resolution};
 pub use items::{Import, ImportForm, Item, ItemKind, Member, Visibility};
 pub use lex::{Comment, Directive};
 
