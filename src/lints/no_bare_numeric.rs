@@ -92,11 +92,7 @@ impl CrateLint for NoBareNumeric {
                             &rel_path,
                             idx + 1,
                             "no-bare-numeric",
-                            format!(
-                                "bare `{prim}` in {} line {}. arvo is where every numeric here comes from. Wrap in an arvo type, or a domain alias grounded on one; bare primitives do not exist in this stack",
-                                rel_path,
-                                idx + 1,
-                            ),
+                            format!("bare `{prim}`; wrap in an arvo type or a domain alias grounded on one"),
                         ));
                         break;
                     }

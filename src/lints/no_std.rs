@@ -45,7 +45,7 @@ impl CrateLint for NoStd {
                 ctx,
                 1,
                 "no-std",
-                "crate root is missing `#![no_std]`. Every stack crate must be no_std unless explicitly allowed".to_string(),
+                "crate root lacks `#![no_std]`".to_string(),
             ));
         }
 
@@ -66,7 +66,7 @@ impl CrateLint for NoStd {
                     ctx,
                     idx + 1,
                     "no-std",
-                    "`std::*` reference found; use `core::*` equivalents or the stack's own primitives".to_string(),
+                    "`std::*` used; use `core::*` or the stack primitives".to_string(),
                 ));
             }
         }

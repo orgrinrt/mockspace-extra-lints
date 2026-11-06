@@ -67,7 +67,7 @@ fn check_fn(node: Node, ctx: &LintContext, out: &mut Vec<LintError>) {
                     ctx,
                     line,
                     "trait-first-signatures",
-                    format!("`{name}` returns a concrete `{ty}...>`. Take a sink or return `impl Iterator`"),
+                    format!("`{name}` returns concrete `{ty}...>`; take a sink or return `impl Iterator`"),
                 ));
                 return;
             }
@@ -84,7 +84,7 @@ fn check_fn(node: Node, ctx: &LintContext, out: &mut Vec<LintError>) {
                     ctx,
                     line,
                     "trait-first-signatures",
-                    format!("`{name}` parameter uses concrete `{ty}...>`; take `impl IntoIterator<Item = _>` or a trait bound"),
+                    format!("`{name}` parameter is concrete `{ty}...>`; take `impl IntoIterator<Item = _>` or a trait bound"),
                 ));
                 return;
             }

@@ -38,7 +38,7 @@ impl CrateLint for NoDynDispatch {
                     ctx,
                     idx + 1,
                     "no-dyn-dispatch",
-                    "`dyn Trait` forbidden; use generics or concrete impls (monomorphisation is free)".to_string(),
+                    "`dyn Trait` forbidden; use generics or concrete impls".to_string(),
                 ));
             }
         }

@@ -129,16 +129,16 @@ impl RepoLint for CatalogueIgnore {
             let (kind, message) = match &ignore.reason {
                 Reason::Bare => (
                     BARE,
-                    format!("`#[ignore]` carries no reason; write `#[ignore = \"{PREFIX}<the gap>{TRACKED}#<id>\"]`"),
+                    format!("`#[ignore]` has no reason; write `#[ignore = \"{PREFIX}<the gap>{TRACKED}#<id>\"]`"),
                 ),
                 Reason::Opaque => (
                     MALFORMED,
-                    "the reason of `#[ignore]` is not a string literal, so it cannot be read".to_string(),
+                    "`#[ignore]` reason is not a string literal".to_string(),
                 ),
                 Reason::Text(text) => match ids(text) {
                     Err(why) => (
                         MALFORMED,
-                        format!("the reason \"{text}\" is not `{PREFIX}<the gap>{TRACKED}#<id>`: {why}"),
+                        format!("reason \"{text}\" is not `{PREFIX}<the gap>{TRACKED}#<id>`: {why}"),
                     ),
                     Ok(ids) => {
                         let lost: Vec<_> = ids.iter().filter(|i| !known.contains(*i)).collect();
@@ -148,7 +148,7 @@ impl RepoLint for CatalogueIgnore {
                         (
                             UNRESOLVED,
                             format!(
-                                "{} to no row of the ledger or the registry; track the gap in a row that exists",
+                                "{} to no row of the ledger or registry; track the gap in an existing row",
                                 lost.iter().map(|i| format!("`#{i}` resolves")).collect::<Vec<_>>().join(", ")
                             ),
                         )

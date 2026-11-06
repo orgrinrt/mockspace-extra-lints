@@ -218,7 +218,7 @@ fn report_if_forbidden(
                 line,
                 "no-public-raw-field",
                 format!(
-                    "field `{field_name}: {type_text}` in {rel_path} uses raw `{forbidden}`. Wrap in a domain newtype or arvo primitive. Bare primitives do not exist in this stack (pub or private field, no exception)"
+                    "field `{field_name}: {type_text}` uses raw `{forbidden}`; wrap in a domain newtype or arvo type"
                 ),
             ));
             return;

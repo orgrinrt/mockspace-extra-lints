@@ -103,8 +103,7 @@ fn check_fn(node: Node, ctx: &LintContext, out: &mut Vec<LintError>) {
                 line,
                 "semantic-alias-nudge",
                 format!(
-                    "`{name}` exposes `{prim}` in its signature, which states a width rather than \
-                     what the value is. An alias naming the domain reads better at a public position."
+                    "`{name}` exposes `{prim}` in its signature; name the domain with an alias"
                 ),
             ));
             return;

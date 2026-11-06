@@ -44,10 +44,9 @@
 //!
 //! # Patterns are configuration
 //!
-//! The built-in pattern sets are defaults loaded from configuration, not
-//! hardcoded rules. A project adds its own via `extra_patterns`, and the shipped
-//! `attribution-claude` / `attribution-copilot` presets are just named bundles it
-//! can import and then extend.
+//! The built-in pattern sets are defaults. A project adds its own via
+//! `extra_patterns`. The `attribution-claude` and `attribution-copilot` presets
+//! in `presets/` show the keys for each tool; nothing loads them yet.
 
 use std::collections::HashMap;
 
@@ -200,7 +199,7 @@ impl MessageLint for MessageAttribution {
                         n,
                         "advert",
                         &format!(
-                            "tool-advertising trailer, permitted by no configuration here: {}",
+                            "tool advert trailer not permitted: {}",
                             line.trim()
                         ),
                     ));
@@ -222,13 +221,13 @@ impl MessageLint for MessageAttribution {
                     "byline",
                     &if permitted.is_empty() {
                         format!(
-                            "an agent byline is permitted in no form under mode `{}`: {}",
+                            "agent byline not permitted under mode `{}`: {}",
                             ctx.mode.as_token(),
                             value.trim()
                         )
                     } else {
                         format!(
-                            "the byline does not match the `{}` pattern `{permitted}`: {}",
+                            "byline does not match the `{}` pattern `{permitted}`: {}",
                             ctx.mode.as_token(),
                             value.trim()
                         )
@@ -253,7 +252,7 @@ impl MessageLint for MessageAttribution {
                 1,
                 "missing-byline",
                 &format!(
-                    "headless work requires a byline matching `{}`, and none is present",
+                    "headless work needs a byline matching `{}`",
                     self.autonomous_glob
                 ),
             ));
@@ -296,10 +295,10 @@ impl MessageAttribution {
                 continue;
             }
             let why = if permitted.is_empty() {
-                format!("permitted in no form under mode `{}`", ctx.mode.as_token())
+                format!("not permitted under mode `{}`", ctx.mode.as_token())
             } else {
                 format!(
-                    "it does not match the `{}` pattern `{permitted}`",
+                    "does not match the `{}` pattern `{permitted}`",
                     ctx.mode.as_token()
                 )
             };
@@ -308,23 +307,17 @@ impl MessageAttribution {
             let advice = match (ctx.mode, permitted.is_empty()) {
                 (AgentMode::Assistant, _) => {
                     format!(
-                        "A commit made with a human in the loop is the human's: set `user.name` \
-                         and `user.email` to them, then remake every commit in the range with \
-                         `{remake}`, since `--reset-author` on its own repairs only the tip."
+                        "With a human in the loop, set `user.name` and `user.email` to the human, then run `{remake}` (`--reset-author` alone fixes only the tip)."
                     )
                 },
                 (AgentMode::Autonomous, true) => {
                     format!(
-                        "This mode permits no agent identity: set `user.name` and `user.email` to \
-                         a person, then remake every commit in the range with `{remake}`, since \
-                         `--reset-author` on its own repairs only the tip."
+                        "Set `user.name` and `user.email` to a person, then run `{remake}` (`--reset-author` alone fixes only the tip)."
                     )
                 },
                 (AgentMode::Autonomous, false) => {
                     format!(
-                        "Set `user.name` and `user.email` to an identity matching the pattern, \
-                         then remake every commit in the range with `{remake}`, since \
-                         `--reset-author` on its own repairs only the tip."
+                        "Set `user.name` and `user.email` to an identity matching the pattern, then run `{remake}` (`--reset-author` alone fixes only the tip)."
                     )
                 },
             };
