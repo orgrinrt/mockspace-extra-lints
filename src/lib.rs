@@ -1,4 +1,4 @@
-//! An opt-in mockspace lint pack, shared lints and presets a project imports
+//! An opt-in mockspace lint pack, shared lints a project opts into
 //! because it wants them rather than anything mockspace ships by default.
 //!
 //! Some of it is narrow, the bare-primitive family and the arvo and
@@ -62,6 +62,7 @@ pub mod lints {
     pub mod no_std;
     pub mod no_superseded_citation;
     pub mod no_vec_in_trait_sig;
+    pub mod one_relation_field;
     pub mod re_export_foreign_names;
     pub mod semantic_alias_nudge;
     pub mod strategy_marker_required;
@@ -91,6 +92,7 @@ use lints::no_source_include_in_test::NoSourceIncludeInTest;
 use lints::no_std::NoStd;
 use lints::no_superseded_citation::NoSupersededCitation;
 use lints::no_vec_in_trait_sig::NoVecInTraitSig;
+use lints::one_relation_field::OneRelationField;
 use lints::re_export_foreign_names::ReExportForeignNames;
 use lints::semantic_alias_nudge::SemanticAliasNudge;
 use lints::strategy_marker_required::StrategyMarkerRequired;
@@ -98,6 +100,7 @@ use lints::trait_first_signatures::TraitFirstSignatures;
 use lints::writing_style::WritingStyle;
 
 use crate::tools::coverage::Coverage;
+use crate::tools::near_copies::NearCopies;
 use crate::tools::rulings_with_no_verbatim::RulingsWithNoVerbatim;
 
 mockspace_lint_rules::lint_pack! {
@@ -130,6 +133,7 @@ mockspace_lint_rules::lint_pack! {
         NoFirstPartyRevPin,
         NoSourceIncludeInTest::default(),
         NoSupersededCitation::default(),
+        OneRelationField::default(),
     ],
     // Both carry configuration, so they are constructed rather than named as
     // unit structs. The macro takes expressions for exactly this case.
@@ -144,6 +148,7 @@ mockspace_lint_rules::lint_pack! {
     // belong here rather than in one repository.
     tools: [
         Coverage,
+        NearCopies,
         RulingsWithNoVerbatim,
     ],
 }

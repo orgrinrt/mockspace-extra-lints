@@ -60,8 +60,13 @@ pub const NAME: &str = "re-export-foreign-names";
 /// crate that says a count would be the same name reachable from twenty
 /// places. The workspace's `no-alloc-no-std-framing` rule states it: arvo,
 /// hilavitkutin and notko are the explicit replacement for `std` and `alloc`.
+/// `applets` is the interface framework a console is declared over: its
+/// places, commands and surfaces are written in the framework's types, and a
+/// crate re-exporting another crate is forbidden by the workspace, so the
+/// framework's family is read the same way.
+///
 /// Matched by root and by the root's family, so `arvo_bits` is `arvo`'s.
-pub const FOUNDATION: &[&str] = &["notko", "arvo", "hilavitkutin"];
+pub const FOUNDATION: &[&str] = &["notko", "arvo", "hilavitkutin", "applets"];
 
 pub struct ReExportForeignNames;
 
@@ -263,9 +268,7 @@ fn own_signatures(
                     line,
                     NAME,
                     format!(
-                        "`{original}` from `{root}` is in the public signature of `{label}` and \
-                         is not re-exported; a consumer cannot name it without depending on \
-                         `{root}`, so add `pub use {root}::...::{original}` here, under any name"
+                        "`{original}` from `{root}` is in the public signature of `{label}` but not re-exported; add `pub use {root}::...::{original}` under any name"
                     ),
                 ));
             }
@@ -463,10 +466,7 @@ fn carried_surfaces(
                 *line,
                 NAME,
                 format!(
-                    "`{item}` is re-exported from `{root}` and its public surface names \
-                     `{}` through {}, which is not re-exported; a consumer holding a `{item}` \
-                     cannot name it without depending on `{root}`, so add `pub use \
-                     {root}::...::{}` beside `{item}`, under any name",
+                    "`{item}` re-exported from `{root}` exposes `{}` through {}, which is not re-exported; add `pub use {root}::...::{}` beside it under any name",
                     exposure.name, exposure.through, exposure.name
                 ),
             ));

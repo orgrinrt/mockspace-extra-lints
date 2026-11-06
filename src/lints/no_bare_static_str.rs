@@ -130,7 +130,7 @@ fn walk(node: Node, source: &str, rel_path: &str, out: &mut Vec<LintError>, ctx:
                                 line,
                                 "no-bare-static-str",
                                 format!(
-                                    "bare `{keyword} {name}: &str` in {rel_path} line {line}. Gate behind `#[cfg(debug_assertions)]` (pre-hilavitkutin-str crates) or use `hilavitkutin_str::Str::const!()` interning (post-hilavitkutin-str crates). Static &str does not exist in this stack outside debug builds"
+                                    "bare `{keyword} {name}: &str`; use `hilavitkutin_str::Str::const!()`, or gate it behind `#[cfg(debug_assertions)]` in crates without hilavitkutin-str"
                                 ),
                             ));
                         }

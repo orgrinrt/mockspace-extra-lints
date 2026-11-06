@@ -72,11 +72,7 @@ impl CrateLint for NoBareResult {
                         &rel_path,
                         idx + 1,
                         "no-bare-result",
-                        format!(
-                            "bare `Result` in {} line {}. Use notko::Outcome<T, E> (cold) or notko::Just<T> (hot). Result does not exist in this stack",
-                            rel_path,
-                            idx + 1,
-                        ),
+                        "bare `Result`; use `notko::Outcome<T, E>` (cold) or `notko::Just<T>` (hot)".to_string(),
                     ));
                 }
             }

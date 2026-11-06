@@ -81,7 +81,7 @@ impl CrateLint for NoAlloc {
                         ctx,
                         lineno,
                         "no-alloc",
-                        format!("`{path}` is a heap allocation; the stack is no_alloc. Use arvo/hilavitkutin storage primitives"),
+                        format!("`{path}` is a heap allocation; use arvo/hilavitkutin storage primitives"),
                     ));
                     reported = true;
                     break;
@@ -96,7 +96,7 @@ impl CrateLint for NoAlloc {
                         ctx,
                         lineno,
                         "no-alloc",
-                        format!("`{ident}` is a heap container; use Seq<T, N: Cap> / Map<K, V, N: Cap> / &[T] / impl IntoIterator"),
+                        format!("`{ident}` is a heap container; use `Seq<T, N: Cap>`, `Map<K, V, N: Cap>`, `&[T]` or `impl IntoIterator`"),
                     ));
                     break;
                 }

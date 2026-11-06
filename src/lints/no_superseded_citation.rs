@@ -180,7 +180,7 @@ fn unconfigured(reg: &RegistryView) -> Vec<LintError> {
         1,
         NAME,
         format!(
-            "the registry has rows but neither `{FIELD_KEY}` nor `{SUPERSEDES_KEY}` is named under `[lints.{NAME}]` in `mockspace.toml`, so no row is read as superseded"
+            "registry has rows but `{FIELD_KEY}` and `{SUPERSEDES_KEY}` are both unset under `[lints.{NAME}]`; no row is read as superseded"
         ),
     );
     e.path = Some("mockspace.toml".to_string());
