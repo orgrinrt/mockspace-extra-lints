@@ -60,8 +60,13 @@ pub const NAME: &str = "re-export-foreign-names";
 /// crate that says a count would be the same name reachable from twenty
 /// places. The workspace's `no-alloc-no-std-framing` rule states it: arvo,
 /// hilavitkutin and notko are the explicit replacement for `std` and `alloc`.
+/// `applets` is the interface framework a console is declared over: its
+/// places, commands and surfaces are written in the framework's types, and a
+/// crate re-exporting another crate is forbidden by the workspace, so the
+/// framework's family is read the same way.
+///
 /// Matched by root and by the root's family, so `arvo_bits` is `arvo`'s.
-pub const FOUNDATION: &[&str] = &["notko", "arvo", "hilavitkutin"];
+pub const FOUNDATION: &[&str] = &["notko", "arvo", "hilavitkutin", "applets"];
 
 pub struct ReExportForeignNames;
 
