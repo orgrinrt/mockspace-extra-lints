@@ -330,8 +330,8 @@ fn arvo_types_only_fires_in_module_file_not_lib_rs() {
     let hits = ArvoTypesOnly.check(&ctx);
     assert!(!hits.is_empty(), "drift in src/bits.rs must be flagged");
     assert!(
-        hits.iter().any(|e| e.message.contains("src/bits.rs")),
-        "error message should name the offending file"
+        hits.iter().any(|e| e.path.as_deref() == Some("src/bits.rs")),
+        "the finding should carry the offending file as its path"
     );
 }
 
@@ -344,8 +344,8 @@ fn no_bare_option_fires_in_module_file_not_lib_rs() {
     let hits = NoBareOption.check(&ctx);
     assert!(!hits.is_empty(), "Option in src/resolve.rs must be flagged");
     assert!(
-        hits.iter().any(|e| e.message.contains("src/resolve.rs")),
-        "error message should name the offending file"
+        hits.iter().any(|e| e.path.as_deref() == Some("src/resolve.rs")),
+        "the finding should carry the offending file as its path"
     );
 }
 
@@ -533,7 +533,7 @@ fn no_public_raw_field_fires_in_module_file_not_lib_rs() {
         "tuple-struct raw u32 in src/handle.rs must be flagged"
     );
     assert!(
-        hits.iter().any(|e| e.message.contains("src/handle.rs")),
-        "error message should name the offending file"
+        hits.iter().any(|e| e.path.as_deref() == Some("src/handle.rs")),
+        "the finding should carry the offending file as its path"
     );
 }
