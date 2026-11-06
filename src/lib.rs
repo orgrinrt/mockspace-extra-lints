@@ -22,6 +22,7 @@
 
 mod const_generic_parameters;
 mod dep_surface;
+mod manifest_toml;
 mod paths;
 mod repo_files;
 mod string_literal;
@@ -37,6 +38,7 @@ pub mod lints {
     //! with its sources, the workspace as a whole, or one commit message or
     //! forge body.
 
+    pub mod a_lint_admits_no_crate_list;
     pub(crate) mod agent_identity;
     pub mod arvo_types_only;
     pub(crate) mod authored_message;
@@ -52,6 +54,7 @@ pub mod lints {
     pub mod no_bare_static_str;
     pub mod no_bare_string;
     pub mod no_dyn_dispatch;
+    pub mod no_first_party_rev_pin;
     pub mod no_public_raw_field;
     pub mod no_runtime_registration;
     pub mod no_runtime_spawn;
@@ -67,6 +70,7 @@ pub mod lints {
     pub mod writing_style;
 }
 
+use lints::a_lint_admits_no_crate_list::ALintAdmitsNoCrateList;
 use lints::arvo_types_only::ArvoTypesOnly;
 use lints::catalogue_ignore::CatalogueIgnore;
 use lints::commit_style::CommitStyle;
@@ -80,6 +84,7 @@ use lints::no_bare_result::NoBareResult;
 use lints::no_bare_static_str::NoBareStaticStr;
 use lints::no_bare_string::NoBareString;
 use lints::no_dyn_dispatch::NoDynDispatch;
+use lints::no_first_party_rev_pin::NoFirstPartyRevPin;
 use lints::no_public_raw_field::NoPublicRawField;
 use lints::no_runtime_registration::NoRuntimeRegistration;
 use lints::no_runtime_spawn::NoRuntimeSpawn;
@@ -123,7 +128,9 @@ mockspace_lint_rules::lint_pack! {
         WritingStyle,
     ],
     repo_lints: [
+        ALintAdmitsNoCrateList,
         CatalogueIgnore::default(),
+        NoFirstPartyRevPin::default(),
         NoSourceIncludeInTest::default(),
         NoSupersededCitation::default(),
         OneRelationField::default(),
