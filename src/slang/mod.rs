@@ -15,6 +15,7 @@
 //! functions, types, constants and globals with their visibility, attributes, parameter types and
 //! return type, and every comment with its line. A body is skipped as balanced braces.
 
+mod declared;
 mod files;
 mod items;
 mod lex;
@@ -23,6 +24,7 @@ mod text;
 #[cfg(test)]
 mod tests;
 
+pub use declared::declared_types;
 pub use files::{SlangSource, sources};
 pub use items::{Import, ImportForm, Item, ItemKind, Member, Visibility};
 pub use lex::{Comment, Directive};
