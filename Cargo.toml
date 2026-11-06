@@ -28,6 +28,9 @@ tree-sitter-rust = "0.23.3"
 # manifest path there and nowhere else reliably.
 serde_json = "1"
 toml = "0.8"
+# Reads a manifest with the spans of its keys, which the findings' line numbers come from. The engine's
+# own `toml_edit` is the older 0.22, so the lockfile holds both.
+toml_edit = "0.25"
 
 [dev-dependencies]
 tempfile = "3"
