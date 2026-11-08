@@ -8,7 +8,7 @@
 
 use std::collections::HashMap;
 
-use mockspace_lint_rules::{Lint, LintError, RepoContext, RepoLint, Severity};
+use mockspace_lint_rules::{Lint, LintError, Reach, RepoContext, RepoLint, Severity};
 
 use crate::slang::{SlangSource, sources};
 
@@ -34,6 +34,10 @@ impl Default for SlangFileSize {
 impl Lint for SlangFileSize {
     fn name(&self) -> &'static str {
         NAME
+    }
+
+    fn reach(&self) -> Reach {
+        Reach::Paths(crate::slang::SLANG_READS)
     }
 
     fn default_severity(&self) -> Severity {
