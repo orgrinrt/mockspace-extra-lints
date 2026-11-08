@@ -14,7 +14,7 @@
 
 use std::collections::BTreeMap;
 
-use mockspace_lint_rules::{Lint, LintError, RepoContext, RepoLint, Severity};
+use mockspace_lint_rules::{Lint, LintError, Reach, RepoContext, RepoLint, Severity};
 
 use crate::slang::{ItemKind, SlangSource, sources};
 
@@ -28,6 +28,10 @@ pub struct SlangNoDuplicateFn;
 impl Lint for SlangNoDuplicateFn {
     fn name(&self) -> &'static str {
         NAME
+    }
+
+    fn reach(&self) -> Reach {
+        Reach::Paths(crate::slang::SLANG_READS)
     }
 
     fn default_severity(&self) -> Severity {
