@@ -27,7 +27,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::ops::Range;
 
-use mockspace_lint_rules::{glob_match_anchored, Lint, LintError, RepoContext, RepoLint, Severity};
+use mockspace_lint_rules::{glob_match_anchored, Lint, LintError, Reach, RepoContext, RepoLint, Severity};
 use toml_edit::{Item, TableLike};
 
 use crate::manifest_toml::{line_of, parse};
@@ -38,6 +38,9 @@ pub const NAME: &str = "a-git-dependency-is-not-pinned";
 
 /// The files whose tables are read.
 const MANIFESTS: &[&str] = &["Cargo.toml", "mockspace.toml"];
+
+/// What the lint reads, as the paths its reach declares: every manifest it walks.
+const READS: &[&str] = &["**/Cargo.toml", "**/mockspace.toml"];
 
 /// The keys that fix a dependency to one point in history, the first that is written the finding.
 const FIXING: &[&str] = &["rev", "tag"];
@@ -72,6 +75,10 @@ fn list(value: &str) -> Vec<String> {
 impl Lint for AGitDependencyIsNotPinned {
     fn name(&self) -> &'static str {
         NAME
+    }
+
+    fn reach(&self) -> Reach {
+        Reach::Paths(READS)
     }
 
     fn default_severity(&self) -> Severity {

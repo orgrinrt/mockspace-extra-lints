@@ -27,6 +27,10 @@ mod tests;
 
 pub use declared::declared_types;
 pub use files::{SlangSource, sources};
+
+/// The files a Slang lint reads, as the paths a lint declares in its reach: every shader, and the
+/// manifests that name the crates a shader is attributed to.
+pub const SLANG_READS: &[&str] = &["**/*.slang", "**/Cargo.toml"];
 pub use graph::{Graph, Module, Resolution};
 pub use items::{Import, ImportForm, Item, ItemKind, Member, Visibility};
 pub use lex::{Comment, Directive};

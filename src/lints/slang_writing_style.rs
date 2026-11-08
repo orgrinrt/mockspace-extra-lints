@@ -5,7 +5,7 @@
 //! hype, jargon, filler, greeting openers), over the comments the Slang reader found, so a `//` inside
 //! a string is not a comment and a block comment is read line by line.
 
-use mockspace_lint_rules::{Lint, LintError, RepoContext, RepoLint, Severity};
+use mockspace_lint_rules::{Lint, LintError, Reach, RepoContext, RepoLint, Severity};
 
 use super::writing_style::check_comment_corpus;
 use crate::slang::{SlangSource, sources};
@@ -20,6 +20,10 @@ pub struct SlangWritingStyle;
 impl Lint for SlangWritingStyle {
     fn name(&self) -> &'static str {
         NAME
+    }
+
+    fn reach(&self) -> Reach {
+        Reach::Paths(crate::slang::SLANG_READS)
     }
 
     fn default_severity(&self) -> Severity {

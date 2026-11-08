@@ -12,7 +12,7 @@
 
 use std::collections::BTreeMap;
 
-use mockspace_lint_rules::{DeclaredType, Lint, LintError, RepoContext, RepoLint, Severity};
+use mockspace_lint_rules::{DeclaredType, Lint, LintError, Reach, RepoContext, RepoLint, Severity};
 
 use crate::slang::{SlangSource, declared_types, sources};
 
@@ -26,6 +26,10 @@ pub struct SlangSingleSource;
 impl Lint for SlangSingleSource {
     fn name(&self) -> &'static str {
         NAME
+    }
+
+    fn reach(&self) -> Reach {
+        Reach::Paths(crate::slang::SLANG_READS)
     }
 
     fn default_severity(&self) -> Severity {
