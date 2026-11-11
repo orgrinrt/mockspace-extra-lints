@@ -476,6 +476,7 @@ impl<'a> Scan<'a> {
             let open = self.i;
             self.skip_group('{', '}');
             if let Some(f) = item.as_mut().filter(|f| f.kind == ItemKind::Func) {
+                // a body never closed runs to the end of the file, and the `- 1` that drops the `}` then drops its last token
                 let inner = &self.t[open + 1 .. self.i.saturating_sub(1).max(open + 1)];
                 f.body = render(inner);
                 f.body_tokens = inner.len();
