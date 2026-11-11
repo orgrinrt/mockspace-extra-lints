@@ -7,7 +7,7 @@
 //! - `signature`: the same name with the same parameter types and return type, in one crate or in
 //!   two. A different signature under a shared name is an overload and passes;
 //! - `body`: the same body under another name or signature, once comments and spacing are dropped,
-//!   for a body of at least `min_body_tokens` tokens (24 when not set), since a short body such as
+//!   for a body of at least `min_body_tokens` tokens (24 when not set, and never under one), since a short body such as
 //!   `return x;` is the same in many unrelated functions. A function already reported as
 //!   `signature` is not compared by its body, so one copy gets one finding.
 //!
@@ -163,7 +163,9 @@ fn judge(files: &[SlangSource], min_body_tokens: usize) -> Vec<LintError> {
     }
     let mut by_body: BTreeMap<&str, Vec<&Site>> = BTreeMap::new();
     for (site, _) in functions.iter().zip(&signature_copy).filter(|(_, copy)| !**copy) {
-        if site.item.body_tokens >= min_body_tokens {
+        // A declaration has no body to copy, and its empty body is the same as every other
+        // declaration's, so a threshold of zero still compares only bodies that hold a token.
+        if site.item.body_tokens >= min_body_tokens.max(1) {
             by_body.entry(site.item.body.as_str()).or_default().push(site);
         }
     }

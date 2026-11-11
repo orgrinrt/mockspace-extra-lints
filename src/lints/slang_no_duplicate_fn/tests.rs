@@ -219,3 +219,15 @@ fn an_overload_with_the_same_body_is_one_body_copy() {
     assert_eq!(found.len(), 1, "{found:?}");
     assert_eq!(found[0].finding_kind, Some(BODY));
 }
+
+#[test]
+fn a_threshold_of_zero_does_not_call_two_declarations_copies() {
+    let d = tempfile::tempdir().unwrap();
+    write(d.path(), ALPHA, "module light;\nfloat f(float d);\n");
+    write(d.path(), BETA, "module shade;\nfloat g(float3 d);\n");
+    assert!(run(&with("0"), d.path()).is_empty());
+    // the control: two real bodies are still compared at zero
+    write(d.path(), ALPHA, "module light;\nfloat f(float d) { return d * d; }\n");
+    write(d.path(), BETA, "module shade;\nfloat g(float3 d) { return d * d; }\n");
+    assert_eq!(run(&with("0"), d.path()).len(), 1);
+}
