@@ -485,3 +485,22 @@ fn canon_paths_are_read_the_way_the_engine_reads_them() {
         ["tenet/a.toml", "tenet/k/b.toml"],
     );
 }
+
+#[test]
+fn a_citation_in_a_shader_carries_the_slang_kind_and_one_elsewhere_carries_none() {
+    let d = dir("slang-kind");
+    write(d.path(), "mock/crates/alpha/shaders/pass.slang", "// after `old`\nvoid f() {}\n");
+    write(d.path(), "mock/crates/alpha/src/lib.rs", "//! After old-rule.\n");
+    let found = run(d.path(), &[]);
+    assert_eq!(found.len(), 2, "{found:?}");
+    let kind_of = |suffix: &str| {
+        found
+            .iter()
+            .find(|e| e.path.as_deref().is_some_and(|p| p.ends_with(suffix)))
+            .map(|e| e.finding_kind)
+    };
+    assert_eq!(kind_of(".slang"), Some(Some(SLANG)));
+    // the control: a Rust source citing the same row is the plain kind, held to the lint's own severity
+    assert_eq!(kind_of(".rs"), Some(None));
+    assert!(NoSupersededCitation::default().finding_kinds().contains(&SLANG));
+}

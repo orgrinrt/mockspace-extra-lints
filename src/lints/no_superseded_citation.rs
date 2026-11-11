@@ -25,6 +25,10 @@
 //! There is no default: a project that has named neither gets one finding at `mockspace.toml`
 //! while the registry has rows, and a registry with no row carrying a named field declares nothing
 //! superseded.
+//!
+//! A citation in a `.slang` file carries the finding kind `slang`, so a project that lowers the lint
+//! while a redesign is under way can still keep its shaders at error:
+//! `[lints.no-superseded-citation.findings] slang = "error"`.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs;
@@ -35,6 +39,10 @@ use crate::repo_files::{paths, record_dirs};
 
 /// The lint's name, as a project's `[lints.*]` table spells it.
 pub const NAME: &str = "no-superseded-citation";
+
+/// The finding kind of a citation in a shader source (`.slang`), so a project can hold its shaders
+/// to a stricter severity than the rest under `[lints.no-superseded-citation.findings]`.
+pub const SLANG: &str = "slang";
 
 /// The key under `[lints.no-superseded-citation]` that names the field a registry row carries to say
 /// what replaced it.
@@ -73,6 +81,10 @@ impl Lint for NoSupersededCitation {
 
     fn default_severity(&self) -> Severity {
         Severity::HARD_ERROR
+    }
+
+    fn finding_kinds(&self) -> &[&str] {
+        &[SLANG]
     }
 
     fn config_keys(&self) -> &[&str] {
@@ -164,6 +176,9 @@ fn file_findings(
         };
         let mut e = LintError::error(crate_name.to_string(), line, NAME, message);
         e.path = Some(rel.to_string());
+        if rel.ends_with(".slang") {
+            e.finding_kind = Some(SLANG);
+        }
         out.push(e);
     }
     out
