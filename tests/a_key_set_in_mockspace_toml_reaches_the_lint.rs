@@ -40,6 +40,7 @@ fn found_with(toml: &str) -> (Vec<String>, bool) {
         invocation: None,
         canon_paths: &[],
         open_panels: &[],
+        ref_files: &mockspace_lint_rules::src_layout::NO_REF_FILES,
         registry: &registry,
         verdicts: None,
     };
