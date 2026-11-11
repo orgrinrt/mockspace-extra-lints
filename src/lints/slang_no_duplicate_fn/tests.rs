@@ -13,6 +13,10 @@ fn write(root: &Path, rel: &str, text: &str) {
 }
 
 fn check(root: &Path) -> Vec<LintError> {
+    run(&SlangNoDuplicateFn::default(), root)
+}
+
+fn run(lint: &SlangNoDuplicateFn, root: &Path) -> Vec<LintError> {
     let crates = BTreeSet::from(["alpha".to_string(), "beta".to_string()]);
     let reg = RegistryView::new(BTreeMap::new(), BTreeMap::new());
     let ctx = RepoContext {
@@ -27,7 +31,7 @@ fn check(root: &Path) -> Vec<LintError> {
         registry: &reg,
         verdicts: None,
     };
-    SlangNoDuplicateFn::default().check_repo(&ctx)
+    lint.check_repo(&ctx)
 }
 
 fn tree(files: &[(&str, &str)]) -> Vec<LintError> {
@@ -174,24 +178,44 @@ fn the_allow_marker_lets_a_body_copy_through() {
 
 #[test]
 fn the_shortest_body_compared_is_the_projects_to_set() {
+    // `return d * d;` is five tokens, so a threshold of five compares it and six does not
     let d = tempfile::tempdir().unwrap();
     write(d.path(), ALPHA, "module light;\npublic float falloff(float d) { return d * d; }\n");
     write(d.path(), BETA, "module shade;\nfloat glow(float d) { return d * d; }\n");
-    let crates = BTreeSet::from(["alpha".to_string(), "beta".to_string()]);
-    let reg = RegistryView::new(BTreeMap::new(), BTreeMap::new());
-    let ctx = RepoContext {
-        mock_dir: &d.path().join("mock"),
-        repo_root: d.path(),
-        all_crates: &crates,
-        src_dirs: &[],
-        invocation: None,
-        canon_paths: &[],
-        open_panels: &[],
-        ref_files: &mockspace_lint_rules::src_layout::NO_REF_FILES,
-        registry: &reg,
-        verdicts: None,
-    };
-    assert_eq!(with("4").check_repo(&ctx).len(), 1);
-    assert!(with("24").check_repo(&ctx).is_empty());
+    assert_eq!(run(&with("5"), d.path()).len(), 1);
+    assert!(run(&with("6"), d.path()).is_empty());
     assert!(SlangNoDuplicateFn::default().config_keys().contains(&MIN_BODY_TOKENS_KEY));
+}
+
+#[test]
+fn a_shortest_body_that_is_not_a_number_is_reported() {
+    let d = tempfile::tempdir().unwrap();
+    write(d.path(), ALPHA, &format!("module light;\npublic float falloff(float d) {LONG}\n"));
+    let found = run(&with("2x"), d.path());
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert!(found[0].message.contains("`2x`"), "{}", found[0].message);
+    // the control: a number is taken and the clean tree stays clean
+    assert!(run(&with("24"), d.path()).is_empty());
+}
+
+#[test]
+fn a_function_reported_as_a_signature_copy_is_not_also_a_body_copy() {
+    let found = tree(&[
+        (ALPHA, &format!("module light;\nfloat glow(float d) {LONG}\nfloat falloff(float3 d) {LONG}\n")),
+        (BETA, &format!("module shade;\nfloat falloff(float3 d) {LONG}\n")),
+    ]);
+    let mut kinds: Vec<(&str, Option<&str>)> =
+        found.iter().map(|e| (e.path.as_deref().unwrap(), e.finding_kind)).collect();
+    kinds.sort();
+    assert_eq!(kinds, vec![(ALPHA, Some(BODY)), (BETA, Some(SIGNATURE))], "{found:?}");
+}
+
+#[test]
+fn an_overload_with_the_same_body_is_one_body_copy() {
+    let found = tree(&[
+        (ALPHA, &format!("module light;\nfloat falloff(float d) {LONG}\n")),
+        (BETA, &format!("module shade;\nfloat falloff(float3 d) {LONG}\n")),
+    ]);
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert_eq!(found[0].finding_kind, Some(BODY));
 }

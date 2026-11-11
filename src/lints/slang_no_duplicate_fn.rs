@@ -8,8 +8,11 @@
 //!   two. A different signature under a shared name is an overload and passes;
 //! - `body`: the same body under another name or signature, once comments and spacing are dropped,
 //!   for a body of at least `min_body_tokens` tokens (24 when not set), since a short body such as
-//!   `return x;` is the same in many unrelated functions. A pair already reported as `signature` is
-//!   not reported again.
+//!   `return x;` is the same in many unrelated functions. A function already reported as
+//!   `signature` is not compared by its body, so one copy gets one finding.
+//!
+//! A `min_body_tokens` that is not a whole number is reported as a finding of its own, and the lint
+//! reads nothing until it is fixed.
 //!
 //! A similar body that is not the same is the near-copy tool's to report, not a gate's. Entry points
 //! are not counted, since every pass has a `main` of its own, and a file that is not shipped (a test
@@ -20,6 +23,7 @@ use std::collections::{BTreeMap, HashMap};
 
 use mockspace_lint_rules::{Lint, LintError, Reach, RepoContext, RepoLint, Severity};
 
+use crate::repo_files::WORKSPACE;
 use crate::slang::{Item, ItemKind, SlangSource, sources};
 
 /// The lint's name, as a project's `[lints.*]` table spells it.
@@ -40,12 +44,15 @@ pub const DEFAULT_MIN_BODY_TOKENS: usize = 24;
 /// The configured lint.
 pub struct SlangNoDuplicateFn {
     min_body_tokens: usize,
+    /// A `min_body_tokens` value that did not parse, reported in place of the check.
+    bad_min_body_tokens: Option<String>,
 }
 
 impl Default for SlangNoDuplicateFn {
     fn default() -> Self {
         Self {
             min_body_tokens: DEFAULT_MIN_BODY_TOKENS,
+            bad_min_body_tokens: None,
         }
     }
 }
@@ -72,14 +79,28 @@ impl Lint for SlangNoDuplicateFn {
     }
 
     fn configure(&mut self, params: &HashMap<String, String>) {
-        if let Some(n) = params.get(MIN_BODY_TOKENS_KEY).and_then(|v| v.trim().parse().ok()) {
-            self.min_body_tokens = n;
+        if let Some(v) = params.get(MIN_BODY_TOKENS_KEY) {
+            match v.trim().parse() {
+                Ok(n) => {
+                    self.min_body_tokens = n;
+                    self.bad_min_body_tokens = None;
+                }
+                Err(_) => self.bad_min_body_tokens = Some(v.clone()),
+            }
         }
     }
 }
 
 impl RepoLint for SlangNoDuplicateFn {
     fn check_repo(&self, ctx: &RepoContext) -> Vec<LintError> {
+        if let Some(v) = &self.bad_min_body_tokens {
+            return vec![LintError::error(
+                WORKSPACE.to_string(),
+                0,
+                NAME,
+                format!("`{MIN_BODY_TOKENS_KEY}` is `{v}`, which is not a whole number, so the lint reads nothing"),
+            )];
+        }
         let files = sources(ctx.repo_root, ctx.mock_dir, ctx.all_crates);
         let min = self.min_body_tokens.to_string();
         let mut parts: Vec<&[u8]> = vec![min.as_bytes()];
@@ -115,25 +136,23 @@ fn judge(files: &[SlangSource], min_body_tokens: usize) -> Vec<LintError> {
                 .map(move |item| Site { file, item })
         })
         .collect();
-    let mut by_signature: BTreeMap<(String, String), Vec<&Site>> = BTreeMap::new();
-    let mut by_body: BTreeMap<&str, Vec<&Site>> = BTreeMap::new();
-    for site in &functions {
-        by_signature
-            .entry((site.item.name.clone(), site.signature()))
-            .or_default()
-            .push(site);
-        if site.item.body_tokens >= min_body_tokens {
-            by_body.entry(site.item.body.as_str()).or_default().push(site);
-        }
+    let mut by_signature: BTreeMap<(String, String), Vec<usize>> = BTreeMap::new();
+    for (i, site) in functions.iter().enumerate() {
+        by_signature.entry((site.item.name.clone(), site.signature())).or_default().push(i);
     }
+    // a function past the first under its signature is reported as that, and only as that, so it
+    // takes no part in the body comparison
+    let mut signature_copy = vec![false; functions.len()];
     let mut out = Vec::new();
     for ((name, signature), sites) in &by_signature {
-        let Some((first, rest)) = sites.split_first() else {
+        let Some((&first, rest)) = sites.split_first() else {
             continue;
         };
-        for dup in rest {
+        let first = &functions[first];
+        for &dup in rest {
+            signature_copy[dup] = true;
             out.extend(finding(
-                dup,
+                &functions[dup],
                 SIGNATURE,
                 format!(
                     "function `{name}{signature}` is also defined in `{}` line {}; keep one and import it",
@@ -142,12 +161,17 @@ fn judge(files: &[SlangSource], min_body_tokens: usize) -> Vec<LintError> {
             ));
         }
     }
+    let mut by_body: BTreeMap<&str, Vec<&Site>> = BTreeMap::new();
+    for (site, _) in functions.iter().zip(&signature_copy).filter(|(_, copy)| !**copy) {
+        if site.item.body_tokens >= min_body_tokens {
+            by_body.entry(site.item.body.as_str()).or_default().push(site);
+        }
+    }
     for sites in by_body.values() {
         let Some((first, rest)) = sites.split_first() else {
             continue;
         };
-        let same_signature = |s: &Site| s.item.name == first.item.name && s.signature() == first.signature();
-        for dup in rest.iter().filter(|s| !same_signature(s)) {
+        for dup in rest {
             out.extend(finding(
                 dup,
                 BODY,
