@@ -19,6 +19,7 @@ fn run_in_order(reg: &RegistryView, root: &Path, crates: &[&str], store: Option<
         invocation: None,
         canon_paths: &[],
         open_panels: &[],
+        ref_files: &mockspace_lint_rules::src_layout::NO_REF_FILES,
         registry: reg,
         verdicts: store.map(|s| s as &dyn VerdictCache),
     };
@@ -137,6 +138,7 @@ fn saved_one_by_one(reg: &RegistryView, root: &Path, rels: &[&str], store: &Kept
         invocation: None,
         canon_paths: &[],
         open_panels: &[],
+        ref_files: &mockspace_lint_rules::src_layout::NO_REF_FILES,
         registry: reg,
         verdicts: Some(store as &dyn VerdictCache),
     };
