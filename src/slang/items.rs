@@ -62,6 +62,11 @@ pub struct Item {
     pub members:    Vec<Member>,
     /// For a type, the generic parameters as written between its angle brackets, empty without.
     pub generics:   String,
+    /// For a function with a body, the body between its braces rendered with comments and spacing
+    /// dropped, so two copies that differ only in layout read the same. Empty for anything else.
+    pub body:       String,
+    /// How many tokens that body holds.
+    pub body_tokens: usize,
 }
 
 /// One member of a type, as `name` over `body`: a field's type, a variant's value, a method's
@@ -263,6 +268,8 @@ impl<'a> Scan<'a> {
             ret: String::new(),
             members: Vec::new(),
             generics: String::new(),
+            body: String::new(),
+            body_tokens: 0,
         };
         match word {
             "module" | "implementing" | "import" | "__include" => self.reference(word, out),
@@ -459,15 +466,24 @@ impl<'a> Scan<'a> {
                     ret: String::new(),
                     members: Vec::new(),
                     generics: String::new(),
+                    body: String::new(),
+                    body_tokens: 0,
                 })
             },
         };
-        out.items.extend(item);
+        let mut item = item;
         if self.at('{') {
+            let open = self.i;
             self.skip_group('{', '}');
+            if let Some(f) = item.as_mut().filter(|f| f.kind == ItemKind::Func) {
+                let inner = &self.t[open + 1 .. self.i.saturating_sub(1).max(open + 1)];
+                f.body = render(inner);
+                f.body_tokens = inner.len();
+            }
         } else if self.at(';') {
             self.i += 1;
         }
+        out.items.extend(item);
     }
 
     pub(super) fn function(
@@ -508,6 +524,8 @@ impl<'a> Scan<'a> {
             ret,
             members: Vec::new(),
             generics: String::new(),
+            body: String::new(),
+            body_tokens: 0,
         })
     }
 

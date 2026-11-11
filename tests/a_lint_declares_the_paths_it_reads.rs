@@ -17,7 +17,7 @@ fn runs(lint: &dyn Lint, changed: &[&str]) -> bool {
 #[test]
 fn a_slang_lint_runs_for_a_shader_and_not_for_a_rust_file() {
     let file_size = SlangFileSize::default();
-    let lints: [&dyn Lint; 4] = [&file_size, &SlangSingleSource, &SlangNoDuplicateFn, &SlangWritingStyle];
+    let lints: [&dyn Lint; 4] = [&file_size, &SlangSingleSource, &SlangNoDuplicateFn::default(), &SlangWritingStyle];
     for lint in lints {
         assert!(matches!(lint.reach(), Reach::Paths(_)), "{} declares its reads", lint.name());
         assert!(runs(lint, &["mock/crates/kaski-sky/shaders/sky.slang"]), "{}", lint.name());
@@ -72,7 +72,7 @@ mod held_to_the_declaration {
     #[test]
     fn the_duplicate_fn_lint() {
         held(
-            &SlangNoDuplicateFn,
+            &SlangNoDuplicateFn::default(),
             &[("mock/crates/a/shaders/x.slang", FUNC), ("mock/crates/b/shaders/y.slang", FUNC), OUTSIDE],
         );
     }
