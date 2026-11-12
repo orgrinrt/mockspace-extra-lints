@@ -57,10 +57,7 @@ pub mod categories {
 /// forbidden tokens to bypass.
 #[must_use]
 pub fn crate_introduces_category(ctx: &LintContext, category: &str) -> bool {
-    ctx.primitive_introductions
-        .get(ctx.crate_name)
-        .map(|list| list.iter().any(|c| c == category))
-        .unwrap_or(false)
+    ctx.introduces(category)
 }
 
 /// Slice of source for a node.
@@ -104,7 +101,7 @@ pub fn line_lint_allowed(line: &str, rule_name: &str) -> bool {
 #[allow(dead_code)]
 pub fn is_lint_allowed(node: Node, ctx: &LintContext, rule_name: &str) -> bool {
     let row = node.start_position().row;
-    let line = ctx.source.lines().nth(row).unwrap_or("");
+    let line = ctx.source().lines().nth(row).unwrap_or("");
     line_lint_allowed(line, rule_name)
 }
 

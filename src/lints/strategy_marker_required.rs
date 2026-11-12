@@ -27,8 +27,8 @@ impl CrateLint for StrategyMarkerRequired {
             return Vec::new();
         }
         let mut out = Vec::new();
-        for_each_fn(ctx.tree.root_node(), |node| {
-            if !is_public(node, ctx.source) {
+        for_each_fn(ctx.tree().root_node(), |node| {
+            if !is_public(node, ctx.source()) {
                 return;
             }
             check_fn(node, ctx, &mut out);
@@ -40,7 +40,7 @@ impl CrateLint for StrategyMarkerRequired {
 fn check_fn(node: Node, ctx: &LintContext, out: &mut Vec<LintError>) {
     let line = node.start_position().row + 1;
     let src_line = ctx
-        .source
+        .source()
         .lines()
         .nth(node.start_position().row)
         .unwrap_or("");
@@ -50,11 +50,11 @@ fn check_fn(node: Node, ctx: &LintContext, out: &mut Vec<LintError>) {
 
     let mut sig = String::new();
     if let Some(params) = node.child_by_field_name("parameters") {
-        sig.push_str(txt(params, ctx.source));
+        sig.push_str(txt(params, ctx.source()));
     }
     if let Some(ret) = node.child_by_field_name("return_type") {
         sig.push(' ');
-        sig.push_str(txt(ret, ctx.source));
+        sig.push_str(txt(ret, ctx.source()));
     }
 
     for ty in &["UFixed", "IFixed"] {
@@ -64,7 +64,7 @@ fn check_fn(node: Node, ctx: &LintContext, out: &mut Vec<LintError>) {
             if params < 3 {
                 let name = node
                     .child_by_field_name("name")
-                    .map(|n| txt(n, ctx.source))
+                    .map(|n| txt(n, ctx.source()))
                     .unwrap_or("<unknown>");
                 out.push(err(
                     ctx,

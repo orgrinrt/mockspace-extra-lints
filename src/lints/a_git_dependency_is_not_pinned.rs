@@ -24,23 +24,19 @@
 //! the line of the `git` key. A lockfile is not read, since it records a commit by design.
 
 use std::collections::HashMap;
-use std::fs;
 use std::ops::Range;
 
-use mockspace_lint_rules::{glob_match_anchored, Lint, LintError, Reach, RepoContext, RepoLint, Severity};
+use mockspace_lint_rules::{glob_match_anchored, Lint, LintError, RepoContext, RepoLint, Severity};
 use toml_edit::{Item, TableLike};
 
 use crate::manifest_toml::{line_of, parse};
-use crate::repo_files::{WORKSPACE, paths};
+use crate::repo_scope::{WORKSPACE, paths};
 
 /// The lint's name, as a project's `[lints.*]` table spells it.
 pub const NAME: &str = "a-git-dependency-is-not-pinned";
 
 /// The files whose tables are read.
 const MANIFESTS: &[&str] = &["Cargo.toml", "mockspace.toml"];
-
-/// What the lint reads, as the paths its reach declares: every manifest it walks.
-const READS: &[&str] = &["**/Cargo.toml", "**/mockspace.toml"];
 
 /// The keys that fix a dependency to one point in history, the first that is written the finding.
 const FIXING: &[&str] = &["rev", "tag"];
@@ -75,10 +71,6 @@ fn list(value: &str) -> Vec<String> {
 impl Lint for AGitDependencyIsNotPinned {
     fn name(&self) -> &'static str {
         NAME
-    }
-
-    fn reach(&self) -> Reach {
-        Reach::Paths(READS)
     }
 
     fn default_severity(&self) -> Severity {
@@ -130,31 +122,17 @@ impl RepoLint for AGitDependencyIsNotPinned {
         if self.accounts.is_empty() {
             return Vec::new();
         }
-        let found = paths(ctx.repo_root, &[], |name, rel| {
+        let view = ctx.view();
+        let root = ctx.repo_root;
+        let found = paths(view, root, &[], |name, rel| {
             MANIFESTS.contains(&name) && !self.exempt.iter().any(|g| glob_match_anchored(g, rel))
         });
-        let files: Vec<(String, String)> = found
+        // Each manifest is judged on its own, through its own view, so one edited is the only one
+        // judged again; the three keys are part of what the lint is saved under.
+        view.each(&found, |v, rel| self.judge(rel, v.text(root.join(rel))))
             .into_iter()
-            .filter_map(|rel| {
-                fs::read_to_string(ctx.repo_root.join(&rel))
-                    .ok()
-                    .map(|t| (rel, t))
-            })
-            .collect();
-        // The verdict follows from the text of the manifests and the three keys, so it replays when
-        // none moved.
-        let config = format!(
-            "{:?}|{}|{:?}",
-            self.accounts,
-            self.branch.as_deref().unwrap_or(""),
-            self.exempt
-        );
-        let mut parts: Vec<&[u8]> = vec![config.as_bytes()];
-        for (rel, text) in &files {
-            parts.push(rel.as_bytes());
-            parts.push(text.as_bytes());
-        }
-        ctx.remembered(NAME, &parts, || self.judge(&files))
+            .flatten()
+            .collect()
     }
 }
 
@@ -174,37 +152,39 @@ struct Pin {
 }
 
 impl AGitDependencyIsNotPinned {
-    fn judge(&self, files: &[(String, String)]) -> Vec<LintError> {
+    /// The findings of one manifest, `None` where it could not be read.
+    fn judge(&self, rel: &str, text: Option<&str>) -> Vec<LintError> {
         let mut out = Vec::new();
-        for (rel, text) in files {
-            let Some(doc) = parse(text) else {
-                continue;
+        let Some(text) = text else {
+            return out;
+        };
+        let Some(doc) = parse(text) else {
+            return out;
+        };
+        let mut pins = Vec::new();
+        self.walk_table(doc.as_table(), &mut pins);
+        pins.sort_by_key(|pin| pin.span.as_ref().map(|s| s.start));
+        for pin in pins {
+            let message = match &pin.fault {
+                Fault::Fixed(key) => format!(
+                    "a dependency on `{}` names a fixed `{key}`; it tracks the head of a branch instead, and the lockfile records the commit",
+                    pin.url
+                ),
+                Fault::Branch(None) => format!(
+                    "a dependency on `{}` names no branch; it tracks `{}`",
+                    pin.url,
+                    self.branch.as_deref().unwrap_or("")
+                ),
+                Fault::Branch(Some(other)) => format!(
+                    "a dependency on `{}` tracks `{other}`; it tracks `{}`",
+                    pin.url,
+                    self.branch.as_deref().unwrap_or("")
+                ),
             };
-            let mut pins = Vec::new();
-            self.walk_table(doc.as_table(), &mut pins);
-            pins.sort_by_key(|pin| pin.span.as_ref().map(|s| s.start));
-            for pin in pins {
-                let message = match &pin.fault {
-                    Fault::Fixed(key) => format!(
-                        "a dependency on `{}` names a fixed `{key}`; it tracks the head of a branch instead, and the lockfile records the commit",
-                        pin.url
-                    ),
-                    Fault::Branch(None) => format!(
-                        "a dependency on `{}` names no branch; it tracks `{}`",
-                        pin.url,
-                        self.branch.as_deref().unwrap_or("")
-                    ),
-                    Fault::Branch(Some(other)) => format!(
-                        "a dependency on `{}` tracks `{other}`; it tracks `{}`",
-                        pin.url,
-                        self.branch.as_deref().unwrap_or("")
-                    ),
-                };
-                let mut e =
-                    LintError::error(WORKSPACE.to_string(), line_of(text, pin.span), NAME, message);
-                e.path = Some(rel.clone());
-                out.push(e);
-            }
+            let mut e =
+                LintError::error(WORKSPACE.to_string(), line_of(text, pin.span), NAME, message);
+            e.path = Some(rel.to_string());
+            out.push(e);
         }
         out
     }
@@ -288,13 +268,12 @@ impl AGitDependencyIsNotPinned {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::{BTreeMap, BTreeSet};
+    use std::collections::BTreeSet;
+    use std::fs;
     use std::path::Path;
 
-    use mockspace_lint_rules::RegistryView;
-
     use super::*;
-    use crate::test_support::Kept;
+    use crate::test_support::run_repo_lint;
 
     const OURS: &str = "github.com/acme,github.com/other";
 
@@ -314,31 +293,15 @@ mod tests {
         lint
     }
 
-    fn check_with(
-        lint: &AGitDependencyIsNotPinned,
-        root: &Path,
-        store: Option<&Kept>,
-    ) -> Vec<LintError> {
+    fn check_with(lint: &AGitDependencyIsNotPinned, root: &Path) -> Vec<LintError> {
         let crates = BTreeSet::from(["alpha".to_string()]);
-        let reg = RegistryView::new(BTreeMap::new(), BTreeMap::new());
-        let ctx = RepoContext {
-            mock_dir:    &root.join("mock"),
-            repo_root:   root,
-            all_crates:  &crates,
-            src_dirs:    &[],
-            invocation:  None,
-            canon_paths: &[],
-            open_panels: &[],
-            registry:    &reg,
-            verdicts:    store.map(|s| s as &dyn mockspace_lint_rules::verdict::VerdictCache),
-        };
-        lint.check_repo(&ctx)
+        run_repo_lint(lint, root, &crates)
     }
 
     fn at(lint: &AGitDependencyIsNotPinned, rel: &str, body: &str) -> Vec<LintError> {
         let d = tempfile::tempdir().unwrap();
         write(d.path(), rel, body);
-        check_with(lint, d.path(), None)
+        check_with(lint, d.path())
     }
 
     /// The pack configured the way a consumer of one body of work would, no branch.
@@ -364,9 +327,9 @@ mod tests {
         let body = "[dependencies]\na = { git = \"https://github.com/acme/a\", rev = \"1\" }\n";
         let d = tempfile::tempdir().unwrap();
         write(d.path(), "mock/crates/alpha/Cargo.toml", body);
-        let found = check_with(&AGitDependencyIsNotPinned::default(), d.path(), None);
+        let found = check_with(&AGitDependencyIsNotPinned::default(), d.path());
         assert!(found.is_empty(), "{found:?}");
-        let found = check_with(&lint(&[("branch", "main")]), d.path(), None);
+        let found = check_with(&lint(&[("branch", "main")]), d.path());
         assert!(found.is_empty(), "a branch alone names no repository: {found:?}");
         assert!(!manifest(body).is_empty(), "the control: configured, the same file is a finding");
     }
@@ -529,10 +492,10 @@ mod tests {
         write(d.path(), "mock/research/sketches/x/Cargo.toml", body);
         write(d.path(), "mock/design_rounds/old/Cargo.toml", body);
         let none = lint(&[("accounts", OURS)]);
-        assert_eq!(check_with(&none, d.path(), None).len(), 2, "no default exemption");
+        assert_eq!(check_with(&none, d.path()).len(), 2, "no default exemption");
         write(d.path(), "mock/crates/alpha/Cargo.toml", body);
         let some = lint(&[("accounts", OURS), ("exempt", "mock/research/**, mock/design_rounds/**")]);
-        let found = check_with(&some, d.path(), None);
+        let found = check_with(&some, d.path());
         // Mutation: any exempt config silences the whole repository.
         assert_eq!(
             found.iter().filter_map(|e| e.path.as_deref()).collect::<Vec<_>>(),
@@ -548,11 +511,11 @@ mod tests {
         let d = tempfile::tempdir().unwrap();
         write(d.path(), "mock/crates/alpha/Cargo.toml", body);
         let cross = lint(&[("accounts", OURS), ("exempt", "mock/*/Cargo.toml")]);
-        assert_eq!(check_with(&cross, d.path(), None).len(), 1, "`*` stops at a slash");
+        assert_eq!(check_with(&cross, d.path()).len(), 1, "`*` stops at a slash");
         let cased = lint(&[("accounts", OURS), ("exempt", "MOCK/**")]);
-        assert_eq!(check_with(&cased, d.path(), None).len(), 1, "the case is kept");
+        assert_eq!(check_with(&cased, d.path()).len(), 1, "the case is kept");
         let right = lint(&[("accounts", OURS), ("exempt", "mock/*/*/Cargo.toml")]);
-        assert!(check_with(&right, d.path(), None).is_empty(), "the control: the right glob exempts it");
+        assert!(check_with(&right, d.path()).is_empty(), "the control: the right glob exempts it");
     }
 
     #[test]
@@ -586,37 +549,6 @@ mod tests {
         let both = lint(&[("accounts", "github.com/acme,acme,/x")]);
         let d = tempfile::tempdir().unwrap();
         write(d.path(), "mock/crates/alpha/Cargo.toml", "[dependencies]\n");
-        assert_eq!(check_with(&both, d.path(), None).len(), 2, "each bad entry once");
-    }
-
-    #[test]
-    fn a_warm_run_replays_the_verdict_and_an_edit_or_a_config_change_is_judged_again() {
-        // Mutation: the verdict is saved without the text of the manifests, or without the config.
-        let d = tempfile::tempdir().unwrap();
-        let store = Kept::default();
-        let lint_a = lint(&[("accounts", OURS)]);
-        let pinned = "[dependencies]\na = { git = \"https://github.com/acme/a\", rev = \"1\" }\n";
-        write(d.path(), "mock/crates/alpha/Cargo.toml", pinned);
-        let cold = check_with(&lint_a, d.path(), Some(&store));
-        assert_eq!(cold.len(), 1, "{cold:?}");
-        assert_eq!((store.hits(NAME), store.misses(NAME)), (0, 1), "a cold run replays nothing");
-        store.clear_counts();
-        let warm = check_with(&lint_a, d.path(), Some(&store));
-        assert_eq!(lines(&warm), lines(&cold));
-        assert_eq!((store.hits(NAME), store.misses(NAME)), (1, 0), "a warm run is one replay");
-        store.clear_counts();
-        let other = lint(&[("accounts", "github.com/elsewhere")]);
-        let moved = check_with(&other, d.path(), Some(&store));
-        assert!(moved.is_empty(), "{moved:?}");
-        assert_eq!((store.hits(NAME), store.misses(NAME)), (0, 1), "another config is judged again");
-        store.clear_counts();
-        write(
-            d.path(),
-            "mock/crates/alpha/Cargo.toml",
-            "[dependencies]\na = { git = \"https://github.com/acme/a\", branch = \"dev\" }\n",
-        );
-        let edited = check_with(&lint_a, d.path(), Some(&store));
-        assert!(edited.is_empty(), "{edited:?}");
-        assert_eq!((store.hits(NAME), store.misses(NAME)), (0, 1), "an edited manifest is judged again");
+        assert_eq!(check_with(&both, d.path()).len(), 2, "each bad entry once");
     }
 }

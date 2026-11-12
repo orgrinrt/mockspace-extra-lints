@@ -10,9 +10,9 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
-use tree_sitter::Node;
+use mockspace_lint_rules::View;
+use tree_sitter::{Node, Tree};
 
 use crate::paths::{
     RESERVED_ROOTS,
@@ -20,7 +20,6 @@ use crate::paths::{
     for_each_kind,
     generic_names,
     is_plain_pub,
-    parse,
     type_names,
     under_cfg_test,
 };
@@ -43,27 +42,45 @@ pub struct Dependencies {
 /// credential helper on this machine blocks it indefinitely rather than
 /// failing. What comes back on failure is the tool's own stderr rather than
 /// nothing, so a lint reporting it says why.
-pub fn dependencies(workspace_root: &Path, crate_name: &str) -> Result<Dependencies, String> {
-    let manifest = manifest_above(workspace_root)?;
-    let output = Command::new("cargo")
-        .arg("metadata")
-        .arg("--format-version")
-        .arg("1")
-        .arg("--offline")
-        .arg("--manifest-path")
-        .arg(&manifest)
-        .output()
-        .map_err(|e| format!("cargo metadata could not run: {e}"))?;
-    if !output.status.success() {
+///
+/// The process is asked through the view, and its output is known by the
+/// workspace manifest, every `Cargo.toml` under the manifest's directory and
+/// the lock file beside it. A dependency changing underneath a path outside
+/// the repository is not one of those files and does not rerun the lint.
+pub fn dependencies(view: &View<'_>, workspace_root: &Path, crate_name: &str) -> Result<Dependencies, String> {
+    let manifest = manifest_above(view, workspace_root)?;
+    let base = manifest.parent().unwrap_or(workspace_root).to_path_buf();
+    let mut inputs: Vec<PathBuf> = view.walk(&base, |rel, _| skipped(rel));
+    inputs.retain(|p| p.file_name().and_then(|n| n.to_str()) == Some("Cargo.toml"));
+    inputs.push(base.join("Cargo.lock"));
+    let refs: Vec<&Path> = inputs.iter().map(PathBuf::as_path).collect();
+    let manifest_arg = manifest.to_string_lossy();
+    let output = view.run(
+        "cargo",
+        &["metadata", "--format-version", "1", "--offline", "--manifest-path", &manifest_arg],
+        workspace_root,
+        &refs,
+    );
+    if !output.started() {
+        return Err("cargo metadata could not run".to_string());
+    }
+    if !output.ok() {
         return Err(format!(
             "cargo metadata failed for {}: {}",
             manifest.display(),
-            String::from_utf8_lossy(&output.stderr).trim()
+            String::from_utf8_lossy(output.stderr()).trim()
         ));
     }
-    let json: serde_json::Value = serde_json::from_slice(&output.stdout)
+    let json: serde_json::Value = serde_json::from_slice(output.stdout())
         .map_err(|e| format!("cargo metadata produced something that is not json: {e}"))?;
     resolve(&json, crate_name)
+}
+
+/// Whether a walk leaves a path out: a hidden directory or a build directory.
+fn skipped(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|n| n.to_str())
+        .is_some_and(|n| n.starts_with('.') || n == "target")
 }
 
 /// The workspace manifest a mock dir's crates belong to: the mock dir's own
@@ -79,15 +96,15 @@ pub fn dependencies(workspace_root: &Path, crate_name: &str) -> Result<Dependenc
 ///
 /// No `Cargo.toml` in the mock dir or above it within the repository,
 /// naming where the search started.
-pub fn manifest_above(workspace_root: &Path) -> Result<PathBuf, String> {
+pub fn manifest_above(view: &View<'_>, workspace_root: &Path) -> Result<PathBuf, String> {
     let mut found = None;
     for dir in workspace_root.ancestors() {
         let manifest = dir.join("Cargo.toml");
-        if manifest.is_file() {
+        if view.is_file(&manifest) {
             found = Some(manifest);
             break;
         }
-        if dir.join(".git").exists() {
+        if view.exists(dir.join(".git")) {
             break;
         }
     }
@@ -151,20 +168,27 @@ fn resolve(json: &serde_json::Value, crate_name: &str) -> Result<Dependencies, S
 }
 
 /// A dependency's sources, read once.
-pub struct Sources {
-    pub files:    Vec<(PathBuf, String)>,
+pub struct Sources<'r> {
+    /// Each readable Rust file's text and its tree, in path order.
+    pub files:    Vec<(&'r str, &'r Tree)>,
     /// Every `pub` type, trait, enum and alias the crate declares, by name.
     pub declared: BTreeSet<String>,
 }
 
 /// Every Rust file under `dir/src`, with the crate's own public declarations
-/// indexed.
-pub fn sources(dir: &Path) -> Sources {
+/// indexed. The files are read and parsed through the view.
+pub fn sources<'r>(view: &View<'r>, dir: &Path) -> Sources<'r> {
     let mut files = Vec::new();
-    collect(&dir.join("src"), &mut files);
+    for path in view.walk(dir.join("src"), |_, _| false) {
+        if path.extension().and_then(|e| e.to_str()) != Some("rs") {
+            continue;
+        }
+        if let (Some(text), Some(tree)) = (view.text(&path), view.rust(&path)) {
+            files.push((text, tree));
+        }
+    }
     let mut declared = BTreeSet::new();
-    for (_, text) in &files {
-        let Some(tree) = parse(text) else { continue };
+    for (text, tree) in &files {
         for kind in ["struct_item", "enum_item", "trait_item", "type_item", "union_item"] {
             for_each_kind(tree.root_node(), kind, &mut |node| {
                 if is_plain_pub(node, text) {
@@ -178,21 +202,6 @@ pub fn sources(dir: &Path) -> Sources {
     Sources {
         files,
         declared,
-    }
-}
-
-fn collect(dir: &Path, into: &mut Vec<(PathBuf, String)>) {
-    let Ok(entries) = std::fs::read_dir(dir) else { return };
-    let mut paths: Vec<PathBuf> = entries.flatten().map(|e| e.path()).collect();
-    paths.sort();
-    for path in paths {
-        if path.is_dir() {
-            collect(&path, into);
-        } else if path.extension().and_then(|e| e.to_str()) == Some("rs") {
-            if let Ok(text) = std::fs::read_to_string(&path) {
-                into.push((path, text));
-            }
-        }
     }
 }
 
@@ -213,10 +222,10 @@ pub struct Exposure {
 /// stands for. Names the dependency did not declare itself are left out: they
 /// belong to its own dependencies, which is one crate further than this
 /// reads.
-pub fn exposures(sources: &Sources, item: &str) -> Vec<Exposure> {
+pub fn exposures(sources: &Sources<'_>, item: &str) -> Vec<Exposure> {
     let mut out = BTreeSet::new();
-    for (_, text) in &sources.files {
-        let Some(tree) = parse(text) else { continue };
+    for (text, tree) in &sources.files {
+        let text = *text;
         let root = tree.root_node();
         for kind in ["struct_item", "enum_item", "trait_item", "type_item"] {
             for_each_kind(root, kind, &mut |node| {
@@ -254,7 +263,7 @@ fn item_surface(
     node: Node,
     text: &str,
     generics: &BTreeSet<String>,
-    sources: &Sources,
+    sources: &Sources<'_>,
     out: &mut BTreeSet<Exposure>,
 ) {
     match node.kind() {
@@ -302,7 +311,7 @@ fn fields(
     body: Node,
     text: &str,
     generics: &BTreeSet<String>,
-    sources: &Sources,
+    sources: &Sources<'_>,
     label: &str,
     out: &mut BTreeSet<Exposure>,
 ) {
@@ -335,7 +344,7 @@ fn methods(
     body: Node,
     text: &str,
     generics: &BTreeSet<String>,
-    sources: &Sources,
+    sources: &Sources<'_>,
     out: &mut BTreeSet<Exposure>,
 ) {
     let mut cursor = body.walk();
@@ -372,7 +381,7 @@ fn take(
     node: Node,
     text: &str,
     generics: &BTreeSet<String>,
-    sources: &Sources,
+    sources: &Sources<'_>,
     through: &str,
     out: &mut BTreeSet<Exposure>,
 ) {
@@ -407,6 +416,13 @@ pub fn is_reserved(root: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use mockspace_lint_rules::Reading;
+
+    /// `manifest_above` through a view read fresh, since a reading remembers what it saw.
+    fn above(start: &Path) -> Result<PathBuf, String> {
+        let reading = Reading::new(start);
+        manifest_above(&reading.view(), start)
+    }
 
     /// A repository under a directory of its own: `<dir>/repo/.git` marks
     /// the repository, and `<dir>/repo/mock/crates` is where the crates sit.
@@ -424,7 +440,7 @@ mod tests {
         std::fs::write(repo.join("mock/Cargo.toml"), "[workspace]\n").unwrap();
         std::fs::write(repo.join("Cargo.toml"), "[workspace]\n").unwrap();
         assert_eq!(
-            manifest_above(&repo.join("mock")).unwrap(),
+            above(&repo.join("mock")).unwrap(),
             repo.join("mock/Cargo.toml")
         );
     }
@@ -435,13 +451,13 @@ mod tests {
         let repo = dir.path().join("repo");
         std::fs::write(repo.join("Cargo.toml"), "[workspace]\n").unwrap();
         assert_eq!(
-            manifest_above(&repo.join("mock")).unwrap(),
+            above(&repo.join("mock")).unwrap(),
             repo.join("Cargo.toml")
         );
         // a directory is not a manifest
         std::fs::create_dir_all(repo.join("mock/Cargo.toml")).unwrap();
         assert_eq!(
-            manifest_above(&repo.join("mock")).unwrap(),
+            above(&repo.join("mock")).unwrap(),
             repo.join("Cargo.toml")
         );
     }
@@ -452,7 +468,7 @@ mod tests {
         let repo = dir.path().join("repo");
         // a workspace above the repository, which is somebody else's
         std::fs::write(dir.path().join("Cargo.toml"), "[workspace]\n").unwrap();
-        let err = manifest_above(&repo.join("mock")).unwrap_err();
+        let err = above(&repo.join("mock")).unwrap_err();
         assert!(err.contains("no Cargo.toml in"), "{err}");
         assert!(err.contains("within the repository"), "{err}");
         assert!(err.contains("repo/mock"), "{err}");
@@ -460,7 +476,7 @@ mod tests {
         // finds that one and not the outer
         std::fs::write(repo.join("Cargo.toml"), "[workspace]\n").unwrap();
         assert_eq!(
-            manifest_above(&repo.join("mock")).unwrap(),
+            above(&repo.join("mock")).unwrap(),
             repo.join("Cargo.toml")
         );
     }
@@ -473,7 +489,7 @@ mod tests {
         // machine this runs on
         let mock = dir.path().join("repo/mock");
         std::fs::create_dir_all(&mock).unwrap();
-        let err = manifest_above(&mock).unwrap_err();
+        let err = above(&mock).unwrap_err();
         assert!(err.contains("no Cargo.toml in"), "{err}");
         assert!(err.contains("repo/mock"), "{err}");
     }

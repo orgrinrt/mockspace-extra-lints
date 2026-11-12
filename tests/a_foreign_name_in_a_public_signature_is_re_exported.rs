@@ -11,63 +11,21 @@
 //! Every arm carries its control, the same source with the re-export added,
 //! because a lint that reported nothing anywhere would pass half of these.
 
-use std::collections::{BTreeMap, BTreeSet};
-
 use mockspace_extra_lints::lints::re_export_foreign_names::ReExportForeignNames;
-use mockspace_lint_rules::{CrateLint, CrateSourceFile, Lint, LintContext};
+use mockspace_lint_rules::testkit::LintFixture;
+use mockspace_lint_rules::{CrateLint, Lint};
 
 /// A crate of several files, with `deps` as the manifest names them.
 /// `files[0]` is the root, as the engine documents.
-fn ctx_over(
-    files: &'static [(&'static str, &'static str)],
-    deps: &'static [&'static str],
-    siblings: &'static [&'static str],
-) -> LintContext<'static> {
-    let mut parser = tree_sitter::Parser::new();
-    parser
-        .set_language(&tree_sitter_rust::LANGUAGE.into())
-        .unwrap();
-    let tree = parser.parse(files[0].1, None).unwrap();
-    let tree: &'static tree_sitter::Tree = Box::leak(Box::new(tree));
-    let all_sources: &'static [CrateSourceFile] = Box::leak(Box::new(
-        files
-            .iter()
-            .map(|(p, text)| {
-                CrateSourceFile {
-                    rel_path: std::path::PathBuf::from(*p),
-                    text:     text.to_string(),
-                }
-            })
-            .collect::<Vec<_>>(),
-    ));
-    let deps: &'static [String] = Box::leak(Box::new(
-        deps.iter().map(|d| d.to_string()).collect::<Vec<_>>(),
-    ));
-    let all_crates: &'static BTreeSet<String> = Box::leak(Box::new(
-        siblings
-            .iter()
-            .map(|s| s.to_string())
-            .collect::<BTreeSet<_>>(),
-    ));
-    LintContext {
-        crate_name: "kit-text",
-        short_name: "text",
-        source: files[0].1,
-        tree,
-        all_sources,
-        deps,
-        all_crates,
-        design_doc: None,
-        all_doc_content: "",
-        shame_doc: None,
-        // No `Cargo.toml` here, so the second tier has nothing to read; every
-        // case in this file is about the first.
-        workspace_root: std::path::Path::new("/nonexistent"),
-        proc_macro_crates: &[],
-        lint_proc_macro_source: false,
-        crate_prefix: "kit",
-        primitive_introductions: Box::leak(Box::new(BTreeMap::new())),
-    }
+fn ctx_over(files: &[(&str, &str)], deps: &[&str], siblings: &[&str]) -> LintFixture {
+    // No `Cargo.toml` at the default workspace root, so the second tier has
+    // nothing to read; every case in this file is about the first.
+    LintFixture::new(files[0].1)
+        .with_sources(files)
+        .with_crate_name("kit-text", "text")
+        .with_crate_prefix("kit")
+        .with_deps(deps)
+        .with_all_crates(siblings)
 }
 
 fn findings(src: &'static str) -> Vec<String> {
@@ -81,9 +39,9 @@ fn findings(src: &'static str) -> Vec<String> {
 /// A `pub use` of a foreign name makes the second tier run, and with no
 /// workspace on disk it reports that the surface could not be read, which is
 /// measured in `a_re_exported_type_carries_its_surface.rs` and is noise here.
-fn tier_one(ctx: &LintContext<'static>) -> Vec<String> {
+fn tier_one(fixture: &LintFixture) -> Vec<String> {
     ReExportForeignNames
-        .check(ctx)
+        .check(&fixture.ctx())
         .into_iter()
         .map(|e| e.message)
         .filter(|m| !m.contains("could not be read"))
@@ -467,7 +425,7 @@ fn a_crate_of_the_same_workspace_is_not_foreign() {
         &["kit-value", "riimu-face"],
         &["kit-value", "kit-text"],
     );
-    let hits = ReExportForeignNames.check(&ctx);
+    let hits = ReExportForeignNames.check(&ctx.ctx());
     assert!(
         hits.is_empty(),
         "{:?}",
@@ -506,7 +464,7 @@ fn with_no_manifest_in_hand_every_unreserved_root_is_foreign() {
         &[],
         &[],
     );
-    assert_eq!(ReExportForeignNames.check(&ctx).len(), 1);
+    assert_eq!(ReExportForeignNames.check(&ctx.ctx()).len(), 1);
 }
 
 #[test]
@@ -561,7 +519,7 @@ fn the_finding_names_the_crate_the_name_came_from_and_where_it_sits() {
         &["riimu-face"],
         &[],
     );
-    let hits = ReExportForeignNames.check(&ctx);
+    let hits = ReExportForeignNames.check(&ctx.ctx());
     assert_eq!(hits.len(), 1);
     let hit = &hits[0];
     assert_eq!(hit.path.as_deref(), Some("src/glyph.rs"));

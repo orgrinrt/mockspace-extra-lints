@@ -29,7 +29,7 @@
 //! genuinely requires a bare literal at runtime.
 
 use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
-use tree_sitter::{Node, Parser, Tree};
+use tree_sitter::Node;
 
 use crate::util::{categories, crate_introduces_category, err_in_file, line_lint_allowed, txt};
 
@@ -66,26 +66,14 @@ impl CrateLint for NoBareStaticStr {
 
         let mut out = Vec::new();
 
-        if ctx.all_sources.is_empty() {
-            scan_source(ctx, "src/lib.rs", ctx.source, &mut out);
+        if ctx.all_sources().is_empty() {
+            scan_source(ctx, "src/lib.rs", ctx.source(), &mut out);
             return out;
         }
 
-        let mut parser = Parser::new();
-        if parser
-            .set_language(&tree_sitter_rust::LANGUAGE.into())
-            .is_err()
-        {
-            return out;
-        }
-
-        for file in ctx.all_sources {
-            let tree: Tree = match parser.parse(&file.text, None) {
-                Some(t) => t,
-                None => continue,
-            };
+        for file in ctx.all_sources() {
             let rel_path = file.rel_path.display().to_string();
-            walk(tree.root_node(), &file.text, &rel_path, &mut out, ctx);
+            walk(file.tree().root_node(), file.text, &rel_path, &mut out, ctx);
         }
 
         out
@@ -93,17 +81,7 @@ impl CrateLint for NoBareStaticStr {
 }
 
 fn scan_source(ctx: &LintContext, rel_path: &str, source: &str, out: &mut Vec<LintError>) {
-    let mut parser = Parser::new();
-    if parser
-        .set_language(&tree_sitter_rust::LANGUAGE.into())
-        .is_err()
-    {
-        return;
-    }
-    let tree = match parser.parse(source, None) {
-        Some(t) => t,
-        None => return,
-    };
+    let tree = ctx.view().parse(source);
     walk(tree.root_node(), source, rel_path, out, ctx);
 }
 

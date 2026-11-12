@@ -1,7 +1,9 @@
+use std::fs;
 use std::collections::BTreeSet;
 use std::path::Path;
 
 use super::*;
+use crate::test_support::run_repo_lint_in;
 
 pub(super) fn registry(rows: &[(&str, &[(&str, &str)])]) -> RegistryView {
     let rows = rows
@@ -50,18 +52,7 @@ fn run_with(
     canon_paths: &[String],
 ) -> Vec<LintError> {
     let crates = BTreeSet::from(["alpha".to_string()]);
-    let ctx = RepoContext {
-        mock_dir: &root.join("mock"),
-        repo_root: root,
-        all_crates: &crates,
-        src_dirs: &[],
-        invocation: None,
-        canon_paths,
-        open_panels: &[],
-        registry: reg,
-        verdicts: None,
-    };
-    lint.check_repo(&ctx)
+    run_repo_lint_in(lint, root, &crates, reg, canon_paths)
 }
 
 fn run(root: &Path, canon_paths: &[String]) -> Vec<LintError> {

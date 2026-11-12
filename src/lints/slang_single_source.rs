@@ -12,7 +12,7 @@
 
 use std::collections::BTreeMap;
 
-use mockspace_lint_rules::{DeclaredType, Lint, LintError, Reach, RepoContext, RepoLint, Severity};
+use mockspace_lint_rules::{DeclaredType, Lint, LintError, RepoContext, RepoLint, Severity};
 
 use crate::slang::{SlangSource, declared_types, sources};
 
@@ -28,10 +28,6 @@ impl Lint for SlangSingleSource {
         NAME
     }
 
-    fn reach(&self) -> Reach {
-        Reach::Paths(crate::slang::SLANG_READS)
-    }
-
     fn default_severity(&self) -> Severity {
         Severity::HARD_ERROR
     }
@@ -39,13 +35,8 @@ impl Lint for SlangSingleSource {
 
 impl RepoLint for SlangSingleSource {
     fn check_repo(&self, ctx: &RepoContext) -> Vec<LintError> {
-        let files = sources(ctx.repo_root, ctx.mock_dir, ctx.all_crates);
-        let mut parts: Vec<&[u8]> = Vec::new();
-        for f in &files {
-            parts.push(f.rel.as_bytes());
-            parts.push(f.text.as_bytes());
-        }
-        ctx.remembered(NAME, &parts, || judge(&files))
+        let files = sources(ctx.view(), ctx.repo_root, ctx.mock_dir, ctx.all_crates());
+        judge(&files)
     }
 }
 

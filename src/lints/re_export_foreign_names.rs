@@ -41,7 +41,6 @@ use crate::paths::{
     imports_of,
     is_plain_pub,
     modules_of,
-    parse,
     re_exports_of,
     type_names,
     under_cfg_test,
@@ -135,17 +134,13 @@ impl CrateLint for ReExportForeignNames {
         let mut krate = Crate {
             re_exports: BTreeSet::new(),
             modules:    BTreeSet::new(),
-            deps:       ctx.deps.iter().map(|d| as_root(d)).collect(),
-            siblings:   ctx.all_crates.iter().map(|c| as_root(c)).collect(),
+            deps:       ctx.deps().iter().map(|d| as_root(d)).collect(),
+            siblings:   ctx.all_crates().iter().map(|c| as_root(c)).collect(),
         };
-        let trees: Vec<_> = ctx
-            .all_sources
-            .iter()
-            .filter_map(|f| parse(&f.text).map(|t| (f, t)))
-            .collect();
+        let trees: Vec<_> = ctx.all_sources().iter().map(|f| (f, f.tree())).collect();
         for (file, tree) in &trees {
-            re_exports_of(tree.root_node(), &file.text, &mut krate.re_exports);
-            modules_of(tree.root_node(), &file.text, &mut krate.modules);
+            re_exports_of(tree.root_node(), file.text, &mut krate.re_exports);
+            modules_of(tree.root_node(), file.text, &mut krate.modules);
             if let Some(stem) = file.rel_path.file_stem().and_then(|s| s.to_str()) {
                 krate.modules.insert(stem.to_string());
             }
@@ -153,10 +148,10 @@ impl CrateLint for ReExportForeignNames {
 
         for (file, tree) in &trees {
             let rel = file.rel_path.display().to_string();
-            let imports = imports_of(tree.root_node(), &file.text);
+            let imports = imports_of(tree.root_node(), file.text);
             own_signatures(
                 tree.root_node(),
-                &file.text,
+                file.text,
                 &rel,
                 &imports,
                 &krate,
@@ -395,7 +390,7 @@ fn reachable(item: Node, src: &str) -> bool {
 
 /// Tier two: the surfaces of the foreign items this crate re-exports.
 fn carried_surfaces(
-    trees: &[(&mockspace_lint_rules::CrateSourceFile, tree_sitter::Tree)],
+    trees: &[(&mockspace_lint_rules::CrateSourceFile<'_>, &tree_sitter::Tree)],
     krate: &Crate,
     ctx: &LintContext,
     out: &mut Vec<LintError>,
@@ -406,14 +401,14 @@ fn carried_surfaces(
     for (file, tree) in trees {
         let rel = file.rel_path.display().to_string();
         for_each_kind(tree.root_node(), "use_declaration", &mut |node| {
-            if !is_plain_pub(node, &file.text) {
+            if !is_plain_pub(node, file.text) {
                 return;
             }
             let line = node.start_position().row + 1;
             if line_lint_allowed(file.text.lines().nth(line - 1).unwrap_or(""), NAME) {
                 return;
             }
-            for (_, root, original) in use_leaves(node, &file.text) {
+            for (_, root, original) in use_leaves(node, file.text) {
                 if original == "*" || !krate.is_foreign(&root) {
                     continue;
                 }
@@ -429,7 +424,7 @@ fn carried_surfaces(
 
     let Dependencies {
         roots,
-    } = match dependencies(ctx.workspace_root, ctx.crate_name) {
+    } = match dependencies(ctx.view(), ctx.workspace_root(), ctx.crate_name) {
         Ok(d) => d,
         Err(why) => {
             // The promise cannot be checked, and a check that cannot run says
@@ -447,10 +442,10 @@ fn carried_surfaces(
         },
     };
 
-    let mut read: BTreeMap<String, crate::dep_surface::Sources> = BTreeMap::new();
+    let mut read: BTreeMap<String, crate::dep_surface::Sources<'_>> = BTreeMap::new();
     for ((root, item), (rel, line)) in &carried {
         let Some(dir) = roots.get(root) else { continue };
-        let src = read.entry(root.clone()).or_insert_with(|| sources(dir));
+        let src = read.entry(root.clone()).or_insert_with(|| sources(ctx.view(), dir));
         // A re-exported name the dependency does not declare is a module or a
         // function or a macro, none of which carries a surface this reads.
         if !src.declared.contains(item) {

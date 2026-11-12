@@ -15,7 +15,7 @@ mod scan;
 
 use std::path::Path;
 
-use mockspace_lint_rules::{Lint, LintContext, LintError, Severity, WorkspaceLint};
+use mockspace_lint_rules::{Lint, LintContext, LintError, Severity, View, WorkspaceLint};
 
 use scan::{
     count_exclamations_in_prose,
@@ -70,8 +70,8 @@ impl Lint for WritingStyle {
 
 impl WorkspaceLint for WritingStyle {
     fn check_all(&self, crates: &[(&str, &LintContext)]) -> Vec<LintError> {
-        let workspace_root = match crates.first() {
-            Some((_, ctx)) => ctx.workspace_root,
+        let (workspace_root, view) = match crates.first() {
+            Some((_, ctx)) => (ctx.workspace_root(), ctx.view()),
             None => return Vec::new(),
         };
 
@@ -81,27 +81,27 @@ impl WorkspaceLint for WritingStyle {
         // location is already the path and there is nothing to hang off it.
         for name in &["PRINCIPLES.md.tmpl", "DESIGN.md.tmpl", "WORKFLOW.md.tmpl"] {
             let path = workspace_root.join(name);
-            check_file(&path, name, None, &mut out);
+            check_file(view, &path, name, None, &mut out);
         }
 
         // Per-crate public docs.
         for (crate_name, ctx) in crates {
             for doc in &["README.md.tmpl", "DESIGN.md.tmpl", "BACKLOG.md.tmpl"] {
                 let path = workspace_root.join("crates").join(crate_name).join(doc);
-                if path.exists() {
-                    check_file(&path, crate_name, Some(doc), &mut out);
+                if view.exists(&path) {
+                    check_file(view, &path, crate_name, Some(doc), &mut out);
                 }
             }
             // Rust comments, every module file rather than the crate root.
             // `all_sources` is empty on an older engine, and the crate root is
             // what that engine gives, so the fallback is what the scope used to
             // be rather than nothing.
-            let sources: Vec<(String, &str)> = if ctx.all_sources.is_empty() {
-                vec![("src/lib.rs".to_string(), ctx.source)]
+            let sources: Vec<(String, &str)> = if ctx.all_sources().is_empty() {
+                vec![("src/lib.rs".to_string(), ctx.source())]
             } else {
-                ctx.all_sources
+                ctx.all_sources()
                     .iter()
-                    .map(|f| (f.rel_path.display().to_string(), f.text.as_str()))
+                    .map(|f| (f.rel_path.display().to_string(), f.text))
                     .collect()
             };
             for (rel_path, source) in sources {
@@ -111,8 +111,8 @@ impl WorkspaceLint for WritingStyle {
 
         // Agent rules + skills.
         let agent_dir = workspace_root.join("agent");
-        if agent_dir.is_dir() {
-            walk_md_tmpl(&agent_dir, workspace_root, &mut out);
+        if view.is_dir(&agent_dir) {
+            walk_md_tmpl(view, &agent_dir, workspace_root, &mut out);
         }
 
         out
@@ -125,16 +125,21 @@ impl WorkspaceLint for WritingStyle {
 /// a crate's own readme reads `<crate>/README.md.tmpl:12` rather than naming a
 /// line in a crate root that has no such line. `None` where `crate_name` is
 /// already the file, which is the workspace-level case.
-fn check_file(path: &Path, crate_name: &str, rel_label: Option<&str>, out: &mut Vec<LintError>) {
+fn check_file(
+    view: &View<'_>,
+    path: &Path,
+    crate_name: &str,
+    rel_label: Option<&str>,
+    out: &mut Vec<LintError>,
+) {
     if is_self_exempt(path) {
         return;
     }
-    let content = match std::fs::read_to_string(path) {
-        Ok(s) => s,
-        Err(_) => return,
+    let Some(content) = view.text(path) else {
+        return;
     };
     let mut found = Vec::new();
-    check_text(&content, crate_name, Body::Document, &mut found);
+    check_text(content, crate_name, Body::Document, &mut found);
     for mut e in found {
         e.path = rel_label.map(str::to_string);
         out.push(e);
@@ -154,16 +159,9 @@ fn is_self_exempt(path: &Path) -> bool {
 /// The label goes in the crate-name position rather than in `path`, because
 /// these sit under no crate, and a bare `agent:5` names a directory instead of
 /// a file anybody can open.
-fn walk_md_tmpl(dir: &Path, workspace_root: &Path, out: &mut Vec<LintError>) {
-    let entries = match std::fs::read_dir(dir) {
-        Ok(e) => e,
-        Err(_) => return,
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.is_dir() {
-            walk_md_tmpl(&path, workspace_root, out);
-        } else if path.extension().is_some_and(|e| e == "tmpl")
+fn walk_md_tmpl(view: &View<'_>, dir: &Path, workspace_root: &Path, out: &mut Vec<LintError>) {
+    for path in view.walk(dir, |_, _| false) {
+        if path.extension().is_some_and(|e| e == "tmpl")
             && path
                 .file_name()
                 .is_some_and(|n| n.to_string_lossy().ends_with(".md.tmpl"))
@@ -173,7 +171,7 @@ fn walk_md_tmpl(dir: &Path, workspace_root: &Path, out: &mut Vec<LintError>) {
                 .unwrap_or(&path)
                 .display()
                 .to_string();
-            check_file(&path, &label, None, out);
+            check_file(view, &path, &label, None, out);
         }
     }
 }

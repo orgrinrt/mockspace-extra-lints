@@ -11,7 +11,7 @@
 //! restricted to public fields.
 
 use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
-use tree_sitter::{Node, Parser, Tree};
+use tree_sitter::Node;
 
 use crate::util::{
     categories,
@@ -79,31 +79,19 @@ impl CrateLint for NoPublicRawField {
         // Scan every src/*.rs file, not just lib.rs. Parse each file
         // with its own tree-sitter tree so node positions and text
         // line up with that file's contents.
-        if ctx.all_sources.is_empty() {
+        if ctx.all_sources().is_empty() {
             // Back-compat: older mockspace versions carry only
-            // ctx.source/ctx.tree for lib.rs.
-            for_each_struct(ctx.tree.root_node(), |node| {
-                check_struct(node, ctx.source, "src/lib.rs", &mut out, ctx);
+            // ctx.source()/ctx.tree() for lib.rs.
+            for_each_struct(ctx.tree().root_node(), |node| {
+                check_struct(node, ctx.source(), "src/lib.rs", &mut out, ctx);
             });
             return out;
         }
 
-        let mut parser = Parser::new();
-        if parser
-            .set_language(&tree_sitter_rust::LANGUAGE.into())
-            .is_err()
-        {
-            return out;
-        }
-
-        for file in ctx.all_sources {
-            let tree: Tree = match parser.parse(&file.text, None) {
-                Some(t) => t,
-                None => continue,
-            };
+        for file in ctx.all_sources() {
             let rel_path = file.rel_path.display().to_string();
-            for_each_struct(tree.root_node(), |node| {
-                check_struct(node, &file.text, &rel_path, &mut out, ctx);
+            for_each_struct(file.tree().root_node(), |node| {
+                check_struct(node, file.text, &rel_path, &mut out, ctx);
             });
         }
 

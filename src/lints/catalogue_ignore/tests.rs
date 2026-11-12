@@ -1,9 +1,11 @@
 use std::collections::BTreeMap;
+use std::fs;
 use std::path::Path;
 
 use mockspace_lint_rules::RegistryView;
 
 use super::*;
+use crate::test_support::run_repo_lint_in;
 
 fn registry(rows: &[&str]) -> RegistryView {
     let rows = rows
@@ -27,18 +29,7 @@ fn write(root: &Path, rel: &str, text: &str) {
 
 fn run_with(lint: &CatalogueIgnore, reg: &RegistryView, root: &Path) -> Vec<LintError> {
     let crates = BTreeSet::from(["alpha".to_string()]);
-    let ctx = RepoContext {
-        mock_dir: &root.join("mock"),
-        repo_root: root,
-        all_crates: &crates,
-        src_dirs: &[],
-        invocation: None,
-        canon_paths: &[],
-        open_panels: &[],
-        registry: reg,
-        verdicts: None,
-    };
-    lint.check_repo(&ctx)
+    run_repo_lint_in(lint, root, &crates, reg, &[])
 }
 
 /// A repository holding one test file with `body`, a ledger with rows `C1-001` and `C2-054`, and a

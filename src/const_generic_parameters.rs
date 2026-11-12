@@ -18,7 +18,7 @@
 
 use core::ops::Range;
 
-use tree_sitter::{Node, Parser};
+use tree_sitter::{Node, Tree};
 
 /// The source with the type of every const generic parameter blanked out.
 ///
@@ -32,8 +32,8 @@ use tree_sitter::{Node, Parser};
 /// only where its text is one of the primitive names the lints refuse, so a
 /// recovered parse can except a primitive and can never except anything else.
 #[must_use]
-pub fn without_const_generic_parameter_types(source: &str) -> String {
-    let spans = const_generic_parameter_type_spans(source);
+pub fn without_const_generic_parameter_types(source: &str, tree: &Tree) -> String {
+    let spans = const_generic_parameter_type_spans(source, tree);
     if spans.is_empty() {
         return source.to_string();
     }
@@ -46,18 +46,7 @@ pub fn without_const_generic_parameter_types(source: &str) -> String {
 /// Empty when the file has none, and not empty merely because the file is
 /// broken, since the parser recovers; see the note above.
 #[must_use]
-pub fn const_generic_parameter_type_spans(source: &str) -> Vec<Range<usize>> {
-    let mut parser = Parser::new();
-    if parser
-        .set_language(&tree_sitter_rust::LANGUAGE.into())
-        .is_err()
-    {
-        return Vec::new();
-    }
-    let Some(tree) = parser.parse(source, None) else {
-        return Vec::new();
-    };
-
+pub fn const_generic_parameter_type_spans(source: &str, tree: &Tree) -> Vec<Range<usize>> {
     let mut spans = Vec::new();
     collect(source, tree.root_node(), &mut spans);
     spans
@@ -117,14 +106,21 @@ fn blank_spans(source: &str, spans: &[Range<usize>]) -> String {
 
 #[cfg(test)]
 mod tests {
+    use mockspace_lint_rules::Reading;
+
     use super::{
         blank_spans,
         const_generic_parameter_type_spans,
         without_const_generic_parameter_types,
     };
 
+    /// A tree of `source` the way a lint is handed one.
+    fn tree_of(source: &str) -> tree_sitter::Tree {
+        Reading::new(".").view().parse(source)
+    }
+
     fn masked(source: &str) -> String {
-        without_const_generic_parameter_types(source)
+        without_const_generic_parameter_types(source, &tree_of(source))
     }
 
     #[test]
@@ -186,7 +182,7 @@ mod tests {
     #[test]
     fn a_use_site_argument_carries_no_type_to_blank() {
         let source = "type Byte = Signed<8>;\n";
-        assert!(const_generic_parameter_type_spans(source).is_empty());
+        assert!(const_generic_parameter_type_spans(source, &tree_of(source)).is_empty());
     }
 
     #[test]
@@ -199,7 +195,7 @@ mod tests {
     #[test]
     fn a_lifetime_or_type_parameter_is_not_a_const_parameter() {
         let source = "pub struct Pair<'a, T, const N: u8>(&'a T);\n";
-        let spans = const_generic_parameter_type_spans(source);
+        let spans = const_generic_parameter_type_spans(source, &tree_of(source));
         assert_eq!(
             spans.len(),
             1,
@@ -265,7 +261,7 @@ mod tests {
             "the nested primitive stays reported: {out:?}"
         );
         assert!(
-            const_generic_parameter_type_spans(source).is_empty(),
+            const_generic_parameter_type_spans(source, &tree_of(source)).is_empty(),
             "and nothing about `Foo<u32>` is excepted at all"
         );
     }

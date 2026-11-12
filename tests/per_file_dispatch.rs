@@ -15,8 +15,6 @@
 //! These tests assert the declarations and simulate the dispatcher, because the
 //! defect lives in the interaction rather than in either half alone.
 
-use std::collections::{BTreeMap, BTreeSet};
-
 use mockspace_extra_lints::lints::arvo_types_only::ArvoTypesOnly;
 use mockspace_extra_lints::lints::no_bare_numeric::NoBareNumeric;
 use mockspace_extra_lints::lints::no_bare_option::NoBareOption;
@@ -26,65 +24,28 @@ use mockspace_extra_lints::lints::no_bare_string::NoBareString;
 use mockspace_extra_lints::lints::no_public_raw_field::NoPublicRawField;
 use mockspace_extra_lints::lints::no_std::NoStd;
 use mockspace_extra_lints::lints::re_export_foreign_names::ReExportForeignNames;
-use mockspace_lint_rules::{CrateLint, CrateSourceFile, Lint, LintContext};
+use mockspace_lint_rules::testkit::{self, LintFixture};
+use mockspace_lint_rules::{CrateLint, Lint, LintPack};
 
 /// A crate of several files. `files[0]` is the root, as the engine documents.
-fn ctx_over(files: &'static [(&'static str, &'static str)]) -> LintContext<'static> {
-    let mut parser = tree_sitter::Parser::new();
-    parser
-        .set_language(&tree_sitter_rust::LANGUAGE.into())
-        .unwrap();
-    let tree = parser.parse(files[0].1, None).unwrap();
-    let tree: &'static tree_sitter::Tree = Box::leak(Box::new(tree));
-
-    let all_sources: &'static [CrateSourceFile] = Box::leak(Box::new(
-        files
-            .iter()
-            .map(|(p, text)| {
-                CrateSourceFile {
-                    rel_path: std::path::PathBuf::from(*p),
-                    text:     text.to_string(),
-                }
-            })
-            .collect::<Vec<_>>(),
-    ));
-
-    LintContext {
-        crate_name: "test-crate",
-        short_name: "test-crate",
-        source: files[0].1,
-        tree,
-        all_sources,
-        deps: &[],
-        all_crates: Box::leak(Box::new(BTreeSet::new())),
-        design_doc: None,
-        all_doc_content: "",
-        shame_doc: None,
-        workspace_root: std::path::Path::new("/tmp"),
-        proc_macro_crates: &[],
-        lint_proc_macro_source: false,
-        crate_prefix: "test",
-        primitive_introductions: Box::leak(Box::new(BTreeMap::new())),
-    }
+fn ctx_over(files: &[(&str, &str)]) -> LintFixture {
+    LintFixture::new(files[0].1)
+        .with_sources(files)
+        .with_workspace_root(std::path::Path::new("/tmp"))
 }
 
-/// What the dispatcher does to a per-file lint: one call per file, with
-/// `source` swapped. Mirrors `check_every_file` in the engine.
-fn dispatch<L: CrateLint>(lint: &L, ctx: &LintContext<'static>) -> usize {
-    if lint.per_file() {
-        ctx.all_sources
-            .iter()
-            .map(|f| {
-                let mut per = *ctx;
-                // The engine swaps `tree` too; these lints read `source` and
-                // `all_sources`, so swapping `source` is what they observe.
-                per.source = Box::leak(f.text.clone().into_boxed_str());
-                lint.check(&per).len()
-            })
-            .sum()
-    } else {
-        lint.check(ctx).len()
-    }
+/// What the engine's dispatcher finds of `lint` over the crate: it asks a per-file lint once per
+/// file and a per-crate one once, and the count is the findings that carry the lint's own name.
+fn dispatch<L: CrateLint + 'static>(lint: L, fixture: &LintFixture) -> usize {
+    let name = lint.name();
+    let pack = LintPack {
+        crate_lints: vec![Box::new(lint)],
+        ..LintPack::default()
+    };
+    testkit::run(std::slice::from_ref(fixture), None, Some(&pack))
+        .into_iter()
+        .filter(|e| e.lint_name == name)
+        .count()
 }
 
 const THREE_FILE_CRATE: &[(&str, &str)] = &[
@@ -129,7 +90,7 @@ fn a_walker_reports_each_finding_once_across_the_crate() {
     let ctx = ctx_over(THREE_FILE_CRATE);
     // Three files, one bare u32 each. Dispatched correctly that is three
     // findings; dispatched per file it would be nine.
-    let n = dispatch(&ArvoTypesOnly, &ctx);
+    let n = dispatch(ArvoTypesOnly, &ctx);
     assert_eq!(
         n, 3,
         "expected one finding per offending file, got {n}; a count that is a \
@@ -143,7 +104,7 @@ fn a_walker_names_the_file_it_found_the_drift_in() {
     // must. Folding it into the message leaves `path` empty and the rendered
     // location points at nothing.
     let ctx = ctx_over(THREE_FILE_CRATE);
-    let hits = ArvoTypesOnly.check(&ctx);
+    let hits = ArvoTypesOnly.check(&ctx.ctx());
     assert!(!hits.is_empty(), "fixture must produce findings");
     for h in &hits {
         assert!(
@@ -164,7 +125,7 @@ fn no_std_reports_a_missing_root_attribute_once() {
         ("src/c.rs", "pub struct C;\n"),
     ];
     let ctx = ctx_over(NO_ATTR);
-    let n = dispatch(&NoStd, &ctx);
+    let n = dispatch(NoStd, &ctx);
     assert_eq!(
         n, 1,
         "the root is missing `#![no_std]` once, not once per module file"
@@ -174,7 +135,7 @@ fn no_std_reports_a_missing_root_attribute_once() {
 #[test]
 fn no_std_does_not_report_module_files_as_roots() {
     let ctx = ctx_over(THREE_FILE_CRATE);
-    let n = dispatch(&NoStd, &ctx);
+    let n = dispatch(NoStd, &ctx);
     assert_eq!(
         n, 0,
         "the root carries `#![no_std]`, so no file should be reported"
@@ -190,7 +151,7 @@ fn no_std_still_sees_use_std_in_a_module_file() {
         ("src/b.rs", "use std::vec::Vec;\npub struct B;\n"),
     ];
     let ctx = ctx_over(STD_IN_MODULE);
-    let n = dispatch(&NoStd, &ctx);
+    let n = dispatch(NoStd, &ctx);
     assert!(
         n >= 1,
         "a module file importing std must be caught, which is what per-file \

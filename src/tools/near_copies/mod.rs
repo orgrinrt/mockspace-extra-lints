@@ -39,13 +39,14 @@ mod scope;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
-mod tests_git;
+mod git_tests;
 #[cfg(test)]
-mod tests_slang;
+mod slang_tests;
 
 use std::collections::BTreeSet;
 
 use compare::{Options, compare};
+use mockspace_lint_rules::Reading;
 use mockspace_lint_rules::tool::{ArgSpec, NotALint, Purpose, Tool, ToolContext, ToolReport};
 
 /// How many of each list are printed unless `--limit` says otherwise.
@@ -147,16 +148,20 @@ impl Tool for NearCopies {
                 "the engine gave no source directory, so no crate could be read".to_string(),
             );
         }
-        let all = scope::sources(ctx.src_dirs, ctx.all_crates);
+        // A tool runs outside a lint run, so it reads through a reading of its own.
+        let reading = Reading::new(ctx.repo_root);
+        let view = reading.view();
+        let all = scope::sources(&reading, ctx.src_dirs, ctx.all_crates);
         let mut types = scope::declarations(&all);
         // The shaders of the crates declare types of the same kinds, compared in the same pass.
         types.extend(crate::slang::declared_types(&crate::slang::sources(
+            &view,
             ctx.repo_root,
             ctx.mock_dir,
             ctx.all_crates,
         )));
         let (scoped, vs): (BTreeSet<String>, Option<BTreeSet<String>>) = if args.crates.is_empty() {
-            let touched = match scope::touched(ctx.repo_root, ctx.all_crates, &args.against) {
+            let touched = match scope::touched(&view, ctx.repo_root, ctx.all_crates, &args.against) {
                 Ok(touched) => touched,
                 Err(why) => return ToolReport::inconclusive(why),
             };
