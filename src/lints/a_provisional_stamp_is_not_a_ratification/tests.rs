@@ -36,8 +36,8 @@ fn kinds(found: &[LintError]) -> Vec<&'static str> {
 }
 
 
-/// The three routes onto a stamp.
-const ROUTES: [&str; 3] = ["coordinators", "experts", "maintainer"];
+// the three routes onto a stamp, from the crate that names them
+use mockspace_extra_stamp::ROUTES;
 
 /// A whole stamp for a route: its ticket, and for the maintainer his passage.
 fn whole(by: &str) -> &'static str {

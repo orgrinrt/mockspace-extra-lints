@@ -20,6 +20,8 @@ publish = false
 # manifest also carries a `[patch]` keyed on the `https://` spelling,
 # which covers this crate only once the two agree.
 mockspace-lint-rules = { git = "https://github.com/hiisi-digital/mockspace.git", branch = "dev" }
+# the stamp's fields, routes and ticket parse, which the canon tool reads stamps through too
+mockspace-extra-stamp = { path = "crates/stamp" }
 tree-sitter = "0.24"
 tree-sitter-rust = "0.23.3"
 # `re-export-foreign-names` reads the surface of a re-exported type out of the

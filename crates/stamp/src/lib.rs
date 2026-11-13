@@ -22,7 +22,16 @@ pub const FIELDS: [&str; 2] = [STAMPED_BY, STAMP];
 /// The routes onto a stamp, the values `stamped_by` takes: the coordinators converging, two domain
 /// experts agreeing after a panel stretch, or the maintainer directing the row onto a stamp himself.
 /// The pack's `registry/namespaces.toml` declares the same values, and a test holds the two equal.
-pub const ROUTES: [&str; 3] = ["coordinators", "experts", "maintainer"];
+pub const ROUTES: [&str; 3] = [COORDINATORS, EXPERTS, MAINTAINER];
+
+/// The route where the coordinators converged on the row.
+pub const COORDINATORS: &str = "coordinators";
+
+/// The route where two domain experts agreed after a panel stretch.
+pub const EXPERTS: &str = "experts";
+
+/// The route where the maintainer put the row on a stamp himself, his passage cited in the stamp.
+pub const MAINTAINER: &str = "maintainer";
 
 /// The word a stamp names its question ticket after, as `ticket` and then the id in backticks.
 pub const TICKET: &str = "ticket";

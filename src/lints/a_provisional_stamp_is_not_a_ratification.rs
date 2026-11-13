@@ -40,10 +40,10 @@ use mockspace_lint_rules::{Lint, LintError, RegistryView, RepoContext, RepoLint,
 /// The lint's name, as a project's `[lints.*]` table spells it.
 pub const NAME: &str = "a-provisional-stamp-is-not-a-ratification";
 
-/// The two fields the stamp is written in. Fixed rather than configured: they are the shape the
-/// projects that carry a stamp agreed on, and a second spelling would be a second mechanism.
-const STAMPED_BY: &str = "stamped_by";
-const STAMP: &str = "stamp";
+/// The two fields the stamp is written in, the routes and the ticket word, from the crate the canon
+/// tool reads stamps through too. Fixed rather than configured: they are the shape the projects that
+/// carry a stamp agreed on, and a second spelling would be a second mechanism.
+use mockspace_extra_stamp::{MAINTAINER, STAMP, STAMPED_BY, TICKET};
 
 /// The configuration keys.
 const NAMESPACES_KEY: &str = "namespaces";
@@ -54,14 +54,8 @@ const RATIFIES_KEY: &str = "ratifies_field";
 const STAMPABLE_KEY: &str = "stampable";
 const SUPERSEDES_KEY: &str = "supersedes_field";
 
-/// The route whose stamp cites his own passage rather than a convergence.
-const MAINTAINER: &str = "maintainer";
-
 /// The separator the engine joins a list field with, and a configured list is written with.
 const JOIN: &str = ",";
-
-/// The word a stamp names its ticket after.
-const TICKET: &str = "ticket";
 
 /// The configured lint.
 pub struct AProvisionalStampIsNotARatification {
@@ -141,16 +135,6 @@ fn present<'a>(reg: &'a RegistryView, q: &str, field: &str) -> Option<&'a str> {
     reg.field(q, field).filter(|v| !v.trim().is_empty())
 }
 
-/// Whether a stamp names its ticket: the word, then an id in backticks.
-fn names_a_ticket(stamp: &str) -> bool {
-    stamp.match_indices(TICKET).any(|(at, _)| {
-        let rest = stamp[at + TICKET.len() ..].trim_start();
-        rest.strip_prefix('`')
-            .and_then(|r| r.split_once('`'))
-            .is_some_and(|(id, _)| !id.trim().is_empty() && !id.contains(char::is_whitespace))
-    })
-}
-
 /// Whether a stamp cites a passage: a backticked `<path>:<line>`, the path holding a dot.
 fn cites_a_passage(stamp: &str) -> bool {
     stamp.split('`').skip(1).step_by(2).any(|span| {
@@ -225,7 +209,7 @@ impl RepoLint for AProvisionalStampIsNotARatification {
                              why, where it is recorded and the question ticket that asks him."
                         ),
                     )),
-                    (Some(_), Some(s)) if !names_a_ticket(s) => out.push(finding(
+                    (Some(_), Some(s)) if mockspace_extra_stamp::ticket(s).is_none() => out.push(finding(
                         "no-ticket",
                         format!(
                             "`{q}`'s `{STAMP}` names no question ticket. A stamp stays provisional \
