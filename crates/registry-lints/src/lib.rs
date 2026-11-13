@@ -21,6 +21,7 @@ pub mod a_relation_adds_what_the_words_do_not;
 pub mod a_retired_word_stays_out;
 pub mod a_tenet_cites_what_its_words_name;
 pub mod a_tenet_names_a_subject;
+pub mod a_ticket_graph_holds;
 pub mod canon_rows;
 pub mod canon_tree;
 pub mod every_fixme_names_a_ticket;
@@ -41,6 +42,7 @@ pub fn collect(pack: &mut LintPack) {
         a_retired_word_stays_out::repo_lint(),
         a_tenet_cites_what_its_words_name::repo_lint(),
         a_tenet_names_a_subject::repo_lint(),
+        a_ticket_graph_holds::repo_lint(),
         every_fixme_names_a_ticket::repo_lint(),
     ]);
 }

@@ -9,3 +9,6 @@ publish.workspace = true
 [dependencies]
 mockspace.workspace = true
 mockspace-registry.workspace = true
+# the ticket and planning rows and the rules over them, which `a-ticket-graph-holds` holds the registry to
+ticket-model.workspace = true
+planning.workspace = true

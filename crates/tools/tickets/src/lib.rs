@@ -21,7 +21,6 @@ pub mod args;
 pub mod close_gone;
 pub mod ids;
 pub mod landing;
-mod lint;
 pub mod member;
 pub mod refs;
 pub mod repoint;
@@ -31,7 +30,7 @@ pub mod testkit;
 pub mod time;
 mod tree;
 use mockspace::reading::Reading;
-use registry_lints::tree_walk;
+use registry_lints::a_ticket_graph_holds::registry_texts;
 pub mod trunk;
 pub mod view;
 pub mod write;
@@ -72,14 +71,9 @@ pub fn plan_of(texts: &[(String, String)]) -> Result<Plan, String> {
     )
 }
 
+/// The registry's files with their texts, read by the lint's own reader over a view of the tool's.
 fn read_texts(registry: &std::path::Path) -> Result<Vec<(String, String)>, String> {
-    let mut texts = Vec::new();
-    for file in tree_walk::with_extension(&Reading::new(registry).view(), registry, "toml", &[]) {
-        let src = std::fs::read_to_string(&file)
-            .map_err(|e| format!("cannot read {}: {e}", file.display()))?;
-        texts.push((file.display().to_string(), src));
-    }
-    Ok(texts)
+    registry_texts(&Reading::new(registry).view(), registry)
 }
 
 /// The registry directory under the mock directory.
@@ -310,7 +304,6 @@ fn check(
 }
 
 mockspace::lint_pack! {
-    repo_lints: [lint::ATicketGraphHolds],
     tools: [Tickets::default()],
 }
 

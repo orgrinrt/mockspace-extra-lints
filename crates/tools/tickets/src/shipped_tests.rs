@@ -13,7 +13,7 @@ use ticket_model::rules;
 use mockspace::testkit::check_repo;
 use mockspace::{RegistryView, RepoInput};
 
-use crate::lint::ATicketGraphHolds;
+use registry_lints::a_ticket_graph_holds;
 use crate::testkit::{Scratch, shipped_registry};
 
 fn shipped() -> Store {
@@ -99,7 +99,7 @@ fn the_lint_gates_the_rows_the_makers_refuse_by() {
     let crates = BTreeSet::new();
     let registry = RegistryView::default();
     let check = |s: &Scratch| {
-        check_repo(&ATicketGraphHolds, RepoInput {
+        check_repo(a_ticket_graph_holds::repo_lint().as_ref(), RepoInput {
             mock_dir:    &s.mock,
             repo_root:   &s.mock,
             all_crates:  &crates,
