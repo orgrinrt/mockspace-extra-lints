@@ -1,6 +1,6 @@
 # `mockspace-extra-lints`
 
-> An opt-in lint pack for mockspace, for the rules that only make sense once a project has picked its foundations.
+> An opt-in pack of lints and tools for mockspace, for the rules and the workflow that only make sense once a project has picked its foundations.
 
 Mockspace ships the lints every project needs, changelist discipline, document and source agreement, file size and dead crates. This pack holds the ones that only make sense once a project has committed to a particular set of foundations, where the right answer for one codebase is noise for another. It isn't on crates.io and isn't meant to be, since a lint pack is reached through mockspace and not through a dependency graph. It's pre-1.0, so the lints and their keys may move, and it builds on the nightly pinned in `rust-toolchain.toml`.
 

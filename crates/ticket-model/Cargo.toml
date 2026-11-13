@@ -1,6 +1,6 @@
 [package]
 name = "mockspace-extra-ticket-model"
-description = "The tickets of the registry and the rules a move is refused by, read from the texts of the registry's files, for the tickets tool and the console alike."
+description = "The tickets of the registry and the rules a move is refused by, read from the texts of the registry's files, for the tickets tool and any page that judges a move."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

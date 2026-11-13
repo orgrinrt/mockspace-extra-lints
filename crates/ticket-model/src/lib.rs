@@ -4,9 +4,9 @@
 //--------------------------------------------------------------------------------------------------
 
 //! The tickets of the registry and the rules a move is refused by, read from the texts of the
-//! registry's files. No file access and nothing of mockspace, so the tickets tool, its makers and the
-//! console's page build this one crate and judge a move alike. The design is this crate's
-//! `DESIGN.md.tmpl` and `mock/WORKFLOW.md.tmpl`, "Work items".
+//! registry's files. It opens no file and takes nothing from mockspace beyond the registry's rule for
+//! what an id may be, so the tickets tool, its makers and any page built on this crate judge a move
+//! alike. The design is this crate's `DESIGN.md`.
 
 pub mod choice;
 pub mod contracts;
