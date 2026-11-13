@@ -65,6 +65,7 @@ pub fn dependencies(view: &View<'_>, workspace_root: &Path, crate_name: &str) ->
         return Err("cargo metadata could not run".to_string());
     }
     if !output.ok() {
+        view.untraced("cargo metadata failed, which a dependency not yet fetched causes as readily as the manifest");
         return Err(format!(
             "cargo metadata failed for {}: {}",
             manifest.display(),
