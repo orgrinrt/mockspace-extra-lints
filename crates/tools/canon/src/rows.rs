@@ -11,7 +11,7 @@
 use std::collections::BTreeMap;
 
 use mockspace::RegistryView;
-use registry_lints::standing::{STAMPED, Standing};
+use registry_lints::standing::Standing;
 
 /// The separator the engine joins a list field with.
 const JOIN: &str = ", ";
@@ -20,11 +20,11 @@ const JOIN: &str = ", ";
 pub struct Tenet<'a> {
     /// Its id, the slug every citation names.
     pub id:            &'a str,
-    /// Whether the maintainer has ratified it or demoted it. Apart from `superseded_by` and a stamp: a
-    /// superseded or a stamped row does not bind whatever its standing.
-    pub standing:      Standing<'a>,
-    /// Who stamped it provisionally, `coordinators` or `experts`, empty where nobody did. A stamp is never
-    /// a ratification, so a stamped row binds nothing.
+    /// Whether the maintainer has ratified it, holds it for himself or demoted it. Apart from
+    /// `superseded_by`: a superseded row does not bind whatever its standing.
+    pub standing:      Standing,
+    /// Who stamped it provisionally, empty where nobody did. A stamp is never a ratification and changes
+    /// nothing about whether the row binds.
     pub stamped_by:    &'a str,
     /// The stamp: what was stamped, why, where it is recorded and the question ticket asking the
     /// maintainer, empty where there is none.
@@ -48,19 +48,14 @@ pub struct Tenet<'a> {
 }
 
 impl Tenet<'_> {
-    /// Whether it still binds: nothing supersedes it, nothing stamps it and its standing binds.
+    /// Whether it still binds: nothing supersedes it and its standing binds.
     pub fn binds(&self) -> bool {
-        !self.replaced() && !self.stamped() && self.standing.binds()
+        !self.replaced() && self.standing.binds()
     }
 
-    /// Whether it carries a provisional stamp, which keeps its standing and binds nothing.
+    /// Whether it carries a provisional stamp, which keeps its standing and is never a ratification.
     pub fn stamped(&self) -> bool {
         !self.stamped_by.is_empty() || !self.stamp.is_empty()
-    }
-
-    /// Why it binds nothing, as `check` says it, where nothing supersedes it; empty where it binds.
-    pub fn unbound(&self) -> &'static str {
-        if self.stamped() { STAMPED } else { self.standing.unbound() }
     }
 
     /// Whether another tenet replaces it, which is what a supersession chain follows. A demoted row is

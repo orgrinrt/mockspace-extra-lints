@@ -13,7 +13,7 @@ use std::fmt::Write as _;
 use std::path::Path;
 
 use mockspace::RegistryView;
-use registry_lints::standing::Standing;
+use registry_lints::standing::{STAMPED, Standing};
 
 use crate::layout::Layout;
 use crate::rows::{Tenet, carries, subjects, tenets};
@@ -258,13 +258,20 @@ pub fn unratified(all: &[Tenet<'_>], ids: &[&str]) -> Vec<String> {
             let id = raw.strip_prefix("tenet::").unwrap_or(raw);
             all.iter()
                 .find(|t| t.id == id && t.binds() && t.standing != Standing::Ratified)
-                .map(|t| format!("`{id}` is {}, not ratified", t.standing.word()))
+                .map(|t| {
+                    if t.stamped() {
+                        let by = if t.stamped_by.is_empty() { "nobody named" } else { t.stamped_by };
+                        format!("`{id}` is {}, stamped by {by}, not ratified: {STAMPED}", t.standing.word())
+                    } else {
+                        format!("`{id}` is {}, not ratified", t.standing.word())
+                    }
+                })
         })
         .collect()
 }
 
 /// What is wrong with the tenets `ids` name, one line each: an id that is no tenet, an id whose tenet
-/// something supersedes, and an id whose tenet is stamped, demoted or of a standing only the project declares, and binds nothing. A `tenet::` prefix is the
+/// something supersedes, and an id whose tenet is held or demoted and binds nothing. A `tenet::` prefix is the
 /// namespace and is read off, as a citation spells it. Empty when every id names a tenet that still
 /// binds, provisional or ratified.
 pub fn check(all: &[Tenet<'_>], ids: &[&str]) -> Vec<String> {
@@ -283,16 +290,8 @@ pub fn check(all: &[Tenet<'_>], ids: &[&str]) -> Vec<String> {
                         t.superseded_by.join(", ")
                     ))
                 },
-                Some(t) if t.stamped() => {
-                    let by = if t.stamped_by.is_empty() { "nobody named" } else { t.stamped_by };
-                    Some(format!(
-                        "`{id}` is {}, stamped by {by}: {}",
-                        t.standing.word(),
-                        t.unbound()
-                    ))
-                },
                 Some(t) if !t.binds() => {
-                    Some(format!("`{id}` is {}: {}", t.standing.word(), t.unbound()))
+                    Some(format!("`{id}` is {}: {}", t.standing.word(), t.standing.unbound()))
                 },
                 Some(_) => None,
             }

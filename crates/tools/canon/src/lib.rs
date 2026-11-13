@@ -90,7 +90,7 @@ impl Tool for Canon {
             ArgSpec {
                 name:        "term",
                 required:    false,
-                description: "the subject, the word, the row (a bare id, or `namespace::id`) or the tenet the verb asks about; `check` takes one or more tenets, names each provisional one as provisional and still exits 0, and exits 1 on one that is no tenet, is superseded, or is stamped, demoted or of a standing only the project declares, and so binds nothing; `contradicts` takes any number of paths, read in one pass, and with none reads the whole repository; `forbids` with none lists the replaced tenets that name no word they rule out; `show`, `find`, `related` and `citers` read every namespace of the registry, and `--in <namespace>[,<namespace>]` narrows them, `canon` standing for the namespaces `canon_paths` reaches",
+                description: "the subject, the word, the row (a bare id, or `namespace::id`) or the tenet the verb asks about; `check` takes one or more tenets, names each provisional one as provisional and still exits 0, and exits 1 on one that is no tenet, is superseded, or is held or demoted, and so binds nothing; a stamped row keeps its standing and is noted with its stamp; `contradicts` takes any number of paths, read in one pass, and with none reads the whole repository; `forbids` with none lists the replaced tenets that name no word they rule out; `show`, `find`, `related` and `citers` read every namespace of the registry, and `--in <namespace>[,<namespace>]` narrows them, `canon` standing for the namespaces `canon_paths` reaches",
             },
         ]
     }
@@ -181,8 +181,8 @@ fn scope_of(ctx: &ToolContext<'_>, verb: &str) -> Result<Scope, String> {
 /// `check <id>...`: silent when every tenet named exists, still binds and is ratified; one line naming each
 /// provisional one, which is no finding and exits 0, since a tenet that matters now is provisional until
 /// the maintainer goes through it and nothing would pass otherwise; one blocking finding for each that is no tenet, is
-/// superseded, or is stamped or demoted. A brief names the rows its job derives from, and a job built on a row that
-/// is gone, replaced, stamped or demoted is built on nothing, so the coordinator asks before it dispatches.
+/// superseded, or is held or demoted; a stamped one is noted with its stamp and passes as its standing does. A brief names the rows its job derives from, and a job built on a row that
+/// is gone, replaced, held or demoted is built on nothing, so the coordinator asks before it dispatches.
 fn check_report(ids: &[&str], registry: &RegistryView) -> ToolReport {
     if ids.is_empty() {
         return ToolReport::inconclusive("`canon check` wants one or more tenet ids");
