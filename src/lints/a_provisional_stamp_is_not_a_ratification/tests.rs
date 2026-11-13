@@ -162,3 +162,20 @@ fn every_finding_blocks() {
         "{f:?}"
     );
 }
+
+#[test]
+fn a_maintainer_stamp_is_read_as_a_stamp_and_never_as_a_ratification() {
+    let whole = [("rung", "stated"), ("stamped_by", "maintainer"), ("stamp", WHOLE)];
+    assert!(run(&[("ruling::r", &whole)]).is_empty());
+    let f = run(&[("ruling::r", &[
+        ("rung", "ratified"),
+        ("stamped_by", "maintainer"),
+        ("stamp", WHOLE),
+    ])]);
+    assert_eq!(kinds(&f), ["on-a-ratified-row"], "{f:?}");
+    let f = run(&[
+        ("ruling::blessing", &[("rung", "ratified"), ("ratifies", "p")]),
+        ("proposal::p", &[("stamped_by", "maintainer"), ("stamp", WHOLE)]),
+    ]);
+    assert_eq!(kinds(&f), ["ratified-still-stamped"], "{f:?}");
+}

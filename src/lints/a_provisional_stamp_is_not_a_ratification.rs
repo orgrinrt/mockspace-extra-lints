@@ -1,10 +1,11 @@
 //! Lint: a row on a provisional stamp is never read as ratified, and a stamp says what decided it.
 //!
 //! While the lead designer is away, a call that would stop the work is made provisionally: the
-//! coordinators converge on it, or two domain experts agree after a panel stretch, and the stamp
-//! is as good as his for now. It is never the final say. He is asked, in a question ticket, to make
+//! coordinators converge on it, two domain experts agree after a panel stretch, or he himself
+//! directs the row onto a stamp, his passage cited in the stamp. The row then binds as its standing
+//! does. It is never the final say. He is asked, in a question ticket, to make
 //! it formal, and his answer can overturn it. A registry records the stamp on the row it decided,
-//! in two fields: `stamped_by`, which of the two routes stamped it, and `stamp`, what was stamped,
+//! in two fields: `stamped_by`, which of the three routes stamped it, and `stamp`, what was stamped,
 //! why, where it is recorded and the question ticket that asks him. The row keeps its own tier: a
 //! stamp is beside the ratification ladder, not a rung on it.
 //!
@@ -159,8 +160,8 @@ impl RepoLint for AProvisionalStampIsNotARatification {
                             "half",
                             format!(
                                 "`{q}` carries `{STAMP}` and no `{STAMPED_BY}`. Say which route \
-                             stamped it, the coordinators converging or two experts, or take the \
-                             stamp off where neither did."
+                             stamped it, the coordinators converging, two experts or the maintainer \
+                             directing it, or take the stamp off where none did."
                             ),
                         ))
                     },
