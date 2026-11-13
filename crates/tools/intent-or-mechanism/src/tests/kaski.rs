@@ -32,6 +32,7 @@ impl Repo {
         let dir = std::env::temp_dir().join(format!("kaski-iom-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(dir.join("mock/crates/kaski-fire")).unwrap();
+        std::fs::create_dir_all(dir.join("content/kaski")).unwrap();
         std::fs::write(dir.join("mockspace.toml"), SCHEMA).unwrap();
         std::fs::write(dir.join("mock/crates/kaski-fire/DESIGN.md.tmpl"), DESIGN).unwrap();
         Self(dir)
@@ -47,7 +48,7 @@ impl Repo {
         }
         let reg = RegistryView::new(map, BTreeMap::new());
         let crates: BTreeSet<String> = ["kaski-fire".to_string()].into();
-        let dirs: Vec<PathBuf> = Vec::new();
+        let dirs: Vec<PathBuf> = vec![self.0.join("mock/crates")];
         IntentOrMechanism.run(&ToolContext {
             mock_dir:   &self.0.join("mock"),
             repo_root:  &self.0,

@@ -61,7 +61,7 @@ fn registry(rows: &[(&str, &[(&str, &str)])]) -> RegistryView {
 
 fn run(root: &Rooted, reg: &RegistryView, args: &[&str]) -> ToolReport {
     let crates = BTreeSet::new();
-    let dirs: Vec<PathBuf> = Vec::new();
+    let dirs: Vec<PathBuf> = vec![root.0.join("crates")];
     IntentOrMechanism.run(&ToolContext {
         mock_dir: &root.0,
         repo_root: &root.0,
@@ -119,6 +119,26 @@ fn every_shape_that_names_a_spelling_is_found_and_named() {
             "and prose carrying no spelling is not: {out}"
         );
     }
+}
+
+#[test]
+fn a_directory_at_the_root_is_a_path_and_one_the_tree_does_not_hold_is_not() {
+    let root = Rooted::new("roots", TWO_NS);
+    std::fs::create_dir_all(root.0.join("content")).unwrap();
+    std::fs::create_dir_all(root.0.join(".git")).unwrap();
+    let reg = registry(&[
+        ("mechanism::seal", &[("name", "the seal")]),
+        ("ruling::a", &[("says", "it lives at content/beings")]),
+        // THE CONTROL: the same spelling under a directory the tree does not hold, and one it holds
+        // hidden, are prose and not paths.
+        ("ruling::b", &[("says", "it lives at gear/beings and at .git/beings")]),
+    ]);
+    let out = run(&root, &reg, &[]).output;
+    assert!(
+        out.contains("ruling::a says: a path in the repository (`content/`)"),
+        "{out}"
+    );
+    assert!(!out.contains("ruling::b"), "{out}");
 }
 
 /// One namespace declaring two statement fields, for the counting tests.

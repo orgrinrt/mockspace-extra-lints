@@ -180,16 +180,16 @@ fn names_crate(lower: &str, krate: &str) -> bool {
     })
 }
 
-/// Every identifier the designs under `mock_dir/crates/` write in backticks, with the crates whose
-/// design writes it, and how many designs were read.
+/// Every identifier the designs of the crates under the source directories write in backticks, with
+/// the crates whose design writes it, and how many designs were read.
 ///
 /// An identifier is a capital and then at least two more letters or digits: a type, a trait, a
 /// variant. A path or a call in backticks is not one, and a statement naming either is caught by
 /// [`SHAPES`] instead.
-fn design_types(mock_dir: &std::path::Path) -> (BTreeMap<String, Vec<String>>, usize) {
+fn design_types(src_dirs: &[std::path::PathBuf]) -> (BTreeMap<String, Vec<String>>, usize) {
     let mut out: BTreeMap<String, Vec<String>> = BTreeMap::new();
     let mut read = 0usize;
-    for (krate, dir) in crate::tree_walk::subdirs(&mock_dir.join("crates")) {
+    for (krate, dir) in src_dirs.iter().flat_map(|d| crate::tree_walk::subdirs(d)) {
         let Ok(text) = std::fs::read_to_string(dir.join("DESIGN.md.tmpl")) else {
             continue;
         };
@@ -209,6 +209,24 @@ fn design_types(mock_dir: &std::path::Path) -> (BTreeMap<String, Vec<String>>, u
     (out, read)
 }
 
+/// The directories at the repository root, each with its slash, which a path in the repository starts
+/// at. Read from the tree, since which directories those are is the repository's own; a hidden
+/// directory, the build directory and a root [`SHAPES`] already names are left out.
+fn path_roots(repo_root: &std::path::Path) -> Vec<String> {
+    let mut out: Vec<String> = std::fs::read_dir(repo_root)
+        .into_iter()
+        .flatten()
+        .filter_map(Result::ok)
+        .filter(|e| e.path().is_dir())
+        .filter_map(|e| e.file_name().to_str().map(str::to_owned))
+        .filter(|n| !n.starts_with('.') && n != "target")
+        .map(|n| format!("{n}/"))
+        .filter(|r| !SHAPES.iter().any(|(s, _)| s == r))
+        .collect();
+    out.sort();
+    out
+}
+
 /// Text shapes that name a spelling rather than a thing.
 ///
 /// Each is matched as a substring on purpose: a version or a path fragment is not a word and does not
@@ -217,12 +235,10 @@ fn design_types(mock_dir: &std::path::Path) -> (BTreeMap<String, Vec<String>>, u
 ///
 /// kamu matched a bare `/` as a path separator. kaski writes alternatives with one, `Being/Genome`,
 /// `realm/culture/region`, and every slash in its statements when this was ported was one of those,
-/// so a path is matched by the roots this repository's paths start at instead.
+/// so a path is matched by the roots the repository's paths start at instead, which [`path_roots()`]
+/// reads from the tree, and by `src/`, which every crate's paths pass through.
 const SHAPES: &[(&str, &str)] = &[
     ("::", "a Rust path"),
-    ("mock/", "a path in the repository"),
-    ("content/", "a path in the repository"),
-    ("docs/", "a path in the repository"),
     ("src/", "a path in the repository"),
     ("--", "a command-line flag"),
     (".toml", "a file extension"),
@@ -292,13 +308,14 @@ impl Tool for IntentOrMechanism {
             );
         }
 
-        let (types, designs) = design_types(ctx.mock_dir);
+        let (types, designs) = design_types(ctx.src_dirs);
+        let roots = path_roots(ctx.repo_root);
         if types.is_empty() {
             return ToolReport::inconclusive(format!(
                 "no design declares a type: {designs} `DESIGN.md.tmpl` read under {}, and none \
                  writes an identifier in backticks. Half of what this looks for could not be looked \
                  for, so a clean report would be about the instrument rather than the canon.",
-                ctx.mock_dir.join("crates").display()
+                ctx.src_dirs.iter().map(|d| d.display().to_string()).collect::<Vec<_>>().join(", ")
             ));
         }
         let crates: Vec<String> = ctx.all_crates.iter().map(|c| c.to_lowercase()).collect();
@@ -343,6 +360,11 @@ impl Tool for IntentOrMechanism {
                     for (shape, what) in SHAPES {
                         if text.contains(shape) {
                             found.push(format!("{what} (`{shape}`)"));
+                        }
+                    }
+                    for root in &roots {
+                        if text.contains(root.as_str()) {
+                            found.push(format!("a path in the repository (`{root}`)"));
                         }
                     }
                     if !found.is_empty() {
