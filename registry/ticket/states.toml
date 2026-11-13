@@ -1,0 +1,82 @@
+# The board's columns. A state is a row: add one here and the board and the tool know it, and a kind
+# lists it in `states` to allow it. `column` orders the board from the left.
+
+[[ticket_state]]
+id = "backlog"
+title = "Backlog"
+what = "Wanted, not yet shaped or not yet next."
+column = 10
+needs_holder = false
+needs_met = false
+closed = false
+satisfies = false
+
+[[ticket_state]]
+id = "ready"
+title = "Ready"
+what = "Shaped and unblocked, waiting for someone to take it."
+column = 20
+needs_holder = false
+needs_met = false
+closed = false
+satisfies = false
+
+[[ticket_state]]
+id = "doing"
+title = "Doing"
+what = "Someone holds it and is working on it."
+column = 30
+needs_holder = true
+needs_met = true
+closed = false
+satisfies = false
+
+[[ticket_state]]
+id = "waiting"
+title = "Waiting"
+what = "Held, and stopped on an answer, a refusal or something outside it."
+column = 40
+needs_holder = true
+needs_met = false
+closed = false
+satisfies = false
+
+[[ticket_state]]
+id = "review"
+title = "Review"
+what = "Finished by its holder and not yet landed or accepted."
+column = 50
+needs_holder = true
+needs_met = true
+closed = false
+satisfies = false
+
+[[ticket_state]]
+id = "done"
+title = "Done"
+what = "Landed or accepted. A ticket that needs this one may start."
+column = 60
+needs_holder = false
+needs_met = true
+closed = true
+satisfies = true
+
+[[ticket_state]]
+id = "dropped"
+title = "Dropped"
+what = "Given up. It meets no `needs` edge, so nothing open may still need it."
+column = 70
+needs_holder = false
+needs_met = false
+closed = true
+satisfies = false
+
+[[ticket_state]]
+id = "held"
+title = "Held"
+what = "Parked on purpose by its holder: kept off the next list and not dropped, so a coordinator's churn shows as held work and not as waiting."
+column = 45
+needs_holder = true
+needs_met = false
+closed = false
+satisfies = false

@@ -1,0 +1,18 @@
+[package]
+name = "mockspace-extra-finish"
+description = "Lists, for a branch, the open tickets in the crates it touched and the canon rows beside its brief that it does not cite, and reads the answers a report gives to each."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+# the trait crate under the name the generated collector gives it; the engine patches every spelling
+# of it to the one it is built from
+mockspace.workspace = true
+# the tenets and how they join, read once by the tool that owns them
+canon.workspace = true
+# the tickets and their board, read once by the tool that owns them
+tickets.workspace = true
+# where the mock directory sits, which a path's crate is read under
+registry-lints.workspace = true

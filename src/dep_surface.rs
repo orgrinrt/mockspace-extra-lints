@@ -192,11 +192,10 @@ pub fn sources<'r>(view: &View<'r>, dir: &Path) -> Sources<'r> {
     for (text, tree) in &files {
         for kind in ["struct_item", "enum_item", "trait_item", "type_item", "union_item"] {
             for_each_kind(tree.root_node(), kind, &mut |node| {
-                if is_plain_pub(node, text) {
-                    if let Some(name) = node.child_by_field_name("name") {
+                if is_plain_pub(node, text)
+                    && let Some(name) = node.child_by_field_name("name") {
                         declared.insert(txt(name, text).to_string());
                     }
-                }
             });
         }
     }
@@ -394,11 +393,10 @@ fn take(
         }
         // Qualified with a root that is not the crate's own is a name from one
         // crate further down, which this does not read.
-        if let Some(root) = &named.root {
-            if !matches!(root.as_str(), "crate" | "self" | "super") {
+        if let Some(root) = &named.root
+            && !matches!(root.as_str(), "crate" | "self" | "super") {
                 continue;
             }
-        }
         if !sources.declared.contains(&named.name) {
             continue;
         }

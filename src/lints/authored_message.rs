@@ -99,11 +99,10 @@ pub(crate) fn body_on_the_command_line(command: &str) -> Option<String> {
             if after_unknown_flag {
                 continue;
             }
-            if let Some(rest) = w.strip_prefix(forge.short) {
-                if !rest.is_empty() {
+            if let Some(rest) = w.strip_prefix(forge.short)
+                && !rest.is_empty() {
                     found = Some(unexpanded(rest));
                 }
-            }
         }
         if let Some(body) = found {
             return body;
@@ -371,15 +370,14 @@ fn collect_messages(segment: &[String], into: &mut Vec<String>) {
             i += 1;
             continue;
         }
-        if w == "--message" {
-            if let Some(v) = segment.get(i + 1) {
+        if w == "--message"
+            && let Some(v) = segment.get(i + 1) {
                 push_authored(v, into);
                 i += 2;
                 continue;
             }
-        }
-        if let Some(short) = w.strip_prefix('-').filter(|s| !s.starts_with('-')) {
-            if let Some(at) = short.find('m') {
+        if let Some(short) = w.strip_prefix('-').filter(|s| !s.starts_with('-'))
+            && let Some(at) = short.find('m') {
                 let cluster_is_flags = short[.. at].chars().all(|c| CLUSTERED_BEFORE_M.contains(c));
                 let attached = &short[at + 1 ..];
                 if cluster_is_flags && !attached.is_empty() {
@@ -389,15 +387,13 @@ fn collect_messages(segment: &[String], into: &mut Vec<String>) {
                     i += 1;
                     continue;
                 }
-                if cluster_is_flags && attached.is_empty() {
-                    if let Some(v) = segment.get(i + 1) {
+                if cluster_is_flags && attached.is_empty()
+                    && let Some(v) = segment.get(i + 1) {
                         push_authored(v, into);
                         i += 2;
                         continue;
                     }
-                }
             }
-        }
         i += 1;
     }
 }

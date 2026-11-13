@@ -1,0 +1,36 @@
+# What a ticket kind and a ticket state mean to planning, so the tickets layer names no planning term.
+
+[[plan_kind_role]]
+id = "task"
+ticket_kind = "task"
+work = true
+complication = false
+
+[[plan_kind_role]]
+id = "job"
+ticket_kind = "job"
+work = true
+complication = false
+
+[[plan_kind_role]]
+id = "question"
+ticket_kind = "question"
+work = false
+complication = false
+
+[[plan_kind_role]]
+id = "complication"
+ticket_kind = "complication"
+work = false
+complication = true
+
+[[plan_state_role]]
+id = "doing"
+ticket_state = "doing"
+starts = true
+
+[[plan_kind_role]]
+id = "track"
+ticket_kind = "track"
+work = false
+complication = false

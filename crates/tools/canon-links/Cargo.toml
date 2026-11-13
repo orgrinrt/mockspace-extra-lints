@@ -1,0 +1,16 @@
+[package]
+name = "mockspace-extra-canon-links"
+description = "Reports how well the canon's rows are joined and found: keywords, relations and a probe set."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+# the trait crate under the name the generated collector gives it; the engine patches every spelling
+# of it to the one it is built from
+mockspace.workspace = true
+# the tenets, and the two questions the probes put to them, from the tool that answers them
+canon.workspace = true
+# the probe set is a TOML file
+toml.workspace = true

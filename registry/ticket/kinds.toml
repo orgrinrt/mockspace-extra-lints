@@ -1,0 +1,48 @@
+# The kinds of ticket. A kind is a row: it lists the states it allows, the fields it must have filled
+# before it is held, and what a move that satisfies it carries. A backlog item is a state and a todo
+# is a task, so neither is a kind; a question put to the maintainer is the `question` kind, closed by a move
+# carrying their answer.
+
+[[ticket_kind]]
+id = "task"
+title = "Task"
+what = "A unit of work of any size, done by anyone, that may be part of another ticket or have parts."
+states = ["backlog", "ready", "doing", "waiting", "held", "review", "done", "dropped"]
+initial = "backlog"
+view = "form"
+
+[[ticket_kind]]
+id = "job"
+title = "Job"
+what = "A task run by a helper session from a brief on the coordination channel, on a branch of its own."
+states = ["backlog", "ready", "doing", "waiting", "held", "review", "done", "dropped"]
+initial = "backlog"
+requires = ["brief", "branch"]
+view = "form"
+
+[[ticket_kind]]
+id = "question"
+title = "Question"
+what = "A question put to the maintainer, with the options it was put with. It waits under their name and their answer closes it."
+states = ["backlog", "waiting", "done", "dropped"]
+initial = "backlog"
+satisfied_by = ["answer", "picks"]
+requires = ["related:subject"]
+view = "question"
+
+[[ticket_kind]]
+id = "complication"
+title = "Complication"
+what = "A declared difficulty in the way of a run of work, held open until it is resolved. Planning reads an open one as a complication of the span its member rows put it in."
+states = ["backlog", "ready", "doing", "waiting", "held", "review", "done", "dropped"]
+initial = "backlog"
+view = "form"
+
+[[ticket_kind]]
+id = "track"
+title = "Track"
+what = "A coordinator's line of work toward one shown result. Its steps are the tickets that are part of it, and their order and the waits between tracks are asked of the registry."
+states = ["backlog", "ready", "doing", "waiting", "held", "review", "done", "dropped"]
+initial = "backlog"
+requires = ["shows"]
+view = "form"

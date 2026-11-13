@@ -1,0 +1,13 @@
+[package]
+name = "mockspace-extra-tackle"
+description = "Weighs every subject on five signals and names the one most owed work, with the reason."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+# the trait crate under the name the generated collector gives it; the engine patches every spelling
+# of it to the one it is built from
+mockspace.workspace = true
+corpus.workspace = true
