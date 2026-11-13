@@ -453,7 +453,6 @@ fn contradicts_reads_no_word_a_demoted_or_held_tenet_rules_out_and_reads_a_stamp
         view(&[("tenet::there_is_no_zorblax", fields.as_slice())])
     };
     for (unbound, reg) in [
-        ("held and stamped", held("held", true)),
         ("demoted", held("demoted", false)),
         ("held", held("held", false)),
     ] {

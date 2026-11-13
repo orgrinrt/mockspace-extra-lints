@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MPL-2.0     https://mozilla.org/MPL/2.0        contact@hiisi.digital
 //--------------------------------------------------------------------------------------------------
 
-//! Whether a row of the canon binds, read from its `standing`, and whether it carries a stamp.
+//! Whether a canon row binds, read from its `standing`, and whether it is stamped.
 //!
 //! This file declares no lint. The canon lints and the canon tool read a row's standing through it, so
 //! the set of words, which of them bind and what a stamp is are named once.
@@ -11,11 +11,6 @@
 use mockspace::RegistryView;
 
 use crate::canon_rows::{list, text};
-
-/// The two fields a provisional stamp writes on a row: who stamped it and the stamp itself (what, why,
-/// where it is recorded, the question ticket that asks the maintainer). The shape is the one the
-/// `a-provisional-stamp-is-not-a-ratification` lint holds rows to.
-pub const STAMP_FIELDS: [&str; 2] = ["stamped_by", "stamp"];
 
 /// What a stamp is, as `check` says it beside a stamped row.
 pub const STAMPED: &str =
@@ -88,7 +83,7 @@ impl Standing {
 /// Whether the row `q` carries a provisional stamp: either stamp field is written. A stamp keeps the
 /// row's standing and changes nothing about whether it binds; it is never a ratification.
 pub fn stamped(reg: &RegistryView, q: &str) -> bool {
-    STAMP_FIELDS
+    stamp::FIELDS
         .iter()
         .any(|f| text(reg, q, f).is_some_and(|v| !v.is_empty()))
 }

@@ -58,6 +58,11 @@ impl Tenet<'_> {
         !self.stamped_by.is_empty() || !self.stamp.is_empty()
     }
 
+    /// The question ticket its stamp names, where it names one.
+    pub fn ticket(&self) -> Option<&str> {
+        stamp::ticket(self.stamp)
+    }
+
     /// Whether another tenet replaces it, which is what a supersession chain follows. A demoted row is
     /// not replaced: it binds nothing and has no heir.
     pub fn replaced(&self) -> bool {
@@ -138,8 +143,8 @@ pub fn tenets(reg: &RegistryView) -> Vec<Tenet<'_>> {
             Tenet {
                 id:            slug(q),
                 standing:      Standing::of(text(reg, q, "standing")),
-                stamped_by:    text(reg, q, "stamped_by"),
-                stamp:         text(reg, q, "stamp"),
+                stamped_by:    text(reg, q, stamp::STAMPED_BY),
+                stamp:         text(reg, q, stamp::STAMP),
                 subject:       reg
                     .field(q, "subject")
                     .map(str::trim)

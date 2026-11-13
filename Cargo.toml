@@ -94,7 +94,7 @@ mockspace-extra-lints = { path = ".", features = ["workflow"] }
 mockspace = { git = "https://github.com/hiisi-digital/mockspace.git", branch = "dev" }
 
 [workspace]
-members = [".", "crates/registry-lints", "crates/ticket-model", "crates/planning", "crates/tools/*"]
+members = [".", "crates/registry-lints", "crates/stamp", "crates/ticket-model", "crates/planning", "crates/tools/*"]
 resolver = "3"
 
 [workspace.package]
@@ -112,6 +112,7 @@ mockspace-registry = { git = "https://github.com/hiisi-digital/mockspace.git", b
 # Private, so spelled ssh: over https git waits for a credential nobody supplies.
 muisti = { git = "ssh://git@github.com/orgrinrt/muisti", branch = "dev", default-features = false }
 toml = "1"
+stamp = { package = "mockspace-extra-stamp", path = "crates/stamp" }
 registry-lints = { package = "mockspace-extra-registry-lints", path = "crates/registry-lints" }
 ticket-model = { package = "mockspace-extra-ticket-model", path = "crates/ticket-model" }
 planning = { package = "mockspace-extra-planning", path = "crates/planning" }

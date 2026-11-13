@@ -261,7 +261,14 @@ pub fn unratified(all: &[Tenet<'_>], ids: &[&str]) -> Vec<String> {
                 .map(|t| {
                     if t.stamped() {
                         let by = if t.stamped_by.is_empty() { "nobody named" } else { t.stamped_by };
-                        format!("`{id}` is {}, stamped by {by}, not ratified: {STAMPED}", t.standing.word())
+                        let asked = t.ticket().map_or_else(
+                            || "naming no question ticket".to_string(),
+                            |k| format!("asked in ticket `{k}`"),
+                        );
+                        format!(
+                            "`{id}` is {}, stamped by {by}, not ratified, {asked}: {STAMPED}",
+                            t.standing.word()
+                        )
                     } else {
                         format!("`{id}` is {}, not ratified", t.standing.word())
                     }
@@ -271,7 +278,9 @@ pub fn unratified(all: &[Tenet<'_>], ids: &[&str]) -> Vec<String> {
 }
 
 /// What is wrong with the tenets `ids` name, one line each: an id that is no tenet, an id whose tenet
-/// something supersedes, and an id whose tenet is held or demoted and binds nothing. A `tenet::` prefix is the
+/// something supersedes, an id whose tenet is held or demoted and binds nothing, and an id whose tenet
+/// states no standing the pack reads, which the word lints read as binding so it never slips out of
+/// them, and which a brief must not rest on until it is written. A `tenet::` prefix is the
 /// namespace and is read off, as a citation spells it. Empty when every id names a tenet that still
 /// binds, provisional or ratified.
 pub fn check(all: &[Tenet<'_>], ids: &[&str]) -> Vec<String> {
@@ -288,6 +297,12 @@ pub fn check(all: &[Tenet<'_>], ids: &[&str]) -> Vec<String> {
                     Some(format!(
                         "`{id}` is superseded by {}",
                         t.superseded_by.join(", ")
+                    ))
+                },
+                Some(t) if t.standing == Standing::Unstated => {
+                    Some(format!(
+                        "`{id}` states no standing the pack reads; write one of {}",
+                        Standing::WORDS.join(", ")
                     ))
                 },
                 Some(t) if !t.binds() => {

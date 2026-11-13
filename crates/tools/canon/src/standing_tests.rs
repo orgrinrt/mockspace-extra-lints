@@ -274,18 +274,37 @@ fn a_stamped_row_keeps_its_standing_and_binds_as_it_does() {
 }
 
 #[test]
-fn check_passes_a_stamped_row_and_notes_its_stamp() {
+fn check_passes_a_stamped_row_and_notes_its_stamp_and_ticket() {
     let r = run(&waiting(), &scratch(), &["check", "kept", "asked"]);
     assert!(matches!(r.outcome, Outcome::Clean { .. }), "{:?}", r.outcome);
     assert!(!r.outcome.blocks(mockspace::LintMode::Push));
     assert!(
-        r.output.contains("`asked` is provisional, stamped by experts, not ratified")
-            && r.output.contains("never a ratification"),
+        r.output.contains(
+            "`asked` is provisional, stamped by experts, not ratified, asked in ticket `0123456789ab`"
+        ) && r.output.contains("never a ratification"),
         "{}",
         r.output
     );
-    // THE CONTROL: the unstamped provisional row is noted with no stamp.
-    assert!(r.output.contains("`kept` is provisional, not ratified"), "{}", r.output);
+    // THE CONTROL: the unstamped provisional row is noted with no stamp and no ticket.
+    assert!(r.output.contains("`kept` is provisional, not ratified\n"), "{}", r.output);
+}
+
+#[test]
+fn a_stamp_naming_no_ticket_is_noted_as_naming_none() {
+    let reg = view(&[("tenet::asked", &[
+        ("standing", "provisional"),
+        ("stamped_by", "experts"),
+        ("stamp", "two experts agreed, recorded in ROWS.md"),
+        ("what", "Waits on the maintainer."),
+    ])]);
+    let r = run(&reg, &scratch(), &["check", "asked"]);
+    assert!(
+        r.output.contains("stamped by experts, not ratified, naming no question ticket"),
+        "{}",
+        r.output
+    );
+    // THE CONTROL: the stamp lint is what refuses such a row; the canon tool notes it and passes.
+    assert!(matches!(r.outcome, Outcome::Clean { .. }), "{:?}", r.outcome);
 }
 
 #[test]
@@ -307,21 +326,58 @@ fn a_listing_marks_a_stamped_row_and_the_subjects_count_it_binding() {
 }
 
 #[test]
-fn a_row_the_maintainer_put_on_a_stamp_is_noted_as_stamped_and_never_as_ratified() {
+fn a_row_on_any_route_is_noted_as_stamped_and_never_as_ratified() {
+    for route in stamp::ROUTES {
+        let reg = view(&[("tenet::asked", &[
+            ("standing", "provisional"),
+            ("stamped_by", route),
+            ("stamp", "recorded at `OP-ANSWERS-18.md:5`, ticket `0123456789ab`"),
+            ("what", "Waits on the maintainer."),
+        ])]);
+        let r = run(&reg, &scratch(), &["check", "asked"]);
+        assert!(matches!(r.outcome, Outcome::Clean { .. }), "{route}: {:?}", r.outcome);
+        assert!(
+            r.output.contains(&format!("`asked` is provisional, stamped by {route}, not ratified")),
+            "{route}: {}",
+            r.output
+        );
+    }
+    // THE CONTROL: a ratified row carrying the same stamp is not noted as unratified, so the note above
+    // comes from the standing and the route cannot turn it off.
     let reg = view(&[("tenet::asked", &[
-        ("standing", "provisional"),
+        ("standing", "ratified"),
         ("stamped_by", "maintainer"),
-        ("stamp", "on the maintainer's own word, OP-ANSWERS-18.md:5, ticket `0123456789ab`"),
-        ("what", "Waits on the maintainer."),
+        ("stamp", "recorded at `OP-ANSWERS-18.md:5`, ticket `0123456789ab`"),
+        ("what", "Ratified."),
     ])]);
     let r = run(&reg, &scratch(), &["check", "asked"]);
+    assert!(!r.output.contains("not ratified"), "{}", r.output);
+}
+
+#[test]
+fn check_blocks_on_a_missing_or_misspelt_standing_that_the_word_lints_still_read_as_binding() {
+    let reg = view(&[
+        ("tenet::bare", &[("what", "No standing at all.")]),
+        ("tenet::cap", &[("standing", "Held"), ("what", "A misspelt word of the set.")]),
+        ("tenet::kept", &[("standing", "provisional"), ("what", "Matters now.")]),
+    ]);
+    let r = run(&reg, &scratch(), &["check", "bare", "cap", "kept"]);
+    match &r.outcome {
+        Outcome::Findings(f) => {
+            assert_eq!(f.len(), 2, "{f:?}");
+            for (row, id) in f.iter().zip(["bare", "cap"]) {
+                assert!(
+                    row.message.contains(&format!("`{id}` states no standing the pack reads")),
+                    "{}",
+                    row.message
+                );
+            }
+        },
+        other => panic!("{other:?}"),
+    }
+    let all = tenets(&reg);
+    assert!(all.iter().all(|t| t.binds()), "the word lints keep reading both as binding");
+    // THE CONTROL: the provisional row alone is clean.
+    let r = run(&reg, &scratch(), &["check", "kept"]);
     assert!(matches!(r.outcome, Outcome::Clean { .. }), "{:?}", r.outcome);
-    assert!(
-        r.output.contains("`asked` is provisional, stamped by maintainer, not ratified"),
-        "{}",
-        r.output
-    );
-    // THE CONTROL: the maintainer's route counts as no ratification, so the row is not read as ratified.
-    let subs = answered(&run(&reg, &scratch(), &["subjects"])).to_string();
-    assert!(subs.contains("1 binding, 0 ratified"), "{subs}");
 }

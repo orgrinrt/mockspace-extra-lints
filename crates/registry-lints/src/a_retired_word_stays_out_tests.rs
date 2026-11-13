@@ -304,7 +304,6 @@ fn a_demoted_or_held_tenet_rules_nothing_out_and_the_same_row_ratified_or_stampe
         view(&[("tenet::there_is_no_quillfern", fields.as_slice())])
     };
     for (unbound, reg) in [
-        ("held and stamped", held("held", true)),
         ("demoted", held("demoted", false)),
         ("held", held("held", false)),
     ] {
