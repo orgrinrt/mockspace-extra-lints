@@ -17,12 +17,15 @@
 //!
 //! A tool because it takes a question, the clone to read: the source is another repository, which no
 //! gate can count on being beside this one.
+//!
+//! The comparison, the locator and the reading of a source are public, so a project whose rows cite
+//! some other kind of place, files of a package registry or one forge's links, writes its own tool on
+//! them and registers it in its own pack, and the ladder stays the one this tool reads by.
 
-mod bevy;
-mod compare;
+pub mod compare;
 mod coverage;
-mod locator;
-mod source;
+pub mod locator;
+pub mod source;
 
 #[cfg(test)]
 mod tests;
@@ -236,129 +239,14 @@ impl Tool for QuoteCheck {
     }
 }
 
-/// `mock bevy-quote-check <registry> [<clone>]`: whether the rows of `bevy` quote the lines they cite.
-pub struct BevyQuoteCheck;
-
-impl Tool for BevyQuoteCheck {
-    fn name(&self) -> &'static str {
-        "bevy-quote-check"
-    }
-
-    fn description(&self) -> &'static str {
-        "whether the rows of the bevy reference quote the crate source or the manifest lines they cite as they are"
-    }
-
-    fn purpose(&self) -> Purpose {
-        Purpose::Check(NotALint::TakesAQuestion)
-    }
-
-    fn args(&self) -> &'static [ArgSpec] {
-        &[
-            ArgSpec {
-                name:        "registry",
-                required:    true,
-                description: "the cargo registry's source directory, `<cargo home>/registry/src/<index>`, holding `<crate>-<version>`",
-            },
-            ArgSpec {
-                name:        "clone",
-                required:    false,
-                description: "a clone of Bevy's repository, read at the tag a blob citation names",
-            },
-        ]
-    }
-
-    fn help(&self) -> &'static str {
-        "Each row of `bevy` with a `quote` is compared with the first place its `doc` names. A crate source \
-         (`<crate>-<version>/<path>:<first>-<last>`) is read from the registry directory, a blob of Bevy's repository \
-         (`.../blob/<tag>/<path>#L<first>-L<last>`) from the clone at that tag. The quote is an excerpt, so it is held \
-         when its lines follow one another inside one cited range, the first and last only as far as they are quoted. \
-         The findings are absent, no-file and past-end. A crate version the registry does not hold is counted as \
-         no-source, a blob with no clone given as needing one, and a row whose quote may be the words of a page it \
-         also cites as not local; none of those is passed or a finding."
-    }
-
-    fn run(&self, ctx: &ToolContext<'_>) -> ToolReport {
-        let (Some(registry), clone) = (ctx.args.first(), ctx.args.get(1)) else {
-            return ToolReport::inconclusive(
-                "`bevy-quote-check` wants the cargo registry's source directory".to_owned(),
-            );
-        };
-        let abs = |p: &str| {
-            let p = Path::new(p);
-            if p.is_absolute() { p.to_path_buf() } else { ctx.repo_root.join(p) }
-        };
-        let mut crates = bevy::CrateDirs::at(&abs(registry));
-        let clone_root = clone.map(|c| abs(c));
-        if clone_root.as_deref().is_some_and(|r| !Git::readable(r)) {
-            return ToolReport::inconclusive(
-                "the clone of Bevy is not a clone git can read".to_owned(),
-            );
-        }
-        let mut blobs = clone_root.as_deref().map(Git::at);
-        let mut counts: BTreeMap<&'static str, usize> = BTreeMap::new();
-        let mut examined = 0;
-        let mut findings = Vec::new();
-        for q in ctx.registry.rows_in("bevy") {
-            let Some(row) = ctx.registry.row(q) else { continue };
-            let Some(quote) = row.get("quote") else { continue };
-            examined += 1;
-            let doc = row.get("doc").map_or("", String::as_str);
-            let outcome = bevy::check(doc, quote, &mut crates, blobs.as_mut());
-            *counts.entry(outcome.name()).or_default() += 1;
-            if outcome.is_finding() {
-                findings.push(LintError::error(
-                    "bevy-quote-check".to_owned(),
-                    0,
-                    "bevy-quote-check",
-                    bevy_finding(q, doc, &outcome),
-                ));
-            }
-        }
-        if examined == 0 {
-            return ToolReport::inconclusive("no row of `bevy` carries a `quote` field".to_owned());
-        }
-        let parts: Vec<String> = counts
-            .iter()
-            .map(|(name, n)| format!("{n} {name}"))
-            .collect();
-        let mut output = format!("{examined} rows of `bevy` quote: {}", parts.join(", "));
-        output.push('\n');
-        if findings.is_empty() {
-            ToolReport::reported(output, examined)
-        } else {
-            ToolReport {
-                outcome: Outcome::Findings(findings),
-                output,
-            }
-        }
-    }
-}
-
-fn bevy_finding(q: &str, doc: &str, outcome: &bevy::Outcome) -> String {
-    match outcome {
-        bevy::Outcome::Absent(line) => {
-            format!("`{q}` quotes `{line}`, which is in none of the places it cites: {doc}")
-        },
-        bevy::Outcome::NoFile(path) => {
-            format!("`{q}` cites `{path}`, which its source does not hold")
-        },
-        bevy::Outcome::PastEnd {
-            path,
-            first,
-            lines,
-        } => format!("`{q}` cites line {first} of `{path}`, which has {lines} lines"),
-        other => format!("`{q}` is {}", other.name()),
-    }
-}
-
 /// The refusal of a run given no `--base` in which `missing` rows cite a bare file name the clone's
 /// root does not hold: their documents sit under a directory the run was not told, so each would read as
-/// a false no-file finding (3451 of them for the seed documents of a renderer namespace).
+/// a false no-file finding.
 pub(crate) fn unbased(base: &str, missing: usize) -> Option<String> {
     (base.is_empty() && missing > 0).then(|| {
         format!(
             "{missing} rows cite a bare file name the clone's root does not hold; name the directory those \
-             documents sit under with `--base <dir>` (the seed documents: `--base mock/research/seed`)"
+             documents sit under with `--base <dir>`"
         )
     })
 }
@@ -407,5 +295,5 @@ fn coverage_report(c: &coverage::Coverage) -> String {
 }
 
 mockspace::lint_pack! {
-    tools: [QuoteCheck, BevyQuoteCheck],
+    tools: [QuoteCheck],
 }

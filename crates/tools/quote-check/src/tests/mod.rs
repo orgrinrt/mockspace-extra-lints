@@ -6,7 +6,6 @@
 //! The comparison, the locator and the coverage, each against a source held in memory, and every
 //! verdict beside the near case that must not reach it.
 
-mod bevy;
 mod compare;
 mod coverage;
 mod locator;
