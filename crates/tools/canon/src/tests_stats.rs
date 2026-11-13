@@ -15,7 +15,7 @@ fn planted() -> (PathBuf, corpus::repo::Ready) {
     )
     .unwrap();
     let cache = repo.join("cache");
-    let ready = corpus::repo::ready_at(Some(&cache), &repo.join("mock"), &repo, None);
+    let ready = corpus::repo::ready_at(Some(&cache), &repo.join("mock"), &repo, None, &[]);
     (repo, ready)
 }
 

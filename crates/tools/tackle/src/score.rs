@@ -53,9 +53,8 @@ pub const WEIGHTS: [(&str, f64); 5] = [
     // a data store specified across four documents and carried by one pointer
     // row. A topic scoring high here needs transcription rather than thought.
     ("unread", 0.30),
-    // How much of the subject has been superseded. kamu weighed here the share an
-    // expert proposed rather than op ratified; every kaski tenet is op's, and a
-    // subject whose rows keep being replaced is the nearest thing to unsettled.
+    // How much of the subject has been superseded. A subject whose rows keep
+    // being replaced is the nearest thing to unsettled.
     ("moving", 0.16),
     // Holes somebody wrote down: rows marking something left open. Cheap to act
     // on and easy to forget, because a hole is invisible to anything counting rows.
@@ -280,8 +279,7 @@ mod tests {
 
     #[test]
     fn a_subject_still_moving_outranks_a_settled_one() {
-        // kamu's arm here was ratified against argued. Every kaski tenet is op's, so
-        // the signal reads how much of a subject has been superseded instead.
+        // The signal reads how much of a subject has been superseded.
         let order =
             ranked(&[("settled", raw(20, 0, 2, 20, 50.0)), ("moving", raw(20, 20, 2, 20, 50.0))]);
         assert_eq!(order.first().map(String::as_str), Some("moving"));

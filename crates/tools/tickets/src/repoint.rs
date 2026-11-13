@@ -7,7 +7,7 @@
 //! written to name the heir.
 //!
 //! What binds in a superseded tenet's place is read once, by `canon`, and which links a ticket should hold
-//! is `kaski-tickets`'s `repoint`; this is only the write, one links-alone record per ticket changed, each
+//! is the ticket model crate's `repoint`; this is only the write, one links-alone record per ticket changed, each
 //! judged by the same rules as any other.
 
 use std::path::Path;

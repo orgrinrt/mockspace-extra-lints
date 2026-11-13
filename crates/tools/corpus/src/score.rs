@@ -189,7 +189,7 @@ const SATURATION: f64 = 1.2;
 ///   always wins, which is what a naive grep over this corpus does.
 /// - **Position.** A hit in a heading is the document declaring its subject; a
 ///   hit in a blockquote is somebody being quoted, and in this corpus that is
-///   usually op. Both outrank a mention in passing.
+///   usually the maintainer. Both outrank a mention in passing.
 /// - **Coverage.** How many of the question's distinct terms land, which
 ///   separates a document about the subject from one that says one of its words
 ///   forty times. This is the part a term-frequency ranking cannot express and

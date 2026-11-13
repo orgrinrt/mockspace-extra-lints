@@ -440,7 +440,7 @@ fn ask(s: &Scratch, args: &[&str]) -> mockspace::tool::ToolReport {
     use mockspace::tool::ToolContext;
     let crates = std::collections::BTreeSet::new();
     let registry = mockspace::RegistryView::default();
-    crate::Tickets
+    crate::Tickets::default()
         .answer(&ToolContext {
             mock_dir: &s.mock,
             repo_root: &s.mock,

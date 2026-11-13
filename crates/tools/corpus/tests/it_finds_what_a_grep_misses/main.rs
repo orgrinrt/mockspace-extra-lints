@@ -14,7 +14,7 @@ struct Planted(PathBuf);
 
 impl Planted {
     fn new(name: &str) -> Self {
-        let dir = std::env::temp_dir().join(format!("kaski-corpus-{name}-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("corpus-it-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(dir.join("research")).unwrap();
         Self(dir)
@@ -53,9 +53,9 @@ fn search(dir: &Planted, phrase: &str, keywords: &[&str]) -> Vec<String> {
 
 mod counting;
 mod finding;
-mod kaski;
 mod ranking;
 mod reporting;
+mod shape;
 mod stemming;
 mod tokenising;
 

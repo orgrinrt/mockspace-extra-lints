@@ -1,16 +1,15 @@
 //! What the research already says about a subject, which no other tool can see.
 //!
-//! Every other tool here reads the registry, which is about two percent of what
-//! this project has written. The rest is the research tree: the argument, the
-//! evidence, the pre-fork material and the panels' own conclusions. So a tool
-//! asked whether a subject has been settled has been answering from the index
-//! rather than from the book, answering confidently, and being believed.
+//! Every other tool here reads the registry, which is a small part of what a
+//! project has written. The rest is the research tree: the argument, the
+//! evidence and the panels' own conclusions. A tool asked whether a subject has
+//! been settled that reads only the registry answers from the index rather than
+//! from the book, answers confidently, and is believed.
 //!
-//! **The cost is measured.** The two-surface data store was reported absent
-//! from a corpus that specifies it in full, twice, because the corpus calls it a
-//! broker with two backends and the question said surfaces. The same questions
-//! reached op three times. `already-said` returning nothing is what licensed
-//! each of those.
+//! A subject is easily reported absent from a corpus that specifies it in full,
+//! because the corpus calls it by other words than the question does, and an
+//! empty `already-said` answer then licenses asking a question the research has
+//! settled.
 //!
 //! **The registry is the expansion, not the answer.** A question first finds the
 //! rows that carry it, takes their `keywords`, and asks the corpus in those
@@ -24,7 +23,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use corpus::day::today;
 use corpus::{Query, Source};
-use mockspace::tool::{ArgSpec, NotALint, Purpose, Tool, ToolContext, ToolReport};
+use mockspace::tool::{ArgSpec, ConfigKey, NotALint, Purpose, Tool, ToolContext, ToolParams, ToolReport};
 use muisti::repo::{Query as AskQuery, RepoIndex};
 
 mod render;
@@ -58,7 +57,11 @@ const SHOWN: usize = 5;
 /// ranking still discriminates.
 const EXPANSION: usize = 24;
 
-pub struct Unearth;
+/// The tool, holding where the project keeps the maintainer's captured words.
+#[derive(Default)]
+pub struct Unearth {
+    maintainer: corpus::Maintainer,
+}
 
 impl Tool for Unearth {
     fn name(&self) -> &'static str {
@@ -89,6 +92,14 @@ impl Tool for Unearth {
         ]
     }
 
+    fn config_keys(&self) -> &[ConfigKey] {
+        corpus::maintainer::KEYS
+    }
+
+    fn configure(&mut self, params: &ToolParams) {
+        self.maintainer.configure(params);
+    }
+
     fn help(&self) -> &'static str {
         "Run this before concluding that anything is missing. It reads the whole \
          research tree, expands the question through the keywords of every \
@@ -99,11 +110,7 @@ impl Tool for Unearth {
 
     fn run(&self, ctx: &ToolContext<'_>) -> ToolReport {
         run_with(ctx, &|| {
-            let op_words = corpus::corpus::op_words_dir(
-                ctx.repo_root,
-                std::env::var(corpus::corpus::OP_WORDS_VAR).ok().as_deref(),
-            );
-            corpus::repo::ready(ctx.mock_dir, ctx.repo_root, op_words.as_deref())
+            corpus::repo::ready(ctx.mock_dir, ctx.repo_root, Some(&self.maintainer))
         })
     }
 }
@@ -428,7 +435,7 @@ fn cited_files(ctx: &ToolContext<'_>) -> BTreeMap<String, usize> {
 }
 
 mockspace::lint_pack! {
-    tools: [Unearth],
+    tools: [Unearth::default()],
 }
 
 #[cfg(test)]

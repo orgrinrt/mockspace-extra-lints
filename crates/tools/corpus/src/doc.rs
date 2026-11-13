@@ -5,8 +5,8 @@
 
 //! The corpus as documents, and what kind each one is.
 //!
-//! The registry is a few hundred rows. The research notes, the round transcripts and op's captured
-//! words beside it are many times that, and they hold the argument and most of the answers. A tool
+//! The registry is a few hundred rows. The research notes, the round transcripts and the maintainer's
+//! captured words beside it are many times that, and they hold the argument and most of the answers. A tool
 //! that reads only the rows answers from a fraction of the material and answers confidently, which is
 //! the failure this crate exists to remove.
 
@@ -14,14 +14,14 @@ use std::path::{Path, PathBuf};
 
 /// What a document is, which decides how much a hit in it is worth.
 ///
-/// Read off where the document sits rather than its contents or its name. kamu, where this came from,
-/// read op's files off a naming convention, and found a name is not provenance: a document named
-/// for op outranked his own words. Here op's words are what sits under the root they were captured
-/// to, `op-responses/`, and nothing else is.
+/// Read off where the document sits rather than its contents or its name, because a name is not
+/// provenance: a note whose file name mentions the maintainer is still a note. The maintainer's
+/// words are what sits under the root they were captured to, `maintainer-words/`, and nothing else
+/// is.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Kind {
-    /// A capture of op's own words. The highest tier there is.
-    Op,
+    /// A capture of the maintainer's own words. The highest tier there is.
+    Maintainer,
     /// A research note, or the data and lists a round of research kept beside it.
     Notes,
     /// A design round's topic or changelist.
@@ -39,7 +39,7 @@ impl Kind {
     #[must_use]
     pub fn weight(self) -> f64 {
         match self {
-            Self::Op => 1.9,
+            Self::Maintainer => 1.9,
             Self::Notes | Self::Round => 1.0,
             Self::Sketch => 0.6,
         }
@@ -49,20 +49,20 @@ impl Kind {
     #[must_use]
     pub fn label(self) -> &'static str {
         match self {
-            Self::Op => "op",
+            Self::Maintainer => "maintainer",
             Self::Notes => "notes",
             Self::Round => "round",
             Self::Sketch => "sketch",
         }
     }
 
-    /// Classify one path, relative to the corpus: `op-responses/`, `research/` or `design_rounds/`
+    /// Classify one path, relative to the corpus: `maintainer-words/`, `research/` or `design_rounds/`
     /// first.
     #[must_use]
     pub fn of(path: &Path) -> Self {
         let full = path.to_string_lossy().to_lowercase();
-        if full.starts_with("op-responses/") {
-            return Self::Op;
+        if full.starts_with("maintainer-words/") {
+            return Self::Maintainer;
         }
         if full.starts_with("design_rounds/") || full.contains("/design_rounds/") {
             return Self::Round;
@@ -84,8 +84,8 @@ pub const SKETCH_EXT: &[&str] = &["rs", "cjs", "js", "sh", "wgsl", "slang"];
 
 /// One document, loaded.
 pub struct Doc {
-    /// What a reader is shown and opens: relative to the mock directory, or under `op-responses/`
-    /// for a capture of op's words, which sits outside it.
+    /// What a reader is shown and opens: relative to the mock directory, or under
+    /// `maintainer-words/` for a capture of the maintainer's words, which sits outside it.
     pub path:  PathBuf,
     /// Where it was read from, so a line can be read back in the case it was written in.
     pub file:  PathBuf,
@@ -172,7 +172,7 @@ impl Doc {
     /// Three tiers and no more. A finer scale would be inventing precision the
     /// corpus does not have: what is genuinely different is a heading, which
     /// declares the subject, and a blockquote, which in this corpus is somebody
-    /// being quoted and usually op.
+    /// being quoted and usually the maintainer.
     #[must_use]
     pub fn position_weight(&self, at: usize) -> f64 {
         if in_range(&self.heads, at) {

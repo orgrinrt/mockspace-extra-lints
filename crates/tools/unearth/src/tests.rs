@@ -120,22 +120,22 @@ fn an_empty_corpus_does_not_divide_by_zero() {
 // happened to show. That last one is the whole product of this tool.
 // -----------------------------------------------------------------------
 
-/// A workspace holding the repository and, beside it, the workspace repository with op's words.
+/// A directory holding the repository and, beside it, the directory of the maintainer's words.
 struct Workspace(PathBuf);
 
 impl Workspace {
     fn new(name: &str) -> Self {
         let ws =
-            std::env::temp_dir().join(format!("kaski-unearth-ws-{name}-{}", std::process::id()));
+            std::env::temp_dir().join(format!("unearth-ws-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&ws);
         for d in [
-            "kaski/mock/research",
-            "kaski/mock/design_rounds",
-            "clause-dev/.data/op-responses",
+            "repo/mock/research",
+            "repo/mock/design_rounds",
+            "words",
         ] {
             std::fs::create_dir_all(ws.join(d)).unwrap();
         }
-        std::fs::write(ws.join("kaski/mockspace.toml"), "project_name = \"kaski\"\n").unwrap();
+        std::fs::write(ws.join("repo/mockspace.toml"), "project_name = \"granary\"\n").unwrap();
         Self(ws)
     }
 
@@ -147,9 +147,9 @@ impl Workspace {
     }
 
     fn run(&self, reg: &RegistryView, args: &[&str]) -> ToolReport {
-        let mock = self.0.join("kaski/mock");
-        let repo = self.0.join("kaski");
-        let words = corpus::corpus::op_words_dir(&repo, None);
+        let mock = self.0.join("repo/mock");
+        let repo = self.0.join("repo");
+        let words = self.0.join("words");
         let crates = BTreeSet::new();
         let dirs: Vec<PathBuf> = Vec::new();
         run_with(
@@ -162,7 +162,7 @@ impl Workspace {
                 stdin: None,
                 registry: reg,
             },
-            &|| corpus::repo::ready_at(None, &mock, &repo, words.as_deref()),
+            &|| corpus::repo::ready_at(None, &mock, &repo, Some(&words), &[]),
         )
     }
 }
@@ -174,18 +174,18 @@ impl Drop for Workspace {
 }
 
 #[test]
-fn op_s_answer_beside_the_repository_is_found_and_ranked_as_his() {
-    // The planted case: op answered who directs research in a capture, and the only
-    // note on the subject talks about advancement lanes in other words. Asked as a
-    // question, the capture is found, ranked first and named as op's.
-    let ws = Workspace::new("op");
+fn the_maintainer_s_answer_beside_the_repository_is_found_and_ranked_as_theirs() {
+    // The planted case: the maintainer answered who directs research in a capture, and
+    // the only note on the subject talks about advancement lanes in other words. Asked
+    // as a question, the capture is found, ranked first and named as the maintainer's.
+    let ws = Workspace::new("words");
     ws.write(
-        "kaski/mock/research/202610032320_advancement/NOTES.md",
+        "repo/mock/research/202610032320_advancement/NOTES.md",
         "# Advancement\n\nResearch moves along the lanes as work is done.\n",
     )
     .write(
-        "clause-dev/.data/op-responses/202610040900_op-on-kaski-advancement.md",
-        "# kaski: advancement\n\nWho directs research.\n> Whoever holds the office\n",
+        "words/202610040900_on-advancement.md",
+        "# granary: advancement\n\nWho directs research.\n> Whoever holds the office\n",
     );
     let reg = registry(&[("tenet::knowledge_is_a_concept", &[
         ("what", "Knowledge is owned through advancement."),
@@ -202,20 +202,19 @@ fn op_s_answer_beside_the_repository_is_found_and_ranked_as_his() {
         .find(|l| l.trim_start().starts_with(|c: char| c.is_ascii_digit()))
         .unwrap_or_default();
     assert!(
-        first.contains("op")
-            && first.contains("op-responses/202610040900_op-on-kaski-advancement.md"),
-        "op's capture ranks first and is named as his: {out}"
+        first.contains("maintainer-words/202610040900_on-advancement.md"),
+        "the maintainer's capture ranks first and is named as theirs: {out}"
     );
-    assert!(!out.contains("op's captured words were not read"), "{out}");
+    assert!(!out.contains("captured words were not read"), "{out}");
 }
 
 #[test]
 fn a_note_cited_by_heading_counts_as_cited() {
-    // kaski cites a note by its heading, `research::<dir>::NOTES::#<heading>`,
+    // A row cites a note by its heading, `research::<dir>::NOTES::#<heading>`,
     // and the note so cited is the absorbed half of the corpus.
     let ws = Workspace::new("cited");
     ws.write(
-        "kaski/mock/research/202610031300_minds/NOTES.md",
+        "repo/mock/research/202610031300_minds/NOTES.md",
         "# Minds\n\nA passphrase is never kept.\n",
     );
     let reg = registry(&[("tenet::a", &[
@@ -230,7 +229,7 @@ fn a_note_cited_by_heading_counts_as_cited() {
 fn a_superseded_tenet_in_the_registry_section_is_marked() {
     let ws = Workspace::new("superseded");
     ws.write(
-        "kaski/mock/research/202610031300_minds/NOTES.md",
+        "repo/mock/research/202610031300_minds/NOTES.md",
         "# Minds\n\nA scholar chooses.\n",
     );
     let reg = registry(&[

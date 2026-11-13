@@ -5,7 +5,7 @@
 
 //! Whether the tenets and subjects a ticket links to are rows of the canon.
 //!
-//! `kaski-tickets` reads no canon, so the ids the canon holds come in from the tool that reads it: the
+//! The ticket model crate reads no canon, so the ids the canon holds come in from the tool that reads it: the
 //! ticket makers refuse a link to a row that is not there, and `tickets check` names the ones a hand edit
 //! left (tickets_check_accepts_tenets_and_subjects_that_do_not_exist).
 

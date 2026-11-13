@@ -7,12 +7,14 @@
 //!
 //! The crate also holds what `mock ticket-add` and `mock ticket-move` write by: the reading of the
 //! registry's files and the file writing. The model of the four ticket namespaces and the rules a
-//! schema cannot say are `kaski-tickets`', which the console builds too, so the makers refuse by the
-//! rules the lint finds breaches of and the page refuses by them as well. The design is
-//! `mock/WORKFLOW.md.tmpl`, "Work items".
+//! schema cannot say are the ticket model crate's, `mockspace-extra-ticket-model`, so the makers
+//! refuse by the same rules the lint finds breaches of, and so does anything else built on that
+//! crate.
 
 use mockspace::LintError;
-use mockspace::tool::{ArgSpec, NotALint, Outcome, Purpose, Tool, ToolContext, ToolReport};
+use mockspace::tool::{
+    ArgSpec, ConfigKey, NotALint, Outcome, Purpose, Tool, ToolContext, ToolParams, ToolReport,
+};
 
 pub mod answerable;
 pub mod args;
@@ -84,8 +86,12 @@ pub fn registry_dir(mock_dir: &std::path::Path) -> std::path::PathBuf {
     mock_dir.join("registry")
 }
 
-/// The check.
-pub struct Tickets;
+/// The check, holding where the project keeps the maintainer's captured words, which `answerable`
+/// searches.
+#[derive(Default)]
+pub struct Tickets {
+    maintainer: corpus::Maintainer,
+}
 
 impl Tool for Tickets {
     fn name(&self) -> &'static str {
@@ -112,8 +118,16 @@ impl Tool for Tickets {
         args::LIST_FLAGS
     }
 
+    fn config_keys(&self) -> &[ConfigKey] {
+        corpus::maintainer::KEYS
+    }
+
+    fn configure(&mut self, params: &ToolParams) {
+        self.maintainer.configure(params);
+    }
+
     fn help(&self) -> &'static str {
-        "One line per ticket: id, state, holder (`-` for none) and title, in board order. `--state`, `--holder`, `--kind`, `--epoch` and `--tag` narrow `list` and `next` and take comma separated values, `--epoch none` meaning the tickets that are members of no epoch and `--tag` the tickets holding any of the tags named, each matched whole. A ticket whose newest member row names an epoch shows ` [epoch <id>]` after its title. `next` lists only what is free to take (open, unheld, nothing it needs unmet, its branch not on the trunk), the one that unblocks the most open tickets first. `check` also names a branch two tickets hold outside one set, an open ticket whose branch has landed and a planning row the planning rules refuse. It also lists, and does not fail on, the tickets that may have stopped being true: an open ticket whose title or `what` names a kaski crate or a path the trunk held once and holds no more, with the commit that deleted it; an open parent all of whose children and needs are closed, and a closed ticket with an open child; and a ticket still naming a superseded tenet, with the one that binds in its place. The count of the first two ends the output as `N tickets may be stale: tickets check`. `tracks` gives one block a track, a ticket holding `shows`: its id, state, holder and `shows`, how many of its first steps wait on another track, then its steps in the order of their `needs` and the board with state and holder, and under a step each `needs` edge that leaves the track for a ticket not yet done, with that ticket's track, state and holder; the filters narrow the tracks by the track ticket as they narrow `list`. `contract <path>...` gives, for each contract path (a crate and a type joined by `::`, or a bare type name matching the type in any crate), the open tickets that change it, a line of `list` and then the path, and refuses a path whose crate the tree does not hold. `branch <name>` prints the id of the ticket holding that branch and `landed <id>` the sha its branch landed at, each silent when there is none. Every verb answers from `origin/dev` after fetching it, whatever the working tree holds. `--tree` reads the working tree instead, which is how a branch is checked with the tickets it adds, and `--no-fetch` reads `origin/dev` as it was last fetched. When the trunk cannot be read as asked, or `--tree` was given, the answer opens with a notice naming what was read and how many commits behind `origin/dev` it is; `branch` and `landed`, which scripts read, refuse instead of printing one. Nothing is printed when no ticket matches."
+        "One line per ticket: id, state, holder (`-` for none) and title, in board order. `--state`, `--holder`, `--kind`, `--epoch` and `--tag` narrow `list` and `next` and take comma separated values, `--epoch none` meaning the tickets that are members of no epoch and `--tag` the tickets holding any of the tags named, each matched whole. A ticket whose newest member row names an epoch shows ` [epoch <id>]` after its title. `next` lists only what is free to take (open, unheld, nothing it needs unmet, its branch not on the trunk), the one that unblocks the most open tickets first. `check` also names a branch two tickets hold outside one set, an open ticket whose branch has landed and a planning row the planning rules refuse. It also lists, and does not fail on, the tickets that may have stopped being true: an open ticket whose title or `what` names a crate or a path the trunk held once and holds no more, with the commit that deleted it; an open parent all of whose children and needs are closed, and a closed ticket with an open child; and a ticket still naming a superseded tenet, with the one that binds in its place. The count of the first two ends the output as `N tickets may be stale: tickets check`. `tracks` gives one block a track, a ticket holding `shows`: its id, state, holder and `shows`, how many of its first steps wait on another track, then its steps in the order of their `needs` and the board with state and holder, and under a step each `needs` edge that leaves the track for a ticket not yet done, with that ticket's track, state and holder; the filters narrow the tracks by the track ticket as they narrow `list`. `contract <path>...` gives, for each contract path (a crate and a type joined by `::`, or a bare type name matching the type in any crate), the open tickets that change it, a line of `list` and then the path, and refuses a path whose crate the tree does not hold. `branch <name>` prints the id of the ticket holding that branch and `landed <id>` the sha its branch landed at, each silent when there is none. Every verb answers from `origin/dev` after fetching it, whatever the working tree holds. `--tree` reads the working tree instead, which is how a branch is checked with the tickets it adds, and `--no-fetch` reads `origin/dev` as it was last fetched. When the trunk cannot be read as asked, or `--tree` was given, the answer opens with a notice naming what was read and how many commits behind `origin/dev` it is; `branch` and `landed`, which scripts read, refuse instead of printing one. Nothing is printed when no ticket matches."
     }
 
     fn run(&self, ctx: &ToolContext<'_>) -> ToolReport {
@@ -192,11 +206,7 @@ impl Tickets {
                 let rows = view::list(&store, &plan, &answerable::open_questions(&req.filter));
                 // The index is made only where there is a question to ask about.
                 let ready = (!rows.is_empty()).then(|| {
-                    let op = corpus::corpus::op_words_dir(
-                        ctx.repo_root,
-                        std::env::var(corpus::corpus::OP_WORDS_VAR).ok().as_deref(),
-                    );
-                    corpus::repo::ready(ctx.mock_dir, ctx.repo_root, op.as_deref())
+                    corpus::repo::ready(ctx.mock_dir, ctx.repo_root, Some(&self.maintainer))
                 });
                 let (mut out, n) = answerable::report(&store, &rows, &|text| {
                     ready.as_ref().map_or_else(Vec::new, |r| {
@@ -300,7 +310,7 @@ fn check(
 
 mockspace::lint_pack! {
     repo_lints: [lint::ATicketGraphHolds],
-    tools: [Tickets],
+    tools: [Tickets::default()],
 }
 
 #[cfg(test)]

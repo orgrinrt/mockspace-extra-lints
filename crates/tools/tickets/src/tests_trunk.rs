@@ -74,7 +74,7 @@ impl World {
         write::add(&registry, &AddRequest {
             title: "Which way".to_string(),
             kind: "question".to_string(),
-            holder: "op".to_string(),
+            holder: "maintainer".to_string(),
             state: Some("waiting".to_string()),
             by: "tester".to_string(),
             at: "2026-10-23T10:00:00Z".to_string(),
@@ -113,7 +113,7 @@ impl World {
         write::move_ticket(&self.other.join("mock/registry"), &MoveRequest {
             ticket: "which_way".to_string(),
             to: "done".to_string(),
-            by: "op".to_string(),
+            by: "maintainer".to_string(),
             at: "2026-10-27T10:00:00Z".to_string(),
             answer: "left".to_string(),
             picks: vec!["left".to_string()],
@@ -195,7 +195,7 @@ fn a_fetch_that_fails_reads_what_was_fetched_before_and_says_how_old_it_is() {
     assert!(r.degraded);
     assert!(r.notice.contains("was not fetched"), "{}", r.notice);
     assert!(
-        r.notice.contains("op may have answered since"),
+        r.notice.contains("questions may have been answered since"),
         "{}",
         r.notice
     );
@@ -247,7 +247,7 @@ fn the_scripted_verbs_refuse_rather_than_print_a_notice_among_their_answer() {
     let registry = mockspace::RegistryView::default();
     let mock = w.tree.join("mock");
     let ask = |args: &[&str]| {
-        crate::Tickets.answer(&ToolContext {
+        crate::Tickets::default().answer(&ToolContext {
             mock_dir: &mock,
             repo_root: &w.tree,
             all_crates: &crates,

@@ -21,16 +21,9 @@ use crate::doc::Doc;
 /// contributing nothing.
 pub const ROOTS: &[&str] = &["research", "design_rounds"];
 
-/// The root op's captured words are shown under. It sits outside the repository, so the path a
-/// report prints for one of them starts here rather than at the mock directory.
-pub const OP_ROOT: &str = "op-responses";
-
-/// The environment variable naming the directory of op's captured words, where it is not where
-/// [`op_words_dir`] would look.
-pub const OP_WORDS_VAR: &str = "MOCKSPACE_OP_WORDS";
-
-/// Where op's captured words sit relative to a workspace.
-const OP_WORDS_IN_WORKSPACE: &str = ".data/op-responses";
+/// The root the maintainer's captured words are shown under. It sits outside the repository, so the
+/// path a report prints for one of them starts here rather than at the mock directory.
+pub const MAINTAINER_ROOT: &str = "maintainer-words";
 
 /// Directories never descended into, whatever root they sit under.
 const SKIP_DIRS: &[&str] = &["target", ".git", "node_modules"];
@@ -41,90 +34,56 @@ const SKIP_DIRS: &[&str] = &["target", ".git", "node_modules"];
 /// count, and none of them carries a sentence a question could match.
 const KEEP_EXT: &[&str] = &["md", "txt", "toml", "rs", "cjs", "js", "sh", "wgsl", "slang"];
 
-/// The directory of op's captured words, if one can be found.
-///
-/// A directory named by `named` (the caller reads [`OP_WORDS_VAR`]) wins, and one naming nothing
-/// finds nothing rather than falling back, so a mistyped name is a missing root a report names
-/// rather than a different directory read in silence. Without a name: `.data/op-responses` in the
-/// repository root or any directory above it, which is op's layout, where this repository is a
-/// clone inside the workspace; then `.data/op-responses` in a directory beside the repository root or
-/// beside any directory above it, the first in name order, which is a helper's, where the workspace
-/// and the repository are cloned side by side.
-///
-/// A stand-in until the tools consolidate into one place for every project and the workspace says
-/// where its data is.
-#[must_use]
-pub fn op_words_dir(repo_root: &Path, named: Option<&str>) -> Option<PathBuf> {
-    if let Some(n) = named.filter(|n| !n.trim().is_empty()) {
-        let p = PathBuf::from(n);
-        return p.is_dir().then_some(p);
-    }
-    for dir in repo_root.ancestors() {
-        let inside = dir.join(OP_WORDS_IN_WORKSPACE);
-        if inside.is_dir() {
-            return Some(inside);
-        }
-        if let Some(beside) = beside(dir) {
-            return Some(beside);
-        }
-    }
-    None
-}
-
-/// `.data/op-responses` in a directory inside `dir`, the first in name order.
-fn beside(dir: &Path) -> Option<PathBuf> {
-    let mut found: Vec<PathBuf> = std::fs::read_dir(dir)
-        .ok()?
-        .filter_map(Result::ok)
-        .map(|e| e.path().join(OP_WORDS_IN_WORKSPACE))
-        .filter(|p| p.is_dir())
-        .collect();
-    found.sort();
-    found.into_iter().next()
-}
-
 /// The loaded corpus, plus what it skipped and why.
 pub struct Corpus {
-    pub docs:       Vec<Doc>,
+    pub docs:        Vec<Doc>,
     /// Roots named above that do not exist on disk.
-    pub missing:    Vec<String>,
+    pub missing:     Vec<String>,
     /// Files found and not read, by extension. A reader deciding whether to trust an empty result
     /// wants this.
-    pub skipped:    BTreeMap<String, usize>,
-    pub unreadable: usize,
-    /// Whether op's captured words were read. Their absence is said in every report, because a
-    /// search over the research alone reports nothing about what op said.
-    pub op_read:    bool,
-    /// Captures of op's words held out because they never name the project asked about. His words
-    /// on another project weigh as his and are not about this one, so counted rather than searched.
-    pub elsewhere:  usize,
+    pub skipped:     BTreeMap<String, usize>,
+    pub unreadable:  usize,
+    /// Whether the maintainer's captured words were read. Their absence is said in every report,
+    /// because a search over the research alone reports nothing about what the maintainer said.
+    pub words_read:  bool,
+    /// The directory named for the maintainer's words, where one was named, read or not.
+    pub words_named: Option<PathBuf>,
+    /// Captures of the maintainer's words held out because they never name the project asked
+    /// about. Words on another project weigh as the maintainer's and are not about this one, so
+    /// they are counted rather than searched.
+    pub elsewhere:   usize,
     /// The project the captures were scoped to, if any.
-    pub about:      Option<String>,
+    pub about:       Option<String>,
 }
 
 impl Corpus {
-    /// The research and the rounds under `mock_dir`, without op's captured words.
+    /// The research and the rounds under `mock_dir`, without the maintainer's captured words.
     #[must_use]
     pub fn load(mock_dir: &Path) -> Self {
         Self::load_with(mock_dir, None)
     }
 
-    /// The research and the rounds under `mock_dir`, and op's captured words from `op_words` where it
-    /// names a directory.
+    /// The research and the rounds under `mock_dir`, and the maintainer's captured words from
+    /// `maintainer_words` where it names a directory.
     #[must_use]
-    pub fn load_with(mock_dir: &Path, op_words: Option<&Path>) -> Self {
-        Self::load_scoped(mock_dir, op_words, None)
+    pub fn load_with(mock_dir: &Path, maintainer_words: Option<&Path>) -> Self {
+        Self::load_scoped(mock_dir, maintainer_words, None)
     }
 
-    fn load_scoped(mock_dir: &Path, op_words: Option<&Path>, project: Option<&str>) -> Self {
+    fn load_scoped(
+        mock_dir: &Path,
+        maintainer_words: Option<&Path>,
+        project: Option<&str>,
+    ) -> Self {
         let mut c = Self {
-            docs:       Vec::new(),
-            missing:    Vec::new(),
-            skipped:    BTreeMap::new(),
-            unreadable: 0,
-            op_read:    false,
-            elsewhere:  0,
-            about:      project.map(str::to_string),
+            docs:        Vec::new(),
+            missing:     Vec::new(),
+            skipped:     BTreeMap::new(),
+            unreadable:  0,
+            words_read:  false,
+            words_named: maintainer_words.map(Path::to_path_buf),
+            elsewhere:   0,
+            about:       project.map(str::to_string),
         };
         for root in ROOTS {
             let dir = mock_dir.join(root);
@@ -134,22 +93,24 @@ impl Corpus {
                 c.missing.push((*root).to_string());
             }
         }
-        if let Some(op) = op_words.filter(|p| p.is_dir()) {
-            c.walk(op, Path::new(OP_ROOT), project);
-            c.op_read = true;
+        if let Some(words) = maintainer_words.filter(|p| p.is_dir()) {
+            c.walk(words, Path::new(MAINTAINER_ROOT), project);
+            c.words_read = true;
         }
         c.docs.sort_by(|a, b| a.path.cmp(&b.path));
         c
     }
 
-    /// As [`Self::load_with`], reading only the captures of op's words that name `project`.
+    /// As [`Self::load_with`], reading only the captures of the maintainer's words that name
+    /// `project`.
     ///
-    /// The captures are every project's, and on a word common to several a capture about another one
-    /// outranks this project's own notes at op's weight. A capture naming the project anywhere is read
-    /// whole. A stand-in for a capture saying which project it is about.
+    /// The captures may cover several projects, and on a word common to several a capture about
+    /// another one would outrank this project's own notes at the maintainer's weight. A capture
+    /// naming the project anywhere is read whole. A stand-in for a capture saying which project it
+    /// is about.
     #[must_use]
-    pub fn load_about(mock_dir: &Path, op_words: Option<&Path>, project: &str) -> Self {
-        Self::load_scoped(mock_dir, op_words, Some(project))
+    pub fn load_about(mock_dir: &Path, maintainer_words: Option<&Path>, project: &str) -> Self {
+        Self::load_scoped(mock_dir, maintainer_words, Some(project))
     }
 
     /// Every readable file under `dir`, each shown under `shown` joined with its path below `dir`.
@@ -219,8 +180,8 @@ impl Corpus {
     /// What was not read, as one sentence, or nothing where nothing was missed.
     ///
     /// Every tool holding a corpus prints this. A document count is a claim about what was searched,
-    /// and a count over a corpus with a root absent, or with op's words unread, is a smaller claim
-    /// wearing the same words.
+    /// and a count over a corpus with a root absent, or with the maintainer's words unread, is a
+    /// smaller claim wearing the same words.
     #[must_use]
     pub fn caveat(&self) -> Option<String> {
         let mut parts = Vec::new();
@@ -230,15 +191,13 @@ impl Corpus {
                 self.missing.join(", ")
             ));
         }
-        if !self.op_read {
-            parts.push(format!(
-                "op's captured words were not read: no `{OP_WORDS_IN_WORKSPACE}` was found above the \
-                 repository or in a directory beside it, and `{OP_WORDS_VAR}` names none"
-            ));
+        if !self.words_read {
+            parts.push(crate::maintainer::unread(self.words_named.as_deref()));
         }
         if self.elsewhere > 0 {
             parts.push(format!(
-                "{} of op's captures name no `{}` and were held out as about another project",
+                "{} of the maintainer's captures name no `{}` and were held out as about another \
+                 project",
                 self.elsewhere,
                 self.about.as_deref().unwrap_or_default()
             ));
