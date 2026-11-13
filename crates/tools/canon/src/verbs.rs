@@ -101,7 +101,7 @@ pub(crate) fn line(out: &mut String, t: &Tenet<'_>, width: usize) {
     if t.standing != Standing::Ratified {
         note = format!("({}) {note}", t.standing.word());
     }
-    if !t.binds() {
+    if t.replaced() {
         note = format!("(superseded by {}) {note}", t.superseded_by.join(", "));
     }
     let _ = writeln!(out, "  {:<width$}  {note}", t.id);
@@ -244,9 +244,9 @@ fn uncited_answer(repo: &Path, all: &[Tenet<'_>]) -> (String, usize) {
     (out, shown)
 }
 
-/// The tenets `ids` name that op has not ratified and nothing supersedes, one line each naming its
-/// standing. Not a finding: every tenet is provisional until op's walk, so a check that blocked on one
-/// would pass nothing.
+/// The tenets `ids` name that still bind and op has not ratified, one line each naming its standing.
+/// Not a finding: a tenet that matters now is provisional until op's walk, so a check that blocked on
+/// one would pass nothing.
 pub fn unratified(all: &[Tenet<'_>], ids: &[&str]) -> Vec<String> {
     ids.iter()
         .filter_map(|raw| {
@@ -258,9 +258,10 @@ pub fn unratified(all: &[Tenet<'_>], ids: &[&str]) -> Vec<String> {
         .collect()
 }
 
-/// What is wrong with the tenets `ids` name, one line each: an id that is no tenet, and an id whose tenet
-/// something supersedes. A `tenet::` prefix is the namespace and is read off, as a citation spells it.
-/// Empty when every id names a tenet that still binds, provisional or ratified.
+/// What is wrong with the tenets `ids` name, one line each: an id that is no tenet, an id whose tenet
+/// something supersedes, and an id whose tenet is demoted and binds nothing. A `tenet::` prefix is the
+/// namespace and is read off, as a citation spells it. Empty when every id names a tenet that still
+/// binds, provisional or ratified.
 pub fn check(all: &[Tenet<'_>], ids: &[&str]) -> Vec<String> {
     ids.iter()
         .filter_map(|raw| {
@@ -271,10 +272,16 @@ pub fn check(all: &[Tenet<'_>], ids: &[&str]) -> Vec<String> {
                         "`{id}` is no tenet; `canon find <word>` looks for one"
                     ))
                 },
-                Some(t) if !t.binds() => {
+                Some(t) if t.replaced() => {
                     Some(format!(
                         "`{id}` is superseded by {}",
                         t.superseded_by.join(", ")
+                    ))
+                },
+                Some(t) if !t.binds() => {
+                    Some(format!(
+                        "`{id}` is {}: kept as reference for a later canon of its domain, it binds nothing",
+                        t.standing.word()
                     ))
                 },
                 Some(_) => None,

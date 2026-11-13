@@ -15,14 +15,18 @@ use mockspace::RegistryView;
 /// The separator the engine joins a list field with.
 const JOIN: &str = ", ";
 
-/// Whether op has ratified a tenet, read from its `standing`. The set is the one `mockspace.toml`
-/// declares for the field, closed there, and named here once.
+/// Whether op has ratified a tenet, or demoted it, read from its `standing`. The set is the one
+/// `mockspace.toml` declares for the field, closed there, and named here once.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Standing {
-    /// Not ratified, pending op's walk: the best current statement, never cited as settled.
+    /// It matters now and op has not ratified it, pending his walk: the best current statement, never
+    /// cited as settled.
     Provisional,
     /// Op went through it on a named date, his answer in the row's `answers`.
     Ratified,
+    /// His walk does not go through it now: kept as reference for a later canon of its domain, binding
+    /// nothing.
+    Demoted,
     /// The field is absent or holds a word outside the set, which the schema refuses; read so a test
     /// over the committed rows can say which.
     Unstated,
@@ -30,13 +34,14 @@ pub enum Standing {
 
 impl Standing {
     /// The words of the set, as a row writes them.
-    pub const WORDS: [&'static str; 2] = ["provisional", "ratified"];
+    pub const WORDS: [&'static str; 3] = ["provisional", "ratified", "demoted"];
 
     /// The standing a row's `standing` field spells.
     pub const fn of(word: &str) -> Self {
         match word.as_bytes() {
             b"provisional" => Self::Provisional,
             b"ratified" => Self::Ratified,
+            b"demoted" => Self::Demoted,
             _ => Self::Unstated,
         }
     }
@@ -46,6 +51,7 @@ impl Standing {
         match self {
             Self::Provisional => "provisional",
             Self::Ratified => "ratified",
+            Self::Demoted => "demoted",
             Self::Unstated => "unstated",
         }
     }
@@ -55,8 +61,8 @@ impl Standing {
 pub struct Tenet<'a> {
     /// Its id, the slug every citation names.
     pub id:            &'a str,
-    /// Whether op has ratified it. Apart from `superseded_by`: a superseded row does not bind whatever
-    /// its standing.
+    /// Whether op has ratified it or demoted it. Apart from `superseded_by`: a superseded row does not
+    /// bind whatever its standing.
     pub standing:      Standing,
     /// The subject it names, where it names one.
     pub subject:       Option<&'a str>,
@@ -77,9 +83,15 @@ pub struct Tenet<'a> {
 }
 
 impl Tenet<'_> {
-    /// Whether it still binds: nothing supersedes it.
+    /// Whether it still binds: nothing supersedes it and it is not demoted.
     pub fn binds(&self) -> bool {
-        self.superseded_by.is_empty()
+        !self.replaced() && self.standing != Standing::Demoted
+    }
+
+    /// Whether another tenet replaces it, which is what a supersession chain follows. A demoted row is
+    /// not replaced: it binds nothing and has no heir.
+    pub fn replaced(&self) -> bool {
+        !self.superseded_by.is_empty()
     }
 }
 
@@ -190,7 +202,7 @@ pub fn heirs(all: &[Tenet<'_>]) -> BTreeMap<String, Vec<String>> {
         }
         seen.push(id);
         match all.iter().find(|t| t.id == id) {
-            Some(t) if !t.binds() => {
+            Some(t) if t.replaced() => {
                 for next in &t.superseded_by {
                     walk(all, next, seen, out);
                 }
@@ -203,7 +215,7 @@ pub fn heirs(all: &[Tenet<'_>]) -> BTreeMap<String, Vec<String>> {
         }
     }
     all.iter()
-        .filter(|t| !t.binds())
+        .filter(|t| t.replaced())
         .map(|t| {
             let mut out = Vec::new();
             let mut seen = vec![t.id];

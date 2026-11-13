@@ -22,7 +22,7 @@ fn unstated(reg: &RegistryView) -> Vec<String> {
 
 #[test]
 fn a_tenet_with_no_standing_or_a_misspelt_one_is_caught() {
-    // THE CONTROL: the law above, shown failing on rows that break it, and passing the two words.
+    // THE CONTROL: the law above, shown failing on rows that break it, and passing the words of the set.
     let reg = view(&[
         ("tenet::bare", &[("what", "No standing at all.")]),
         ("tenet::misspelt", &[
@@ -39,6 +39,10 @@ fn a_tenet_with_no_standing_or_a_misspelt_one_is_caught() {
         ]),
         ("tenet::done", &[
             ("standing", "ratified"),
+            ("what", "In the set."),
+        ]),
+        ("tenet::shelved", &[
+            ("standing", "demoted"),
             ("what", "In the set."),
         ]),
     ]);
@@ -121,4 +125,63 @@ fn a_listing_and_related_show_the_standing() {
     assert!(rel.contains("standing:      ratified"), "{rel}");
     let subs = answered(&run(&reg, &scratch(), &["subjects"])).to_string();
     assert!(subs.contains("4 tenets, 3 binding, 3 ratified"), "{subs}");
+}
+
+/// A provisional row beside a demoted one and a row the demoted one never had: the demoted row binds
+/// nothing and nothing replaces it.
+fn shelf() -> RegistryView {
+    view(&[
+        ("tenet::kept", &[
+            ("standing", "provisional"),
+            ("what", "Matters now."),
+        ]),
+        ("tenet::shelved", &[
+            ("standing", "demoted"),
+            ("what", "Kept as reference."),
+        ]),
+    ])
+}
+
+#[test]
+fn check_blocks_on_a_demoted_row_and_names_it_demoted() {
+    let r = run(&shelf(), &scratch(), &["check", "kept", "shelved"]);
+    match &r.outcome {
+        Outcome::Findings(f) => {
+            assert_eq!(f.len(), 1, "{f:?}");
+            assert!(
+                f[0].message.contains("`shelved` is demoted")
+                    && f[0].message.contains("binds nothing"),
+                "{}",
+                f[0].message
+            );
+            // THE CONTROL: a demoted row is not read as a superseded one.
+            assert!(!f[0].message.contains("superseded"), "{}", f[0].message);
+        },
+        other => panic!("{other:?}"),
+    }
+    assert!(r.outcome.blocks(mockspace::LintMode::Push));
+    assert!(
+        r.output.contains("`kept` is provisional, not ratified"),
+        "{}",
+        r.output
+    );
+    // THE CONTROL: the provisional row alone is clean.
+    let r = run(&shelf(), &scratch(), &["check", "kept"]);
+    assert!(
+        matches!(r.outcome, Outcome::Clean { .. }),
+        "{:?}",
+        r.outcome
+    );
+}
+
+#[test]
+fn a_demoted_row_binds_nothing_and_has_no_heir() {
+    let reg = shelf();
+    let all = tenets(&reg);
+    let row = |id: &str| all.iter().find(|t| t.id == id).expect(id);
+    assert!(!row("shelved").binds());
+    assert!(!row("shelved").replaced());
+    // THE CONTROL: the provisional row binds.
+    assert!(row("kept").binds());
+    assert!(crate::rows::heirs(&all).is_empty());
 }

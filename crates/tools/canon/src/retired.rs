@@ -24,7 +24,7 @@ const SHOWN: usize = 110;
 /// The tenets that still bind and rule out at least one word, as the scan reads them.
 pub fn retiring(all: &[Tenet<'_>]) -> Vec<Retiring> {
     all.iter()
-        .filter(|t| t.binds() && !t.rules_out.is_empty())
+        .filter(|t| !t.replaced() && !t.rules_out.is_empty())
         .map(|t| {
             Retiring {
                 id:    t.id.to_owned(),
@@ -50,23 +50,25 @@ pub fn forbids_answer(repo: &Path, all: &[Tenet<'_>], id: &str) -> Result<(Strin
         }
     };
     let mut out = format!("{id}\n");
-    let binds = if t.binds() {
+    let binds = if t.replaced() {
+        format!("no, superseded by {}", t.superseded_by.join(", "))
+    } else if t.binds() {
         "yes".to_owned()
     } else {
-        format!("no, superseded by {}", t.superseded_by.join(", "))
+        format!("no, {}", t.standing.word())
     };
     let _ = writeln!(out, "  binds:      {binds}");
     let _ = writeln!(out, "  rules out:  {}", words(t));
     for old in all.iter().filter(|o| o.superseded_by.contains(&id)) {
         let _ = writeln!(out, "  supersedes: {} (rules out: {})", old.id, words(old));
     }
-    if t.binds() && t.rules_out.is_empty() {
+    if !t.replaced() && t.rules_out.is_empty() {
         out.push_str(
             "\nit names no word it rules out, so nothing can find the designs and code it \
              falsifies: a tenet that retires or narrows a concept lists the words in `rules_out`\n",
         );
     }
-    if !t.binds() && t.rules_out.is_empty() {
+    if t.replaced() && t.rules_out.is_empty() {
         let named = still_named(all, t, &word_counts(repo));
         if named.is_empty() {
             out.push_str("  dropped:    no word it used and its successors do not is named by a design, code or content line\n");
@@ -93,7 +95,7 @@ pub fn forbids_answer(repo: &Path, all: &[Tenet<'_>], id: &str) -> Result<(Strin
 /// can say for each whether it retires a word and put it in `rules_out`.
 pub fn unretired_answer(repo: &Path, all: &[Tenet<'_>]) -> (String, usize) {
     let counts = word_counts(repo);
-    let replaced: Vec<&Tenet<'_>> = all.iter().filter(|t| !t.binds()).collect();
+    let replaced: Vec<&Tenet<'_>> = all.iter().filter(|t| t.replaced()).collect();
     let named = |t: &Tenet<'_>| {
         !t.rules_out.is_empty()
             || t.superseded_by
@@ -267,7 +269,13 @@ fn named_by(out: &mut String, repo: &Path, all: &[Tenet<'_>], under: &Path) {
             continue;
         }
         any = true;
-        let state = if t.binds() { "binds" } else { "superseded" };
+        let state = if t.replaced() {
+            "superseded"
+        } else if t.binds() {
+            "binds"
+        } else {
+            t.standing.word()
+        };
         let words = if t.rules_out.is_empty() {
             "nothing".to_owned()
         } else {
