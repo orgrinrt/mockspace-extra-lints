@@ -142,8 +142,8 @@ pub fn check_move(store: &Store, m: &Move) -> Result<(), String> {
             t.one("kind")
         ));
     };
-    // FIXME(kaski_tickets_the_canon_holds_no_row_on_the_order): the canon holds no row on the order of a ticket's moves; that a move earlier
-    // than the newest is refused and one of the same second is not rests on the round's topic alone.
+    // FIXME(ticket_model_states_the_order_a_ticket_s_moves_keep): no design states the order of a ticket's moves; that a move earlier
+    // than the newest is refused and one of the same second is not is stated nowhere but in this code.
     if let Some(newest) = store.now_of(ticket)
         && m.at < newest.at
     {

@@ -98,10 +98,19 @@ fn registry(rows: &[(&str, &[(&str, &str)])]) -> RegistryView {
     RegistryView::new(map, Map::new())
 }
 
+/// The subject the fixtures name as about the work, as a project's `[tools.tackle]` would.
+fn about() -> Vec<String> {
+    vec!["workflow".to_owned()]
+}
+
 fn run_in(mock: &Path, reg: &RegistryView, args: &[&str]) -> ToolReport {
+    run_about(mock, reg, args, &about())
+}
+
+fn run_about(mock: &Path, reg: &RegistryView, args: &[&str], about: &[String]) -> ToolReport {
     let crates = std::collections::BTreeSet::new();
     let dirs: Vec<PathBuf> = Vec::new();
-    let cache = std::env::temp_dir().join(format!("kaski-tackle-cache-{}", std::process::id()));
+    let cache = std::env::temp_dir().join(format!("tackle-cache-{}", std::process::id()));
     crate::run_with(
         &ToolContext {
             mock_dir: mock,
@@ -112,6 +121,7 @@ fn run_in(mock: &Path, reg: &RegistryView, args: &[&str]) -> ToolReport {
             stdin: None,
             registry: reg,
         },
+        about,
         &|| corpus::repo::ready_at(Some(&cache), mock, mock, None),
     )
 }
@@ -162,7 +172,7 @@ fn no_arguments_runs_although_the_declaration_says_the_verb_is_required() {
         "no argument is not a wrong argument"
     );
     assert_eq!(
-        Tackle.args()[0].required,
+        Tackle::default().args()[0].required,
         true,
         "and the declaration still says it is required"
     );
@@ -356,6 +366,38 @@ fn the_workflow_subject_is_weighed_and_never_picked() {
 }
 
 #[test]
+fn with_no_subject_named_about_the_work_the_thinnest_is_picked_whatever_it_is() {
+    // THE CONTROL for the test above: `workflow` is held back because the project named it, not
+    // because of its name, so with nothing named it is the thinnest subject and is picked.
+    let out = run_about(
+        Path::new("/nonexistent-mock-dir"),
+        &kaski_canon(),
+        &["next"],
+        &[],
+    )
+    .output;
+    assert!(out.contains("TACKLE NEXT: workflow"), "{out}");
+    assert!(!out.contains("about the work, never picked"), "{out}");
+}
+
+#[test]
+fn the_subjects_about_the_work_come_from_the_tools_table() {
+    let mut t = Tackle::default();
+    assert!(
+        t.config_keys().iter().any(|k| k.name == "about_the_work"),
+        "the key is declared, so the engine hands it over"
+    );
+    let mut params = mockspace::tool::ToolParams::new();
+    params.set("about_the_work", vec!["workflow".to_owned(), "tools".to_owned()]);
+    t.configure(&params);
+    assert_eq!(t.about_the_work, vec!["workflow".to_owned(), "tools".to_owned()]);
+    // A table that sets the key to an empty array names no subject.
+    params.set("about_the_work", Vec::new());
+    t.configure(&params);
+    assert!(t.about_the_work.is_empty());
+}
+
+#[test]
 fn a_superseded_tenet_counts_as_moving_and_not_as_written() {
     let reg = linked(&[
         ("subject::sky", &[("what", "The sky.")]),
@@ -436,7 +478,7 @@ fn the_subject_a_tenet_names_is_not_a_relation_between_tenets() {
         registry:   &reg,
     };
     let subjects: Vec<String> = ["sky", "weather", "workflow"].map(String::from).to_vec();
-    let (raws, ..) = gather(&ctx, &subjects);
+    let (raws, ..) = gather(&ctx, &subjects, &about());
     assert_eq!(
         raws["weather"].edges, 0,
         "a lone tenet naming its subject is an island"

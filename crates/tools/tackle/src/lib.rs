@@ -28,13 +28,15 @@ mod score;
 
 use std::collections::BTreeMap;
 
-use mockspace::tool::{ArgSpec, NotALint, Purpose, Tool, ToolContext, ToolReport};
+use mockspace::tool::{
+    ArgSpec, ConfigKey, NotALint, Purpose, Tool, ToolContext, ToolParams, ToolReport,
+};
 
 use crate::render::{render_brief, render_namespaces, render_table};
 
-/// Subjects that are about how kaski is built rather than about the game. Scored, printed, never
-/// picked, for the reason in [`score::PICKABLE`].
-const ABOUT_THE_WORK: &[&str] = &["workflow"];
+/// The key of `[tools.tackle]` naming the subjects that are about how the project is built rather
+/// than about what it builds.
+const ABOUT_THE_WORK: &str = "about_the_work";
 
 /// The words a tenet marks something left open with, matched in its `what` and `because` ignoring
 /// case. Measured over the canon when this was ported: `not yet` in 7 statements, `left open` 4, `is
@@ -48,7 +50,12 @@ const CORPUS_DEPTH: usize = 10;
 /// How many of a subject's own keywords join its corpus question.
 const SUBJECT_TERMS: usize = 12;
 
-pub struct Tackle;
+/// The tool, holding the subjects its project names as about the work. Scored, printed, never
+/// picked, for the reason in [`score::PICKABLE`]. None unless the project names them.
+#[derive(Default)]
+pub struct Tackle {
+    about_the_work: Vec<String>,
+}
 
 impl Tool for Tackle {
     fn name(&self) -> &'static str {
@@ -71,6 +78,19 @@ impl Tool for Tackle {
         }]
     }
 
+    fn config_keys(&self) -> &[ConfigKey] {
+        &[ConfigKey {
+            name:        ABOUT_THE_WORK,
+            description: "the subject ids about how the project is built rather than about what it builds: weighed and printed, never picked; none when unset",
+        }]
+    }
+
+    fn configure(&mut self, params: &ToolParams) {
+        if let Some(subjects) = params.list(ABOUT_THE_WORK) {
+            self.about_the_work = subjects.to_vec();
+        }
+    }
+
     fn help(&self) -> &'static str {
         "Weighs every subject on how little binds in it, how much research sits unabsorbed behind \
          it, how much of it is superseded, how many of its rows mark something left open, and how \
@@ -80,7 +100,7 @@ impl Tool for Tackle {
     }
 
     fn run(&self, ctx: &ToolContext<'_>) -> ToolReport {
-        run_with(ctx, &|| {
+        run_with(ctx, &self.about_the_work, &|| {
             corpus::repo::ready(ctx.mock_dir, ctx.repo_root, None)
         })
     }
@@ -88,7 +108,11 @@ impl Tool for Tackle {
 
 /// The run, with the index made once the registry has been found worth ranking, so a test hands
 /// over an index of planted files.
-fn run_with(ctx: &ToolContext<'_>, make: &dyn Fn() -> corpus::repo::Ready) -> ToolReport {
+fn run_with(
+    ctx: &ToolContext<'_>,
+    about_the_work: &[String],
+    make: &dyn Fn() -> corpus::repo::Ready,
+) -> ToolReport {
     {
         if let Some(first) = ctx.args.first()
             && *first != "next"
@@ -111,7 +135,7 @@ fn run_with(ctx: &ToolContext<'_>, make: &dyn Fn() -> corpus::repo::Ready) -> To
             );
         }
 
-        let (mut raws, vocab, namers, blind) = gather(ctx, &subjects);
+        let (mut raws, vocab, namers, blind) = gather(ctx, &subjects, about_the_work);
         if namers == 0 {
             return ToolReport::inconclusive(
                 "no row anywhere names a subject, so every subject reads as equally thin and the \
@@ -174,6 +198,7 @@ fn run_with(ctx: &ToolContext<'_>, make: &dyn Fn() -> corpus::repo::Ready) -> To
 fn gather(
     ctx: &ToolContext<'_>,
     subjects: &[String],
+    about_the_work: &[String],
 ) -> (
     BTreeMap<String, score::Raw>,
     BTreeMap<String, Vec<String>>,
@@ -184,7 +209,7 @@ fn gather(
         .iter()
         .map(|t| {
             (t.clone(), score::Raw {
-                about_work: ABOUT_THE_WORK.contains(&t.as_str()),
+                about_work: about_the_work.contains(t),
                 ..score::Raw::default()
             })
         })
@@ -309,7 +334,7 @@ fn split_keywords(raw: &str) -> Vec<String> {
 }
 
 mockspace::lint_pack! {
-    tools: [Tackle],
+    tools: [Tackle::default()],
 }
 
 #[cfg(test)]
