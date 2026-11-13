@@ -19,17 +19,13 @@
 //! every consumer's `mockspace.toml` at once, which is the opposite of what
 //! this change is for.
 
-use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Reach, Severity};
+use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 
 use crate::util::err;
 
 pub struct LintAllowRequiresTaskId;
 
 impl Lint for LintAllowRequiresTaskId {
-    fn reach(&self) -> Reach {
-        Reach::File
-    }
-
     fn name(&self) -> &'static str {
         "lint-allow-requires-task-id"
     }
@@ -42,7 +38,7 @@ impl Lint for LintAllowRequiresTaskId {
 impl CrateLint for LintAllowRequiresTaskId {
     fn check(&self, ctx: &LintContext) -> Vec<LintError> {
         let mut out = Vec::new();
-        for (idx, line) in ctx.source.lines().enumerate() {
+        for (idx, line) in ctx.source().lines().enumerate() {
             let Some(pos) = line.find("lint:allow(") else {
                 continue;
             };
@@ -75,33 +71,20 @@ fn has_reason(s: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::has_reason;
-    use mockspace_lint_rules::reach_check::{crate_lint, Roots};
+    use mockspace_lint_rules::testkit::LintFixture;
+    use mockspace_lint_rules::CrateLint;
 
-    /// The declared file reach holds: the findings follow from the file alone. The corpus carries a bare
-    /// allow, so the lint has something to say and a read past the file would show.
+    /// A bare allow is reported at its line, and one with a reason is not.
     #[test]
-    fn the_declared_reach_holds() {
-        let dir = tempfile::tempdir().unwrap();
-        let populated = dir.path().join("populated");
-        std::fs::create_dir_all(populated.join("design_rounds")).unwrap();
-        std::fs::write(populated.join("mockspace.toml"), "project_name = \"x\"\n").unwrap();
-        let empty = dir.path().join("empty");
-        std::fs::create_dir_all(&empty).unwrap();
-        let corpus = [
-            ("src/lib.rs", "pub fn a() {}\n"),
-            ("src/bare.rs", "// lint:allow(no-std)\nfn b() {}\n"),
-            ("src/reasoned.rs", "// lint:allow(no-std) reason: a boundary\nfn c() {}\n"),
-        ];
+    fn a_bare_allow_is_reported_and_a_reasoned_one_is_not() {
         let lint = super::LintAllowRequiresTaskId;
-        let found = {
-            let f = mockspace_lint_rules::testkit::LintFixture::new(corpus[1].1);
-            mockspace_lint_rules::CrateLint::check(&lint, &f.ctx())
-        };
-        assert_eq!(found.len(), 1, "the control: the bare allow is reported");
-        let witness = crate_lint(&lint, &corpus, &Roots { populated: &populated, empty: &empty }).unwrap();
-        assert!(witness > 0, "the comparison saw no finding, so it proved nothing");
+        let bare = LintFixture::new("// lint:allow(no-std)\nfn b() {}\n");
+        let found = lint.check(&bare.ctx());
+        assert_eq!(found.len(), 1, "the bare allow is reported");
+        assert_eq!(found[0].line, 1);
+        let reasoned = LintFixture::new("// lint:allow(no-std) reason: a boundary\nfn c() {}\n");
+        assert!(lint.check(&reasoned.ctx()).is_empty());
     }
-
 
     #[test]
     fn a_reason_is_accepted() {

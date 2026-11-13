@@ -38,12 +38,11 @@
 //! `exclude`, which the engine reads as its own path filter and never hands to a lint.
 
 use std::collections::{BTreeSet, HashMap};
-use std::fs;
 
 use mockspace_lint_rules::{Lint, LintError, RepoContext, RepoLint, Severity};
-use tree_sitter::{Node, Parser};
+use tree_sitter::{Node, Tree};
 
-use crate::repo_files::{matching, rust_files};
+use crate::repo_scope::{matching, rust_files};
 use crate::string_literal::literal;
 
 /// The lint's name, as a project's `[lints.*]` table spells it.
@@ -106,17 +105,17 @@ impl Lint for CatalogueIgnore {
 
 impl RepoLint for CatalogueIgnore {
     fn check_repo(&self, ctx: &RepoContext) -> Vec<LintError> {
-        let files = rust_files(ctx.repo_root, ctx.mock_dir, ctx.all_crates, &self.skip);
-        let mut parser = Parser::new();
-        if parser.set_language(&tree_sitter_rust::LANGUAGE.into()).is_err() {
-            return Vec::new();
-        }
+        let view = ctx.view();
+        let files = rust_files(view, ctx.repo_root, ctx.mock_dir, ctx.all_crates(), &self.skip);
         let mut found = Vec::new();
         for file in &files {
             if !file.text.contains("ignore") {
                 continue;
             }
-            for ignore in ignores(&mut parser, &file.text) {
+            let Some(tree) = view.rust(ctx.repo_root.join(&file.rel)) else {
+                continue;
+            };
+            for ignore in ignores(tree, &file.text) {
                 found.push((file, ignore));
             }
         }
@@ -180,10 +179,7 @@ struct Ignore {
 }
 
 /// Every `#[ignore]` attribute in the source, in order.
-fn ignores(parser: &mut Parser, source: &str) -> Vec<Ignore> {
-    let Some(tree) = parser.parse(source, None) else {
-        return Vec::new();
-    };
+fn ignores(tree: &Tree, source: &str) -> Vec<Ignore> {
     let mut out = Vec::new();
     collect(source, tree.root_node(), &mut out);
     out
@@ -281,13 +277,13 @@ fn id_char(c: char) -> bool {
 /// Every id a reason may name: the registry's rows by slug and the rows of each ledger file.
 fn known_ids(ctx: &RepoContext, ledgers: &[String]) -> BTreeSet<String> {
     let mut known = BTreeSet::new();
-    for ns in ctx.registry.namespaces() {
-        for q in ctx.registry.rows_in(ns) {
+    for ns in ctx.registry().namespaces() {
+        for q in ctx.registry().rows_in(ns) {
             known.insert(q.rsplit("::").next().unwrap_or(q).to_string());
         }
     }
-    for rel in matching(ctx.repo_root, ledgers) {
-        let Ok(text) = fs::read_to_string(ctx.repo_root.join(rel)) else {
+    for rel in matching(ctx.view(), ctx.repo_root, ledgers) {
+        let Some(text) = ctx.view().text(ctx.repo_root.join(rel)) else {
             continue;
         };
         known.extend(text.lines().filter_map(row_id));

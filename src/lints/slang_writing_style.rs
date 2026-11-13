@@ -5,10 +5,10 @@
 //! hype, jargon, filler, greeting openers), over the comments the Slang reader found, so a `//` inside
 //! a string is not a comment and a block comment is read line by line.
 
-use mockspace_lint_rules::{Lint, LintError, Reach, RepoContext, RepoLint, Severity};
+use mockspace_lint_rules::{Lint, LintError, RepoContext, RepoLint, Severity};
 
 use super::writing_style::check_comment_corpus;
-use crate::slang::{SlangSource, sources};
+use crate::slang::{SlangSource, read_source, slang_paths};
 
 /// The lint's name, as a project's `[lints.*]` table spells it.
 pub const NAME: &str = "slang-writing-style";
@@ -22,10 +22,6 @@ impl Lint for SlangWritingStyle {
         NAME
     }
 
-    fn reach(&self) -> Reach {
-        Reach::Paths(crate::slang::SLANG_READS)
-    }
-
     fn default_severity(&self) -> Severity {
         Severity::PUSH_GATE
     }
@@ -33,13 +29,13 @@ impl Lint for SlangWritingStyle {
 
 impl RepoLint for SlangWritingStyle {
     fn check_repo(&self, ctx: &RepoContext) -> Vec<LintError> {
-        let files = sources(ctx.repo_root, ctx.mock_dir, ctx.all_crates);
-        let mut parts: Vec<&[u8]> = Vec::new();
-        for f in &files {
-            parts.push(f.rel.as_bytes());
-            parts.push(f.text.as_bytes());
-        }
-        ctx.remembered(NAME, &parts, || files.iter().flat_map(judge).collect())
+        let view = ctx.view();
+        let root = ctx.repo_root;
+        let files = slang_paths(view, root, ctx.mock_dir, ctx.all_crates());
+        view.each(&files, |v, path| read_source(v, root, path).map(|s| judge(&s)).unwrap_or_default())
+            .into_iter()
+            .flatten()
+            .collect()
     }
 }
 

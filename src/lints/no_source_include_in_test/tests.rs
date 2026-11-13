@@ -1,10 +1,9 @@
-use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
 
-use mockspace_lint_rules::RegistryView;
-
 use super::*;
+use crate::test_support::run_repo_lint;
 
 pub(super) fn write(root: &Path, rel: &str, text: &str) {
     let p = root.join(rel);
@@ -14,19 +13,7 @@ pub(super) fn write(root: &Path, rel: &str, text: &str) {
 
 fn check_with(lint: &NoSourceIncludeInTest, root: &Path) -> Vec<LintError> {
     let crates = BTreeSet::from(["alpha".to_string()]);
-    let reg = RegistryView::new(BTreeMap::new(), BTreeMap::new());
-    let ctx = RepoContext {
-        mock_dir: &root.join("mock"),
-        repo_root: root,
-        all_crates: &crates,
-        src_dirs: &[],
-        invocation: None,
-        canon_paths: &[],
-        open_panels: &[],
-        registry: &reg,
-        verdicts: None,
-    };
-    lint.check_repo(&ctx)
+    run_repo_lint(lint, root, &crates)
 }
 
 pub(super) fn check(root: &Path) -> Vec<LintError> {

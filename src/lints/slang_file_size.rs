@@ -8,7 +8,7 @@
 
 use std::collections::HashMap;
 
-use mockspace_lint_rules::{Lint, LintError, Reach, RepoContext, RepoLint, Severity};
+use mockspace_lint_rules::{Lint, LintError, RepoContext, RepoLint, Severity};
 
 use crate::slang::{SlangSource, sources};
 
@@ -36,10 +36,6 @@ impl Lint for SlangFileSize {
         NAME
     }
 
-    fn reach(&self) -> Reach {
-        Reach::Paths(crate::slang::SLANG_READS)
-    }
-
     fn default_severity(&self) -> Severity {
         Severity::ADVISORY
     }
@@ -57,14 +53,8 @@ impl Lint for SlangFileSize {
 
 impl RepoLint for SlangFileSize {
     fn check_repo(&self, ctx: &RepoContext) -> Vec<LintError> {
-        let files = sources(ctx.repo_root, ctx.mock_dir, ctx.all_crates);
-        let limit = self.max_lines.to_string();
-        let mut parts: Vec<&[u8]> = vec![limit.as_bytes()];
-        for f in &files {
-            parts.push(f.rel.as_bytes());
-            parts.push(f.text.as_bytes());
-        }
-        ctx.remembered(NAME, &parts, || self.judge(&files))
+        let files = sources(ctx.view(), ctx.repo_root, ctx.mock_dir, ctx.all_crates());
+        self.judge(&files)
     }
 }
 

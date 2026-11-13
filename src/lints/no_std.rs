@@ -36,8 +36,8 @@ impl CrateLint for NoStd {
         // per-file lint the same context with `source` swapped for each module
         // file, so it must fire only when `source` IS the root; otherwise every
         // module file is reported as a root missing its attribute.
-        let is_crate_root = ctx.all_sources.first().is_none_or(|f| f.text == ctx.source);
-        let head = crate_prelude(ctx.source);
+        let is_crate_root = ctx.all_sources().first().is_none_or(|f| f.text == ctx.source());
+        let head = crate_prelude(ctx.source());
         let has_no_std = head.contains("#![no_std]");
         let allowed_at_root = line_lint_allowed(&head, "no-std");
         if is_crate_root && !has_no_std && !allowed_at_root && !ctx.is_proc_macro_crate() {
@@ -50,7 +50,7 @@ impl CrateLint for NoStd {
         }
 
         // Flag per-line `std::*` and `use std::`.
-        for (idx, line) in ctx.source.lines().enumerate() {
+        for (idx, line) in ctx.source().lines().enumerate() {
             if line.trim_start().starts_with("//") {
                 continue;
             }
