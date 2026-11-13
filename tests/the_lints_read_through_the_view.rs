@@ -94,8 +94,12 @@ fn every_registered_lint_is_declared_where_the_guard_reads() {
     let unguarded: Vec<&String> = names
         .iter()
         .filter(|name| {
+            // Declared where a file both names it and implements a lint's `name`, so a mention in a
+            // doc string or a test elsewhere does not count as its declaration.
             let quoted = format!("\"{name}\"");
-            !files.iter().any(|(_, text)| text.contains(&quoted))
+            !files
+                .iter()
+                .any(|(_, text)| text.contains(&quoted) && text.contains("fn name(&self)"))
         })
         .collect();
     assert!(
