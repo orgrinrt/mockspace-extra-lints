@@ -5,8 +5,8 @@
 
 //! `mock research-unbundle <bundle> <dir>`: a research bundle written out as the files of a research note.
 //!
-//! A helper that has no push of its own posts its research as one attachment: every file in turn, each
-//! under a line `=== FILE: <name> ===`. This writes the files under `dir`, `<mock>/research/<stamp>_<slug>/`,
+//! A bundle is research passed around as one file: every file of the note in turn, each under a line
+//! `=== FILE: <name> ===`. This writes the files under `dir`, `<mock>/research/<stamp>_<slug>/`,
 //! and splits any markdown file over [`LIMIT`] lines along its `## ` headings, so a note lands in the
 //! shape the research directory keeps without being cut by hand.
 
@@ -52,7 +52,7 @@ impl Tool for ResearchUnbundle {
             ArgSpec {
                 name:        "bundle",
                 required:    true,
-                description: "the file holding the bundle, as `msg <channel> show --from <name> --attachment` prints it",
+                description: "the file holding the bundle, every file of the note in turn, each under a line `=== FILE: <name> ===`",
             },
             ArgSpec {
                 name:        "dir",

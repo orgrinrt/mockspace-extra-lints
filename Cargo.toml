@@ -27,9 +27,9 @@ tree-sitter-rust = "0.23.3"
 # dependency's source is: a git revision, a path and a `[patch]` all end at a
 # manifest path there and nowhere else reliably.
 serde_json = "1"
-# Pinned to 0.8 against the workspace`s 1, because the root crate reads manifests through the
-# engine`s `View::toml`, which hands back a `toml::Value` of its own 0.8. The members parse their
-# own manifests and take the workspace`s 1.
+# Pinned to 0.8 against the workspace's 1, because the root crate reads manifests through the
+# engine's `View::toml`, which hands back a `toml::Value` of its own 0.8. The members parse their
+# own manifests and take the workspace's 1.
 toml = "0.8"
 # Reads a manifest with the spans of its keys, which the findings' line numbers come from. The engine's
 # own `toml_edit` is the older 0.22, so the lockfile holds both.
