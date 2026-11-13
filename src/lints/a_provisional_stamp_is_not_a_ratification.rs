@@ -88,16 +88,17 @@ impl Lint for AProvisionalStampIsNotARatification {
         if let Some(v) = params.get(NAMESPACES_KEY) {
             self.namespaces = split(v).map(str::to_string).collect();
         }
-        for (key, slot) in [
-            (TIERED_KEY, &mut self.tiered),
-            (TIER_FIELD_KEY, &mut self.tier_field),
-            (RATIFIED_KEY, &mut self.ratified),
-            (RATIFIES_KEY, &mut self.ratifies_field),
-        ] {
-            if let Some(v) = params.get(key) {
-                *slot = v.trim().to_string();
-            }
-        }
+        set(&mut self.tiered, params.get(TIERED_KEY));
+        set(&mut self.tier_field, params.get(TIER_FIELD_KEY));
+        set(&mut self.ratified, params.get(RATIFIED_KEY));
+        set(&mut self.ratifies_field, params.get(RATIFIES_KEY));
+    }
+}
+
+/// Overwrites a field with a configured value, trimmed, where one was given.
+fn set(slot: &mut String, value: Option<&String>) {
+    if let Some(v) = value {
+        *slot = v.trim().to_string();
     }
 }
 

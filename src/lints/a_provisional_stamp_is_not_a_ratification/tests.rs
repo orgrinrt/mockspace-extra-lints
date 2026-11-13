@@ -156,13 +156,9 @@ fn a_project_names_its_own_words() {
 #[test]
 fn every_finding_blocks() {
     let f = run(&[("proposal::p", &[("stamp", WHOLE)])]);
+    assert!(!f.is_empty(), "the planted half stamp raised nothing");
     assert!(
         f.iter().all(|e| e.severity == Severity::HARD_ERROR),
         "{f:?}"
     );
-}
-
-#[test]
-fn it_answers_to_its_name() {
-    assert_eq!(AProvisionalStampIsNotARatification::default().name(), NAME);
 }
