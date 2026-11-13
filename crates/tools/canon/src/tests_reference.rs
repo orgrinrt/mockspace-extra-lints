@@ -29,12 +29,14 @@ const ROWS: &[Row<'static>] = &[
     ("subject::sky", &[("what", "The sky.")]),
     ("subject::time", &[("what", "The clock.")]),
     ("tenet::the_sun_rises", &[
+        ("standing", "ratified"),
         ("subject", "sky"),
         ("what", "The sun rises in the east."),
         ("keywords", "sun, dawn"),
         ("ikiuni_renderer", "a_sky_pass"),
     ]),
     ("tenet::days_follow_the_sun", &[
+        ("standing", "ratified"),
         ("subject", "time"),
         ("what", "A day is the_sun_rises again."),
         ("cites", "the_sun_rises"),

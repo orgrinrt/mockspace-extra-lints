@@ -31,7 +31,7 @@ description = "What the maintainer answered about this row, one entry each as `<
 [[registry.namespace]]
 key = "tenet"
 title = "Tenets"
-description = "A ratified design commitment: a stance on scope, genre, or a loop, rather than a concrete content object."
+description = "A design commitment: a stance on scope, genre, or a loop, rather than a concrete content object. Its `standing` says whether the maintainer has ratified it."
 
 [[registry.namespace.field]]
 name = "what"
@@ -68,6 +68,13 @@ name = "superseded_by"
 type = "tenet[]"
 required = false
 description = "The tenets that replace this one. A superseded tenet is kept rather than deleted, so the canon that replaced it is read with it in view; it no longer binds."
+
+[[registry.namespace.field]]
+name = "standing"
+type = "string"
+required = true
+description = "`provisional` where the maintainer has not ratified it: read as the best current statement and never cited as settled. `ratified` where the maintainer went through it on a named date, with their answer in the row's `answers`. Apart from `superseded_by`: a superseded row does not bind whatever its standing."
+values = ["provisional", "ratified"]
 
 [[registry.namespace.field]]
 name = "subject"

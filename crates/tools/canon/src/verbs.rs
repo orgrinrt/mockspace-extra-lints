@@ -14,7 +14,7 @@ use std::path::Path;
 
 use mockspace::RegistryView;
 
-use crate::rows::{Tenet, carries, subjects, tenets};
+use crate::rows::{Standing, Tenet, carries, subjects, tenets};
 use crate::scope::Scope;
 use crate::tree::mentions;
 use crate::{VERBS, reference};
@@ -94,9 +94,13 @@ pub(crate) fn gist(what: &str) -> String {
     format!("{}...", &cut[.. at])
 }
 
-/// One tenet as a listing line.
+/// One tenet as a listing line, marked with its standing where op has not ratified it and with what
+/// replaced it where it is superseded.
 pub(crate) fn line(out: &mut String, t: &Tenet<'_>, width: usize) {
     let mut note = gist(t.what);
+    if t.standing != Standing::Ratified {
+        note = format!("({}) {note}", t.standing.word());
+    }
     if !t.binds() {
         note = format!("(superseded by {}) {note}", t.superseded_by.join(", "));
     }
@@ -111,8 +115,12 @@ pub(crate) fn width<'a>(ts: impl Iterator<Item = &'a Tenet<'a>>) -> usize {
 fn subjects_answer(reg: &RegistryView, all: &[Tenet<'_>]) -> (String, usize) {
     let subs = subjects(reg);
     let binding = all.iter().filter(|t| t.binds()).count();
+    let ratified = all
+        .iter()
+        .filter(|t| t.standing == Standing::Ratified)
+        .count();
     let mut out = format!(
-        "{} subjects, {} tenets, {binding} binding\n\n",
+        "{} subjects, {} tenets, {binding} binding, {ratified} ratified\n\n",
         subs.len(),
         all.len()
     );
@@ -200,6 +208,7 @@ pub(crate) fn related_answer(all: &[Tenet<'_>], id: &str) -> Result<(String, usi
         .map(|o| o.id)
         .collect();
     let mut out = format!("{id}\n");
+    let _ = writeln!(out, "  standing:      {}", t.standing.word());
     let _ = writeln!(out, "  subject:       {}", t.subject.unwrap_or("none"));
     let _ = writeln!(out, "  cites:         {}", ids_or_nothing(&t.cites));
     let _ = writeln!(out, "  cited by:      {}", ids_or_nothing(&cited_by));
@@ -235,9 +244,23 @@ fn uncited_answer(repo: &Path, all: &[Tenet<'_>]) -> (String, usize) {
     (out, shown)
 }
 
+/// The tenets `ids` name that op has not ratified and nothing supersedes, one line each naming its
+/// standing. Not a finding: every tenet is provisional until op's walk, so a check that blocked on one
+/// would pass nothing.
+pub fn unratified(all: &[Tenet<'_>], ids: &[&str]) -> Vec<String> {
+    ids.iter()
+        .filter_map(|raw| {
+            let id = raw.strip_prefix("tenet::").unwrap_or(raw);
+            all.iter()
+                .find(|t| t.id == id && t.binds() && t.standing != Standing::Ratified)
+                .map(|t| format!("`{id}` is {}, not ratified", t.standing.word()))
+        })
+        .collect()
+}
+
 /// What is wrong with the tenets `ids` name, one line each: an id that is no tenet, and an id whose tenet
 /// something supersedes. A `tenet::` prefix is the namespace and is read off, as a citation spells it.
-/// Empty when every id names a tenet that still binds.
+/// Empty when every id names a tenet that still binds, provisional or ratified.
 pub fn check(all: &[Tenet<'_>], ids: &[&str]) -> Vec<String> {
     ids.iter()
         .filter_map(|raw| {

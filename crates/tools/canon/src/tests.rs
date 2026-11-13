@@ -32,28 +32,33 @@ pub(crate) fn view(rows: &[Row<'_>]) -> RegistryView {
     RegistryView::new(rows, BTreeMap::new())
 }
 
-/// Two subjects, four tenets: one superseded, one citing another, one named nowhere.
+/// Two subjects, four tenets: one superseded, one citing another, one named nowhere and the only one
+/// provisional.
 pub(crate) fn fixture() -> RegistryView {
     view(&[
         ("subject::sky", &[("what", "The sky.")]),
         ("subject::time", &[("what", "The clock.")]),
         ("tenet::the_sun_rises", &[
+            ("standing", "ratified"),
             ("subject", "sky"),
             ("what", "The sun rises in the east."),
             ("keywords", "sun, dawn"),
         ]),
         ("tenet::the_sun_rose", &[
+            ("standing", "ratified"),
             ("subject", "sky"),
             ("what", "The sun rose once."),
             ("superseded_by", "the_sun_rises"),
         ]),
         ("tenet::days_follow_the_sun", &[
+            ("standing", "ratified"),
             ("subject", "time"),
             ("what", "A day is the_sun_rises again."),
             ("cites", "the_sun_rises"),
             ("keywords", "day"),
         ]),
         ("tenet::nobody_names_this", &[
+            ("standing", "provisional"),
             ("subject", "time"),
             ("what", "A Moonless Night."),
             ("related", "tenet::the_sun_rises"),

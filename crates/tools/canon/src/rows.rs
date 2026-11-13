@@ -15,10 +15,49 @@ use mockspace::RegistryView;
 /// The separator the engine joins a list field with.
 const JOIN: &str = ", ";
 
+/// Whether op has ratified a tenet, read from its `standing`. The set is the one `mockspace.toml`
+/// declares for the field, closed there, and named here once.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Standing {
+    /// Not ratified, pending op's walk: the best current statement, never cited as settled.
+    Provisional,
+    /// Op went through it on a named date, his answer in the row's `answers`.
+    Ratified,
+    /// The field is absent or holds a word outside the set, which the schema refuses; read so a test
+    /// over the committed rows can say which.
+    Unstated,
+}
+
+impl Standing {
+    /// The words of the set, as a row writes them.
+    pub const WORDS: [&'static str; 2] = ["provisional", "ratified"];
+
+    /// The standing a row's `standing` field spells.
+    pub const fn of(word: &str) -> Self {
+        match word.as_bytes() {
+            b"provisional" => Self::Provisional,
+            b"ratified" => Self::Ratified,
+            _ => Self::Unstated,
+        }
+    }
+
+    /// The word a listing shows for it.
+    pub const fn word(self) -> &'static str {
+        match self {
+            Self::Provisional => "provisional",
+            Self::Ratified => "ratified",
+            Self::Unstated => "unstated",
+        }
+    }
+}
+
 /// One tenet, as the verbs read it.
 pub struct Tenet<'a> {
     /// Its id, the slug every citation names.
     pub id:            &'a str,
+    /// Whether op has ratified it. Apart from `superseded_by`: a superseded row does not bind whatever
+    /// its standing.
+    pub standing:      Standing,
     /// The subject it names, where it names one.
     pub subject:       Option<&'a str>,
     /// The tenets that replace it, empty while it binds.
@@ -116,6 +155,7 @@ pub fn tenets(reg: &RegistryView) -> Vec<Tenet<'_>> {
         .map(|q| {
             Tenet {
                 id:            slug(q),
+                standing:      Standing::of(text(reg, q, "standing")),
                 subject:       reg
                     .field(q, "subject")
                     .map(str::trim)

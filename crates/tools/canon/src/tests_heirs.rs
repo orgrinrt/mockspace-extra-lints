@@ -5,12 +5,13 @@
 
 //! What binds in the place of a superseded tenet, the chain of replacements followed to its end.
 
-use crate::rows::{Tenet, heirs, tenets};
+use crate::rows::{Standing, Tenet, heirs, tenets};
 use crate::tests::fixture;
 
 fn row<'a>(id: &'a str, superseded_by: &[&'a str]) -> Tenet<'a> {
     Tenet {
         id,
+        standing: Standing::Provisional,
         subject: None,
         superseded_by: superseded_by.to_vec(),
         cites: vec![],

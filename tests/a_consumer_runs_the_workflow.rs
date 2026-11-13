@@ -183,7 +183,7 @@ fn a_consumer_adds_moves_and_lists_a_ticket_and_asks_its_canon() {
         "mock/registry/tenet/ground.toml",
         "[[subject]]\nid = \"ground\"\nwhat = \"The ground and what lies on it.\"\n\n\
          [[tenet]]\nid = \"rain_wets_the_ground\"\nwhat = \"Rain wets the ground it falls on, and the ground stays wet a while.\"\n\
-         subject = \"ground\"\nkeywords = [\"rain\", \"wet\", \"puddle\"]\n\
+         subject = \"ground\"\nstanding = \"ratified\"\nkeywords = [\"rain\", \"wet\", \"puddle\"]\n\
          provenance = [\"research::202611130000_ground::NOTES::#rain\"]\n",
     );
 
