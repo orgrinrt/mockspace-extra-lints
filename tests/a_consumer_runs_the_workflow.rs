@@ -11,111 +11,12 @@
 
 use std::collections::BTreeSet;
 use std::fs;
-use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::path::Path;
 
-use mockspace::config::Config;
-use mockspace_lint_rules::LintPack;
-use mockspace_lint_rules::tool::{Outcome, ToolContext, ToolReport};
+use mockspace_lint_rules::tool::{Outcome, ToolReport};
 
-/// The pack's root, where its shipped `registry/` sits.
-fn pack_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-}
-
-fn write(root: &Path, rel: &str, text: &str) {
-    let p = root.join(rel);
-    fs::create_dir_all(p.parent().unwrap()).unwrap();
-    fs::write(p, text).unwrap();
-}
-
-/// A consumer on `dev`, in a directory of its own for `tag`: its config is its own root keys, the
-/// shipped declarations as they are and then `tools`, its `[tools]` tables; its registry holds the shipped ticket vocabulary and planning roles and no row of its own.
-fn consumer(tag: &str, tools: &str) -> PathBuf {
-    let root =
-        std::env::temp_dir().join(format!("extra-lints-consumer-{tag}-{}", std::process::id()));
-    let _ = fs::remove_dir_all(&root);
-    let shipped = pack_root().join("registry");
-    let declarations = fs::read_to_string(shipped.join("namespaces.toml")).unwrap();
-    write(
-        &root,
-        "mockspace.toml",
-        &format!(
-            "project_name = \"scratch\"\ncrate_prefix = \"scratch\"\nmock_dir = \"mock\"\nsrc_dirs = [\"crates\"]\n\n{declarations}\n{tools}"
-        ),
-    );
-    for f in ["ticket/states.toml", "ticket/kinds.toml", "plan/roles.toml"] {
-        write(
-            &root,
-            &format!("mock/registry/{f}"),
-            &fs::read_to_string(shipped.join(f)).unwrap(),
-        );
-    }
-    fs::create_dir_all(root.join("mock/crates")).unwrap();
-    let git = |args: &[&str]| {
-        let out = Command::new("git")
-            .arg("-C")
-            .arg(&root)
-            .args(args)
-            .output()
-            .unwrap();
-        assert!(
-            out.status.success(),
-            "git {args:?}: {}",
-            String::from_utf8_lossy(&out.stderr)
-        );
-    };
-    git(&["init", "-q", "-b", "dev"]);
-    git(&[
-        "-c",
-        "user.name=t",
-        "-c",
-        "user.email=t@t",
-        "commit",
-        "-q",
-        "--allow-empty",
-        "-m",
-        "base",
-    ]);
-    root
-}
-
-/// The pack's tools as the engine gets them, configured from `root`'s `[tools]` the way the engine
-/// configures a loaded pack, or unconfigured with no `root`.
-fn pack_for(root: Option<&Path>) -> LintPack {
-    let mut pack = LintPack::default();
-    mockspace_extra_lints::collect(&mut pack);
-    if let Some(root) = root {
-        pack.configure_tools(&Config::from_dir(&root.join("mock")).tool_params);
-    }
-    pack
-}
-
-fn pack() -> LintPack {
-    pack_for(None)
-}
-
-/// Runs the tool registered as `name` over the consumer as it stands now.
-fn run(pack: &LintPack, root: &Path, name: &str, args: &[&str]) -> ToolReport {
-    let cfg = Config::from_dir(&root.join("mock"));
-    let registry = mockspace::registry::load_registry_for(&cfg).expect("the registry loads");
-    let view = mockspace::registry::build_view(&registry, &cfg.registry_namespaces);
-    let tool = pack
-        .tools
-        .iter()
-        .find(|t| t.name() == name)
-        .unwrap_or_else(|| panic!("the pack registers `{name}`"));
-    let crates = BTreeSet::new();
-    tool.run(&ToolContext {
-        mock_dir: &cfg.mock_dir,
-        repo_root: &cfg.repo_root,
-        all_crates: &crates,
-        src_dirs: &cfg.src_dirs,
-        args,
-        stdin: None,
-        registry: &view,
-    })
-}
+mod consumer;
+use consumer::{consumer, pack_for, pack_root, run, write};
 
 fn clean(r: &ToolReport) -> bool {
     matches!(r.outcome, Outcome::Clean { .. })
@@ -123,7 +24,7 @@ fn clean(r: &ToolReport) -> bool {
 
 #[test]
 fn every_tool_name_is_registered_once() {
-    let pack = pack();
+    let pack = pack_for(None);
     let mut seen = BTreeSet::new();
     for t in &pack.tools {
         assert!(seen.insert(t.name()), "`{}` is registered twice", t.name());
@@ -149,8 +50,8 @@ fn every_tool_name_is_registered_once() {
 
 #[test]
 fn a_consumer_adds_moves_and_lists_a_ticket_and_asks_its_canon() {
-    let root = consumer("ticket", "");
-    let pack = pack();
+    let root = consumer("ticket", "mock", "");
+    let pack = pack_for(None);
 
     let added = run(&pack, &root, "ticket-add", &[
         "Wet the ground",
@@ -262,6 +163,7 @@ fn two_subjects(root: &Path) {
 fn a_consumer_names_the_subjects_about_the_work_in_its_tools_table() {
     let root = consumer(
         "tackle",
+        "mock",
         "[tools.tackle]\nabout_the_work = [\"ground\", \"tooling\"]\n",
     );
     two_subjects(&root);
@@ -277,7 +179,7 @@ fn a_consumer_names_the_subjects_about_the_work_in_its_tools_table() {
 
     // THE CONTROL: the same consumer with no table has a subject picked, so the refusal above is the
     // table's doing.
-    let bare = consumer("tackle-bare", "");
+    let bare = consumer("tackle-bare", "mock", "");
     two_subjects(&bare);
     let picked = run(&pack_for(Some(&bare)), &bare, "tackle", &["next"]);
     assert!(
