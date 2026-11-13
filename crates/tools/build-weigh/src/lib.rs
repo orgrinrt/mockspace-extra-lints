@@ -293,6 +293,7 @@ impl Tool for BuildWeigh {
 
     fn purpose(&self) -> Purpose {
         Purpose::Make {
+            // FIXME(a_maker_tool_s_writes_cannot_name_the_mock_directory): `writes` names `mock`, since a pattern cannot name the mock directory the config declares
             writes: &["mock/target/**"],
             roots:  &[],
         }

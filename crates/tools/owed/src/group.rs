@@ -133,6 +133,7 @@ pub fn area(rel: &str) -> String {
     match segs.as_slice() {
         ["content", pack, ..] if segs.len() > 2 => format!("content/{pack}"),
         ["content", ..] => "content".to_string(),
+        // FIXME(pack_lints_and_tools_read_the_mock_directory_as_mock): the mock directory is read as `mock`, not as the one `mockspace.toml` declares
         ["mock", "tools", name, ..] if segs.len() > 3 => format!("tool {name}"),
         ["mock", "lints", ..] => "lints".to_string(),
         ["mock", "agent", ..] => "agent text".to_string(),
@@ -144,9 +145,9 @@ pub fn area(rel: &str) -> String {
 }
 
 /// The canon subject a path is about, where one of the registry's `subject` rows is named for it:
-/// the crate without its `kaski-` prefix, the content, or the workflow for the tooling.
-pub fn subject_of(area: &str, subjects: &BTreeSet<String>) -> Option<String> {
-    let guess = if let Some(rest) = area.strip_prefix("kaski-") {
+/// the crate without the project's `crate_prefix` and its dash, the content, or the workflow for the tooling.
+pub fn subject_of(area: &str, prefix: &str, subjects: &BTreeSet<String>) -> Option<String> {
+    let guess = if let Some(rest) = area.strip_prefix(prefix).and_then(|r| r.strip_prefix('-')) {
         rest.replace('-', "_")
     } else if area.starts_with("content") {
         "content".to_string()

@@ -168,6 +168,7 @@ fn check(repo: &Path, reg: &RegistryView, rows: &[ratchets::Row]) -> Vec<LintErr
             .is_some_and(|(file, tag)| used.contains(&(file.to_owned(), tag.to_owned())));
         if !held {
             let mut e = LintError::error(
+                // FIXME(pack_lints_and_tools_read_the_mock_directory_as_mock): the mock directory is read as `mock`, not as the one `mockspace.toml` declares
                 "mock".to_owned(),
                 r.line,
                 NAME,
@@ -179,6 +180,7 @@ fn check(repo: &Path, reg: &RegistryView, rows: &[ratchets::Row]) -> Vec<LintErr
                     r.ticket
                 ),
             );
+            // FIXME(pack_lints_and_tools_read_the_mock_directory_as_mock): the mock directory is read as `mock`, not as the one `mockspace.toml` declares
             e.path = Some(format!("mock/{}", ratchets::FILE));
             out.push(e);
         }
@@ -190,9 +192,6 @@ fn check(repo: &Path, reg: &RegistryView, rows: &[ratchets::Row]) -> Vec<LintErr
 mod tests {
     use super::*;
     use crate::canon_rows::testkit::{git, scratch, view, write};
-    use crate::gate_config::table;
-
-    const CONFIG: &str = include_str!("../../mockspace.toml");
 
     /// The marker word is written `§` here, so this file holds no marker of its own.
     fn t(s: &str) -> String {
@@ -455,13 +454,11 @@ mod tests {
     }
 
     #[test]
-    fn the_default_blocks_every_gate_and_the_repository_configures_it_so() {
+    fn the_default_blocks_every_gate() {
         assert_eq!(
             EveryFixmeNamesATicket.default_severity(),
             Severity::HARD_ERROR
         );
-        let t = table(CONFIG, NAME);
-        assert!(t.blocks_at_every_gate(), "{t:?}");
     }
 
     const SIDE: &str = "mock/crates/kaski-a/src/side.rs";

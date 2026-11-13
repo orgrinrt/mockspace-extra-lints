@@ -11,9 +11,10 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, Ordering};
 
-use kaski_tickets::Store;
+use ticket_model::Store;
 use mockspace::tool::{Outcome, ToolContext, ToolReport};
 use mockspace::{RegistryView, RowFields};
+use registry_lints::tree_walk;
 
 use super::*;
 
@@ -37,9 +38,15 @@ impl Repo {
         let _ = std::fs::remove_dir_all(&root);
         let dir = root.join("mock/registry/ticket");
         std::fs::create_dir_all(&dir).unwrap();
+        // the project the fixtures name, so a crate `kaski-<x>` is about the subject `<x>`
+        std::fs::write(
+            root.join("mockspace.toml"),
+            "project_name = \"kaski\"\ncrate_prefix = \"kaski\"\n",
+        )
+        .unwrap();
         for f in ["states.toml", "kinds.toml"] {
             std::fs::copy(
-                tickets::testkit::committed_registry()
+                tickets::testkit::shipped_registry()
                     .join("ticket")
                     .join(f),
                 dir.join(f),
@@ -389,7 +396,7 @@ fn a_question_filed_before_owed_filed_tasks_is_still_closed_as_dropped_when_its_
     let r = Repo::new();
     let store = r.store();
     let registry = r.root.join("mock/registry");
-    let mut fields = kaski_tickets::Fields::new();
+    let mut fields = ticket_model::Fields::new();
     fields.insert(
         "what".to_string(),
         vec!["The canon silences in kaski-weather, 1 marker.\n\nCovers:\n- mock/crates/kaski-weather/src/lib.rs: how a front moves over a ridge\n".to_string()],
@@ -633,7 +640,7 @@ fn a_list_written_before_lines_were_listed_is_matched_as_it_was() {
     let r = Repo::new();
     r.write(SIM, "// §(stand-in): a flat roof for now\n");
     let store = r.store();
-    let mut fields = kaski_tickets::Fields::new();
+    let mut fields = ticket_model::Fields::new();
     fields.insert("what".to_string(), vec![format!(
         "The stand-ins in kaski-sim, 1 marker.\n\nCovers:\n- {SIM}: a flat roof for now\n"
     )]);
@@ -666,7 +673,7 @@ const FREE: &str = "mock/tools/roofs/src/lib.rs";
 fn question_closed(r: &Repo, id: &str, to: &str, answer: &str, picks: &[&str]) {
     let store = r.store();
     let registry = r.root.join("mock/registry");
-    let mut fields = kaski_tickets::Fields::new();
+    let mut fields = ticket_model::Fields::new();
     fields.insert("options".to_string(), vec![
         "flat: a flat roof".to_string(),
         "pitched: a pitched roof".to_string(),

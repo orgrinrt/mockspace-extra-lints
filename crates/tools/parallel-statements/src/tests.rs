@@ -111,9 +111,9 @@ fn the_pool_floor_is_below_where_the_measure_gets_coarse() {
 
 #[test]
 fn distinctive_drops_the_house_vocabulary_and_the_short_words() {
-    let w = distinctive("The Kaski player SHOULD never grant the same raw access");
-    // Case is folded, and `kaski`, `same` and `never` are on the house list
-    // for the reason the list states: they occur in many statements here and
+    let w = distinctive("The Kaski player SHOULD never grant the same raw access", "kaski");
+    // Case is folded, `kaski` is the project's own name, and `same` and
+    // `never` are on the house list for the reason the list states: they occur in many statements here and
     // say nothing about which statement it is. `raw` goes for being three
     // letters.
     for gone in ["the", "never", "kaski", "same", "raw", "a"] {
@@ -128,7 +128,7 @@ fn distinctive_drops_the_house_vocabulary_and_the_short_words() {
 fn distinctive_counts_a_repeated_word_once() {
     // It is a set, and the share is over set sizes, so a statement repeating
     // one word does not inflate its own denominator.
-    assert_eq!(distinctive("grant grant grant access").len(), 2);
+    assert_eq!(distinctive("grant grant grant access", "kaski").len(), 2);
 }
 
 #[test]

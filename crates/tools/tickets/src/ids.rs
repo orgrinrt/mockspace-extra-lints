@@ -4,7 +4,7 @@
 //--------------------------------------------------------------------------------------------------
 //! A move's id. A ticket's id is a slug of its title, which `kaski-tickets` makes.
 
-use kaski_tickets::rules::slugify;
+use ticket_model::rules::slugify;
 
 use crate::time::now_secs;
 

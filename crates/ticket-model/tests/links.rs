@@ -7,7 +7,7 @@
 //! exist, not the ticket itself, and no cycle, by `check_links` on a ticket being edited and by
 //! `check_store` over the committed rows.
 
-use kaski_tickets::{Store, rules};
+use mockspace_extra_ticket_model::{Store, rules};
 
 const VOCABULARY: &str = r#"
 [[ticket_state]]

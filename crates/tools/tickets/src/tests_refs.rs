@@ -8,7 +8,7 @@
 
 use std::collections::BTreeMap;
 
-use kaski_tickets::Tree;
+use ticket_model::Tree;
 use mockspace::RegistryView;
 use mockspace::tool::Outcome;
 
@@ -26,6 +26,10 @@ impl Trunk for Nothing {
 }
 
 impl Tree for Nothing {
+    fn crate_prefix(&self) -> &str {
+        "kaski"
+    }
+
     fn gone(&self, _: &str) -> Option<String> {
         None
     }
@@ -111,7 +115,7 @@ fn the_check_names_a_ticket_a_hand_edit_left_linking_a_row_that_is_not_there() {
         &store,
         &plan,
         &Nothing,
-        &kaski_tickets::Heirs::new(),
+        &ticket_model::Heirs::new(),
         &Known::of(&canon()),
     );
     assert!(

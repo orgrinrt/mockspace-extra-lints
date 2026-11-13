@@ -12,7 +12,7 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use kaski_tickets::Store;
+use ticket_model::Store;
 use tickets::write::{self, AddRequest, MoveRequest};
 
 use crate::fixme_markers;

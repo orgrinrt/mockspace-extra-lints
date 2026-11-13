@@ -25,8 +25,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use mockspace::tool::{ArgSpec, NotALint, Purpose, Tool, ToolContext, ToolReport};
 
-#[path = "../../../lints/tree_walk.rs"]
-pub mod tree_walk;
+use registry_lints::tree_walk;
 
 /// The fields carrying the canon's own statements, read out of the schema.
 ///

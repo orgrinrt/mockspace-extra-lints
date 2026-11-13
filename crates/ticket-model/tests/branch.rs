@@ -6,7 +6,7 @@
 //! A branch names one job: no two tickets hold the same `branch`, found by the store, refused by
 //! `check_branch` and named by `check_store` where a merge left two.
 
-use kaski_tickets::{Store, rules};
+use mockspace_extra_ticket_model::{Store, rules};
 
 const VOCABULARY: &str = r#"
 [[ticket_state]]

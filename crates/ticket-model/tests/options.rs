@@ -6,7 +6,7 @@
 //! An option that holds a further lettered option is refused by the check, and every shape that only
 //! looks like one is not.
 
-use kaski_tickets::{Store, rules};
+use mockspace_extra_ticket_model::{Store, rules};
 
 const VOCABULARY: &str = r#"
 [[ticket_state]]

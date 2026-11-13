@@ -9,7 +9,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use kaski_tickets::{State, Store};
+use ticket_model::{State, Store};
 
 use crate::time::day_of;
 use crate::{Plan, Row};

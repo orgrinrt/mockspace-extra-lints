@@ -8,7 +8,7 @@
 
 use std::collections::BTreeSet;
 
-use kaski_tickets::Finding;
+use ticket_model::Finding;
 
 use crate::{Plan, Row};
 

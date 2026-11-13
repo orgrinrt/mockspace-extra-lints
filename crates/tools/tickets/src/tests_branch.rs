@@ -10,7 +10,7 @@
 use std::path::Path;
 use std::process::Command;
 
-use kaski_tickets::rules;
+use ticket_model::rules;
 
 use crate::args::{self, Verb};
 use crate::landing::{self, Git, Landing, Trunk};
@@ -245,7 +245,7 @@ fn next_leaves_out_a_job_whose_branch_landed_and_keeps_the_rest() {
         .with("work/fresh", Landing::Open);
     let ids: Vec<String> = view::next(
         &store,
-        &kaski_planning::Plan::default(),
+        &planning::Plan::default(),
         &view::Filter::default(),
         &on,
     )
@@ -255,7 +255,7 @@ fn next_leaves_out_a_job_whose_branch_landed_and_keeps_the_rest() {
     assert_eq!(ids, [fresh.clone()]);
     let all: Vec<String> = view::next(
         &store,
-        &kaski_planning::Plan::default(),
+        &planning::Plan::default(),
         &view::Filter::default(),
         &Branches::default(),
     )

@@ -17,11 +17,14 @@ pub trait Tree {
     /// The commit that deleted `name` where the tree held it once and holds it no more, and nothing
     /// where it is there still or never was.
     fn gone(&self, name: &str) -> Option<String>;
+
+    /// The prefix a crate of this tree is named with, before its dash: the repository's `crate_prefix`.
+    fn crate_prefix(&self) -> &str;
 }
 
-/// The names in a text that could be a crate or a path: a `kaski-` and a lowercase dashed word, or a
-/// word holding a `/`. Each once, in the order first met.
-pub fn names_in(text: &str) -> Vec<String> {
+/// The names in a text that could be a crate or a path: `prefix`, a dash and a lowercase dashed word,
+/// or a word holding a `/`. Each once, in the order first met.
+pub fn names_in(text: &str, prefix: &str) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     for raw in text.split(|c: char| !(c.is_ascii_alphanumeric() || "_./-".contains(c))) {
         let w = raw.trim_matches(|c| c == '.' || c == '-' || c == '/');
@@ -29,15 +32,16 @@ pub fn names_in(text: &str) -> Vec<String> {
         if w.is_empty() || w.contains("://") || raw.starts_with('/') || raw.contains("..") {
             continue;
         }
-        if (is_crate(w) || w.contains('/')) && !out.iter().any(|o| o == w) {
+        if (is_crate(w, prefix) || w.contains('/')) && !out.iter().any(|o| o == w) {
             out.push(w.to_string());
         }
     }
     out
 }
 
-fn is_crate(w: &str) -> bool {
-    w.strip_prefix("kaski-").is_some_and(|rest| {
+fn is_crate(w: &str, prefix: &str) -> bool {
+    w.strip_prefix(prefix)
+        .and_then(|rest| rest.strip_prefix('-')).is_some_and(|rest| {
         !rest.is_empty()
             && rest.split('-').all(|p| {
                 !p.is_empty()
@@ -60,7 +64,7 @@ pub fn gone_names(store: &Store, tree: &impl Tree) -> Vec<Finding> {
             continue;
         }
         let text = format!("{}\n{}", t.one("title"), t.one("what"));
-        let gone: Vec<String> = names_in(&text)
+        let gone: Vec<String> = names_in(&text, tree.crate_prefix())
             .into_iter()
             .filter_map(|n| tree.gone(&n).map(|by| format!("`{n}` (deleted by {by})")))
             .collect();
@@ -153,7 +157,7 @@ pub fn closable(store: &Store, tree: &impl Tree) -> Vec<Closable> {
         if !open(&t.id) || by_answer || held {
             continue;
         }
-        let names = names_in(&format!("{}\n{}", t.one("title"), t.one("what")));
+        let names = names_in(&format!("{}\n{}", t.one("title"), t.one("what")), tree.crate_prefix());
         let gone: Option<Vec<(String, String)>> = names
             .iter()
             .map(|n| tree.gone(n).map(|by| (n.clone(), by)))

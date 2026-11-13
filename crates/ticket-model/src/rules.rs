@@ -11,7 +11,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use kaski_engine_key::Ident;
+use mockspace_registry::is_valid_slug;
 
 use crate::gives::gives;
 use crate::model::{Fields, Kind, Move, Store, Ticket, parse_rank};
@@ -294,7 +294,7 @@ pub fn new_ticket(store: &Store, r: &NewRequest) -> Result<NewTicket, String> {
         return Err("a ticket needs a title".to_string());
     }
     let id = r.id.clone().unwrap_or_else(|| slugify(&r.title));
-    if !Ident::is(&id) {
+    if !is_valid_slug(&id) {
         return Err(format!(
             "`{id}` is not a slug: lowercase letters, digits and underscores, starting with a letter"
         ));

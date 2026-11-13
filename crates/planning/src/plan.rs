@@ -7,7 +7,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use kaski_tickets::Fields;
+use ticket_model::Fields;
 
 /// One planning row: its namespace, its id and its fields.
 #[derive(Debug, Clone, PartialEq, Eq)]

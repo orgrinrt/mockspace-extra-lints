@@ -3,7 +3,7 @@
 
 use std::fmt::Write as _;
 
-use kaski_tickets::Store;
+use ticket_model::Store;
 
 use crate::view::{Filter, Row};
 

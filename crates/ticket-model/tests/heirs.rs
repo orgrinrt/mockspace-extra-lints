@@ -11,7 +11,7 @@ mod common;
 use std::collections::BTreeMap;
 
 use common::{open, store};
-use kaski_tickets::{Heirs, heirs};
+use mockspace_extra_ticket_model::{Heirs, heirs};
 
 fn heirs_of(rows: &[(&str, &[&str])]) -> Heirs {
     rows.iter()
@@ -24,7 +24,7 @@ fn heirs_of(rows: &[(&str, &[&str])]) -> Heirs {
         .collect::<BTreeMap<_, _>>()
 }
 
-fn only(lines: &str) -> kaski_tickets::Ticket {
+fn only(lines: &str) -> mockspace_extra_ticket_model::Ticket {
     let s = store(&[open("a", lines)]);
     s.tickets["a"].clone()
 }

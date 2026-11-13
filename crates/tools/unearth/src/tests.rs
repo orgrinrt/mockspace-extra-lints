@@ -135,6 +135,7 @@ impl Workspace {
         ] {
             std::fs::create_dir_all(ws.join(d)).unwrap();
         }
+        std::fs::write(ws.join("kaski/mockspace.toml"), "project_name = \"kaski\"\n").unwrap();
         Self(ws)
     }
 

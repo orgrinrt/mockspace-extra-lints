@@ -6,7 +6,7 @@
 //! What `tickets check` prints of the tickets that may have stopped being true: a line for each, the count,
 //! and no failure for any of them.
 
-use kaski_tickets::{Heirs, Tree};
+use ticket_model::{Heirs, Tree};
 use mockspace::tool::Outcome;
 
 use crate::landing::{Landing, Trunk};
@@ -21,6 +21,10 @@ impl Trunk for World {
 }
 
 impl Tree for World {
+    fn crate_prefix(&self) -> &str {
+        "kaski"
+    }
+
     fn gone(&self, name: &str) -> Option<String> {
         self.0
             .iter()

@@ -3,9 +3,9 @@
 
 use std::path::Path;
 
-use corpus::corpus::{citation_path, op_words_dir};
-use corpus::doc::Kind;
-use corpus::{Corpus, Index, Query, rank};
+use mockspace_extra_corpus::corpus::{citation_path, op_words_dir};
+use mockspace_extra_corpus::doc::Kind;
+use mockspace_extra_corpus::{Corpus, Index, Query, rank};
 
 use super::Planted;
 

@@ -9,7 +9,7 @@
 //! the row survives, and the moves under it are not touched. The result is parsed again and has to say
 //! what was asked before anyone writes it.
 
-use kaski_tickets::model::Fields;
+use ticket_model::model::Fields;
 
 use crate::write::render_field;
 

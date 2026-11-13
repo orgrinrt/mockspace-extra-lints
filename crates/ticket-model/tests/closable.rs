@@ -6,7 +6,7 @@
 //! The tickets a tool may close for what the tree lost, and the state it closes them to. Each case that
 //! must be refused stands beside the one that is not, so a rule that closed everything would fail.
 
-use kaski_tickets::{Store, Tree, stale};
+use mockspace_extra_ticket_model::{Store, Tree, stale};
 
 const VOCABULARY: &str = r#"
 [[ticket_state]]
@@ -60,6 +60,10 @@ initial = "backlog"
 struct Gone(&'static [(&'static str, &'static str)]);
 
 impl Tree for Gone {
+    fn crate_prefix(&self) -> &str {
+        "kaski"
+    }
+
     fn gone(&self, name: &str) -> Option<String> {
         self.0
             .iter()

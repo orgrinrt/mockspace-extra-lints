@@ -13,8 +13,8 @@
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
-use kaski_tickets::model::{Fields, Move, Store, parse_rank};
-use kaski_tickets::rules;
+use ticket_model::model::{Fields, Move, Store, parse_rank};
+use ticket_model::rules;
 
 use crate::ids::move_id;
 use crate::row;
@@ -352,7 +352,7 @@ pub fn move_ticket(registry: &Path, r: &MoveRequest) -> Result<String, String> {
         .ok_or_else(|| format!("`{}` is no ticket", r.ticket))?;
     let file = PathBuf::from(&held.file);
     let mut links = tag_links(r, held.many("tags"))?;
-    kaski_tickets::contracts::check_fields(&links)?;
+    ticket_model::contracts::check_fields(&links)?;
     stamp_tag(
         &mut links,
         held.many("tags"),

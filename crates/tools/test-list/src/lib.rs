@@ -19,8 +19,7 @@ use std::path::Path;
 use mockspace::tool::{ArgSpec, NotALint, Purpose, Tool, ToolContext, ToolReport};
 
 // Public so the items the lints read and this tool does not are not reported unused.
-#[path = "../../../lints/tree_walk.rs"]
-pub mod tree_walk;
+use registry_lints::tree_walk;
 
 pub mod mask;
 

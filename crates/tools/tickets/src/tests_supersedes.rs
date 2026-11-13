@@ -15,7 +15,7 @@ fn next_ids(s: &Scratch) -> Vec<String> {
     let store = load(&s.root).unwrap();
     view::next(
         &store,
-        &kaski_planning::Plan::default(),
+        &planning::Plan::default(),
         &view::Filter::default(),
         &crate::testkit::Branches::default(),
     )

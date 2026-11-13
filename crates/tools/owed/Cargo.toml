@@ -1,5 +1,5 @@
 [package]
-name = "owed"
+name = "mockspace-extra-owed"
 description = "Files a ticket for every placeholder marker that cites none, rewrites the marker to cite it, and closes the tickets whose markers are gone."
 version.workspace = true
 edition.workspace = true
@@ -9,11 +9,12 @@ publish.workspace = true
 [dependencies]
 # the trait crate under the name the generated collector gives it; the engine patches every spelling
 # of it to the one it is built from
-mockspace = { package = "mockspace-lint-rules", git = "ssh://git@github.com/hiisi-digital/mockspace.git", branch = "dev" }
+mockspace.workspace = true
+registry-lints.workspace = true
 # the writing of a ticket, the reading of the registry, and the notice of a tree behind the trunk
-tickets = { path = "../tickets" }
-kaski-tickets.workspace = true
-kaski-engine-key.workspace = true
+tickets.workspace = true
+ticket-model.workspace = true
+mockspace-registry.workspace = true
 
 [dev-dependencies]
-tickets = { path = "../tickets", features = ["testkit"] }
+tickets = { workspace = true, features = ["testkit"] }

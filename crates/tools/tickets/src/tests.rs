@@ -7,7 +7,7 @@
 //! vocabularies the repository ships: a ticket is refused what the rules refuse, and let through
 //! once the thing refused is put right, so a refusal is never a refusal of everything.
 
-use kaski_tickets::rules;
+use ticket_model::rules;
 
 use crate::testkit::Scratch;
 use crate::view;
@@ -293,7 +293,7 @@ fn listing_is_in_board_order_and_empty_when_nothing_matches() {
     let s = Scratch::new();
     let none = view::list(
         &crate::load(&s.root).unwrap(),
-        &kaski_planning::Plan::default(),
+        &planning::Plan::default(),
         &view::Filter::default(),
     );
     assert!(none.is_empty(), "a registry with no ticket lists none");
@@ -305,14 +305,14 @@ fn listing_is_in_board_order_and_empty_when_nothing_matches() {
     let store = crate::load(&s.root).unwrap();
     let ids: Vec<String> = view::list(
         &store,
-        &kaski_planning::Plan::default(),
+        &planning::Plan::default(),
         &view::Filter::default(),
     )
     .into_iter()
     .map(|r| r.id)
     .collect();
     assert_eq!(ids, [c, a, b]);
-    let held = view::list(&store, &kaski_planning::Plan::default(), &view::Filter {
+    let held = view::list(&store, &planning::Plan::default(), &view::Filter {
         holder: vec!["alpha".into()],
         ..Default::default()
     });
@@ -321,7 +321,7 @@ fn listing_is_in_board_order_and_empty_when_nothing_matches() {
         view::line(&held[0], false),
         "doing_item doing alpha Doing item"
     );
-    let nothing = view::list(&store, &kaski_planning::Plan::default(), &view::Filter {
+    let nothing = view::list(&store, &planning::Plan::default(), &view::Filter {
         state: vec!["review".into()],
         ..Default::default()
     });
@@ -342,7 +342,7 @@ fn next_ranks_free_work_by_what_it_unblocks() {
     let store = crate::load(&s.root).unwrap();
     let next = view::next(
         &store,
-        &kaski_planning::Plan::default(),
+        &planning::Plan::default(),
         &view::Filter::default(),
         &crate::testkit::Branches::default(),
     );

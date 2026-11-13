@@ -128,6 +128,7 @@ pub fn scanned(rel: &Path) -> bool {
             if s == "README.md" {
                 return true;
             }
+            // FIXME(pack_lints_and_tools_read_the_mock_directory_as_mock): the mock directory is read as `mock`, not as the one `mockspace.toml` declares
             s.starts_with("mock/") && (s.ends_with(".slang") || s.ends_with(".wgsl"))
         },
         _ => false,
@@ -141,6 +142,7 @@ pub fn unit_of(rel: &Path) -> String {
     let s = rel.to_string_lossy().replace('\\', "/");
     let parts: Vec<&str> = s.split('/').collect();
     match parts.as_slice() {
+        // FIXME(pack_lints_and_tools_read_the_mock_directory_as_mock): the mock directory is read as `mock`, not as the one `mockspace.toml` declares
         ["mock", "crates", name, _, ..] => (*name).to_owned(),
         ["mock", dir, _, ..] => (*dir).to_owned(),
         ["content", _, ..] => "content".to_owned(),

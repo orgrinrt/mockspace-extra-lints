@@ -16,8 +16,8 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
-use kaski_planning::Plan;
-use kaski_tickets::Store;
+use planning::Plan;
+use ticket_model::Store;
 
 /// The trunk branch the tickets are real on.
 pub const TRUNK: &str = "dev";

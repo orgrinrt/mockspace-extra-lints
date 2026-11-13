@@ -14,7 +14,6 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use mockspace::RegistryView;
 use mockspace::tool::{Outcome, ToolContext, ToolReport, contract_faults, missing_required};
 
-use crate::testkit::{committed, repo_root};
 use crate::{Canon, Tier, mentions, named, tier_of};
 
 pub(crate) type Row<'a> = (&'a str, &'a [(&'a str, &'a str)]);
@@ -368,55 +367,3 @@ fn uncited_lists_the_binding_tenets_nothing_names() {
 }
 
 // --- the committed canon -------------------------------------------------------------------------
-
-#[test]
-fn every_tenet_from_before_the_subjects_is_still_a_tenet() {
-    // the ids `tenet.toml` held when the canon was given subjects, kept with the round's notes; every
-    // citation of a tenet anywhere is by one of these ids, so each one still naming a row is every
-    // citation still resolving
-    let before = std::fs::read_to_string(
-        repo_root().join("mock/research/202610040605_canon-shape/ids-before.txt"),
-    )
-    .expect("the ids from before");
-    let reg = committed();
-    let ids: Vec<&str> = before.lines().filter(|l| !l.is_empty()).collect();
-    assert_eq!(ids.len(), 295);
-    let gone: Vec<&&str> = ids
-        .iter()
-        .filter(|id| reg.row(&format!("tenet::{id}")).is_none())
-        .collect();
-    assert!(gone.is_empty(), "no longer tenets: {gone:?}");
-}
-
-#[test]
-fn asking_for_a_subject_of_the_committed_canon_returns_the_tenets_it_holds() {
-    // the expected answer is read off the rows, so a tenet added to a subject moves the registry and the
-    // answer together; a list written out here is a second copy of live data that every new tenet turns red
-    let reg = committed();
-    let repo = repo_root();
-    let all = crate::rows::tenets(&reg);
-    let out = run(&reg, &repo, &["subjects"]);
-    let subjects: Vec<String> = answered(&out)
-        .lines()
-        .filter(|l| l.starts_with("  "))
-        .filter_map(|l| l.split_whitespace().next().map(str::to_string))
-        .collect();
-    assert!(!subjects.is_empty(), "the committed canon has subjects");
-    let mut seen = BTreeSet::new();
-    for s in &subjects {
-        let mut expected: Vec<&str> = all
-            .iter()
-            .filter(|t| t.subject == Some(s.as_str()))
-            .map(|t| t.id)
-            .collect();
-        expected.sort_unstable();
-        let out = run(&reg, &repo, &["subject", s]);
-        let got = listed(answered(&out));
-        assert_eq!(got, expected, "the answer for subject `{s}`");
-        for id in got {
-            assert!(seen.insert(id.to_string()), "`{id}` is in two subjects");
-        }
-    }
-    // and every tenet is in exactly one subject's answer
-    assert_eq!(seen.len(), reg.rows_in("tenet").len());
-}

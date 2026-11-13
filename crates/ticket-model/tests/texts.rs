@@ -6,7 +6,7 @@
 //! The store read from texts alone: a move is read wherever its file sits, so a move in a file of its
 //! own and a move beside its ticket are one store, and what cannot be read is refused by name.
 
-use kaski_tickets::{Move, Store, rules};
+use mockspace_extra_ticket_model::{Move, Store, rules};
 
 const STATES: &str = r#"
 [[ticket_state]]

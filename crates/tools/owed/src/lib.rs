@@ -20,12 +20,9 @@ use std::collections::BTreeSet;
 use mockspace::tool::{ArgSpec, Purpose, Tool, ToolContext, ToolReport};
 
 mod apply;
-#[path = "../../../lints/fixme_markers.rs"]
-pub mod fixme_markers;
+use registry_lints::fixme_markers;
 mod group;
 mod plan;
-#[path = "../../../lints/tree_walk.rs"]
-pub mod tree_walk;
 
 use fixme_markers::Scope;
 use plan::{Candidate, File, Inputs};
@@ -135,6 +132,7 @@ impl Owed {
         for s in fixme_markers::sources(ctx.repo_root) {
             let name = s.rel.rsplit('/').next().unwrap_or(&s.rel);
             if s.scope == Scope::Record {
+                // FIXME(pack_lints_and_tools_read_the_mock_directory_as_mock): the mock directory is read as `mock`, not as the one `mockspace.toml` declares
                 if s.rel.starts_with("mock/research/")
                     && name.starts_with("CANDIDATE")
                     && name.ends_with(".md")
@@ -178,6 +176,7 @@ impl Owed {
             all_candidates: &all_candidates,
             store:          &store,
             subjects:       &subjects,
+            prefix:         &registry_lints::project::Project::of(ctx.mock_dir).prefix,
             full:           args.only.is_empty(),
         });
         if plan.is_empty() {

@@ -13,7 +13,7 @@
 
 use std::path::Path;
 
-use kaski_tickets::{Tree, stale};
+use ticket_model::{Tree, stale};
 
 use crate::write::{MoveRequest, move_ticket};
 

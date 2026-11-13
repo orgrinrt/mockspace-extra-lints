@@ -9,7 +9,7 @@
 //! held ticket with no holder, or a ticket advanced past a need that is not met. The makers refuse
 //! each of those at write time; this is the gate for the ways round them.
 
-use kaski_tickets::rules;
+use ticket_model::rules;
 use mockspace::{Lint, LintError, RepoContext, RepoLint, Severity};
 
 use crate::registry_dir;
@@ -36,7 +36,7 @@ impl RepoLint for ATicketGraphHolds {
             (Ok(store), Ok(plan)) => {
                 rules::check_store(&store)
                     .into_iter()
-                    .chain(kaski_planning::rules::check_plan(&plan))
+                    .chain(planning::rules::check_plan(&plan))
                     .map(|f| {
                         LintError::error(
                             "registry".to_string(),

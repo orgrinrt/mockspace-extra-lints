@@ -1,5 +1,5 @@
 [package]
-name = "canon-links"
+name = "mockspace-extra-canon-links"
 description = "Reports how well the canon's rows are joined and found: keywords, relations and a probe set."
 version.workspace = true
 edition.workspace = true
@@ -9,12 +9,8 @@ publish.workspace = true
 [dependencies]
 # the trait crate under the name the generated collector gives it; the engine patches every spelling
 # of it to the one it is built from
-mockspace = { package = "mockspace-lint-rules", git = "ssh://git@github.com/hiisi-digital/mockspace.git", branch = "dev" }
+mockspace.workspace = true
 # the tenets, and the two questions the probes put to them, from the tool that answers them
-canon = { path = "../canon" }
+canon.workspace = true
 # the probe set is a TOML file
-toml = "1"
-
-[dev-dependencies]
-# the committed registry, for the tests that ask the real canon
-canon = { path = "../canon", features = ["testkit"] }
+toml.workspace = true

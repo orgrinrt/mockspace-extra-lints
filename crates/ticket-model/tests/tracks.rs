@@ -10,7 +10,7 @@
 mod common;
 
 use common::{closed, open, store};
-use kaski_tickets::tracks;
+use mockspace_extra_ticket_model::tracks;
 
 fn step_ids(t: &tracks::Track) -> Vec<&str> {
     t.steps.iter().map(|s| s.id.as_str()).collect()

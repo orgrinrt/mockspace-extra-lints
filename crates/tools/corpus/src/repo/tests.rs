@@ -143,10 +143,10 @@ fn the_near_words_of_a_question_are_the_forms_in_the_documents_and_the_synonyms_
 
 #[test]
 fn op_words_that_never_name_this_project_are_not_read_and_the_other_roots_are_read_whole() {
-    let repo = plant("project", &[(
-        "mock/research/a.md",
-        "# Note\n\nthe saturation curve of another thing\n",
-    )]);
+    let repo = plant("project", &[
+        ("mockspace.toml", "project_name = \"kaski\"\n"),
+        ("mock/research/a.md", "# Note\n\nthe saturation curve of another thing\n"),
+    ]);
     let words = plant("project_words", &[
         ("a.md", "# a\n\nKaski saturation, said aloud\n"),
         ("b.md", "# b\n\nthe saturation of a different project\n"),

@@ -28,15 +28,14 @@ mod row;
 pub mod testkit;
 pub mod time;
 mod tree;
-#[path = "../../../lints/tree_walk.rs"]
-pub mod tree_walk;
+use registry_lints::tree_walk;
 pub mod trunk;
 pub mod view;
 pub mod write;
 
 use args::Verb;
-use kaski_planning::{NAMESPACES, Plan};
-use kaski_tickets::{Heirs, Store, Tree, rules};
+use planning::{NAMESPACES, Plan};
+use ticket_model::{Heirs, Store, Tree, rules};
 
 /// Reads every ticket row under `registry`, wherever it sits, into the shared crate's `Store`.
 ///
@@ -149,7 +148,7 @@ impl Tickets {
         let notice = if machine { String::new() } else { reading.notice };
         let store = reading.store;
         let plan = reading.plan;
-        let git = landing::Git::at(ctx.repo_root);
+        let git = landing::Git::of(ctx);
         let report = match &req.verb {
             Verb::Check => {
                 let tenets = canon::tenets(ctx.registry);
@@ -247,7 +246,7 @@ fn contract_lines(
     let mut count = 0;
     for path in paths {
         if let Some((krate, _)) = path.split_once("::") {
-            kaski_tickets::contracts::shape(path)?;
+            ticket_model::contracts::shape(path)?;
             if !crate_held(mock_dir, krate) {
                 return Err(format!(
                     "`{path}` names the crate `{krate}`, which the tree does not hold"
@@ -278,7 +277,7 @@ fn check(
         .into_iter()
         .chain(landing::findings(store, trunk))
         .chain(known.findings(store))
-        .chain(kaski_planning::rules::check_plan(plan))
+        .chain(planning::rules::check_plan(plan))
         .map(|f| {
             LintError::error(
                 "registry".to_string(),
@@ -340,10 +339,10 @@ mod tests_trunk;
 /// The tickets that may have stopped being true, one line each and then the count, or nothing where there
 /// are none. A list a person reads: it fails nothing.
 fn stale_lines(store: &Store, tree: &impl Tree, heirs: &Heirs) -> String {
-    let stale = kaski_tickets::stale::gone_names(store, tree)
+    let stale = ticket_model::stale::gone_names(store, tree)
         .into_iter()
-        .chain(kaski_tickets::stale::left_open(store));
-    let repoint = kaski_tickets::heirs::left_naming(store, heirs);
+        .chain(ticket_model::stale::left_open(store));
+    let repoint = ticket_model::heirs::left_naming(store, heirs);
     let mut out = String::new();
     for f in stale {
         out.push_str(&format!("{}: {}\n", f.row, f.message));
@@ -351,13 +350,13 @@ fn stale_lines(store: &Store, tree: &impl Tree, heirs: &Heirs) -> String {
     for f in repoint {
         out.push_str(&format!("{}: {}\n", f.row, f.message));
     }
-    let closable = kaski_tickets::stale::closable(store, tree).len();
+    let closable = ticket_model::stale::closable(store, tree).len();
     if closable > 0 {
         out.push_str(&format!(
             "{closable} of them name only what the tree lost: ticket-move --close-gone\n"
         ));
     }
-    let count = kaski_tickets::stale::stale_count(store, tree);
+    let count = ticket_model::stale::stale_count(store, tree);
     if count > 0 {
         out.push_str(&format!("{count} tickets may be stale: tickets check\n"));
     }

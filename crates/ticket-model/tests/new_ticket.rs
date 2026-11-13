@@ -7,8 +7,8 @@
 //! that stages the rows: a request is refused by the rules, and a request they accept gives the ticket's
 //! fields and its first move.
 
-use kaski_tickets::rules::{self, NewRequest, slugify};
-use kaski_tickets::{Fields, Store};
+use mockspace_extra_ticket_model::rules::{self, NewRequest, slugify};
+use mockspace_extra_ticket_model::{Fields, Store};
 
 const TEXT: &str = r#"
 [[ticket_state]]

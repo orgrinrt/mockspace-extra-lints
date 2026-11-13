@@ -19,7 +19,7 @@ fn eight_matching(name: &str) -> Planted {
     d
 }
 
-fn ranked(dir: &Planted, phrase: &str, limit: usize) -> corpus::Search {
+fn ranked(dir: &Planted, phrase: &str, limit: usize) -> mockspace_extra_corpus::Search {
     let corpus = Corpus::load(dir.mock());
     rank(&corpus, &Index::build(&corpus), &Query::new(phrase), limit)
 }

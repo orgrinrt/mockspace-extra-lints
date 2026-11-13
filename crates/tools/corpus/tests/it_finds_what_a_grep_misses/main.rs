@@ -7,7 +7,7 @@
 
 use std::path::{Path, PathBuf};
 
-use corpus::{Corpus, Index, Query, Source, rank, terms};
+use mockspace_extra_corpus::{Corpus, Index, Query, Source, rank, terms};
 
 /// A corpus on disk, removed when the test ends.
 struct Planted(PathBuf);
@@ -61,7 +61,7 @@ mod tokenising;
 
 /// The whole search, for the tests that are about what a caller may conclude
 /// rather than about which files came back.
-fn run(dir: &Planted, phrase: &str) -> corpus::Search {
+fn run(dir: &Planted, phrase: &str) -> mockspace_extra_corpus::Search {
     let corpus = Corpus::load(dir.mock());
     rank(&corpus, &Index::build(&corpus), &Query::new(phrase), 20)
 }

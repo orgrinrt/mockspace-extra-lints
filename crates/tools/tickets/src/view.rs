@@ -8,8 +8,8 @@
 
 use std::collections::BTreeSet;
 
-use kaski_planning::Plan;
-use kaski_tickets::model::Store;
+use planning::Plan;
+use ticket_model::model::Store;
 
 use crate::landing::{Trunk, landed};
 
@@ -178,7 +178,7 @@ fn who(holder: &str) -> &str {
 /// any do), then its steps in order with state, holder and title, and under a step a line for each wait.
 /// The count of blocks goes with the text.
 pub fn tracks(store: &Store, plan: &Plan, filter: &Filter) -> (String, usize) {
-    let all = kaski_tickets::tracks::of(store);
+    let all = ticket_model::tracks::of(store);
     let mut out = String::new();
     let mut count = 0;
     for row in list(store, plan, filter) {

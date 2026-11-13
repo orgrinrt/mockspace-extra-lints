@@ -27,13 +27,10 @@ pub const OP_ROOT: &str = "op-responses";
 
 /// The environment variable naming the directory of op's captured words, where it is not where
 /// [`op_words_dir`] would look.
-pub const OP_WORDS_VAR: &str = "KASKI_OP_WORDS";
+pub const OP_WORDS_VAR: &str = "MOCKSPACE_OP_WORDS";
 
 /// Where op's captured words sit relative to a workspace.
 const OP_WORDS_IN_WORKSPACE: &str = ".data/op-responses";
-
-/// The workspace repository's name, for the layout where it is cloned beside this one.
-const WORKSPACE_REPO: &str = "clause-dev";
 
 /// Directories never descended into, whatever root they sit under.
 const SKIP_DIRS: &[&str] = &["target", ".git", "node_modules"];
@@ -50,8 +47,9 @@ const KEEP_EXT: &[&str] = &["md", "txt", "toml", "rs", "cjs", "js", "sh", "wgsl"
 /// finds nothing rather than falling back, so a mistyped name is a missing root a report names
 /// rather than a different directory read in silence. Without a name: `.data/op-responses` in the
 /// repository root or any directory above it, which is op's layout, where this repository is a
-/// clone inside the workspace; then `clause-dev/.data/op-responses` beside the repository root or any
-/// directory above it, which is a helper's, where the two are cloned side by side.
+/// clone inside the workspace; then `.data/op-responses` in a directory beside the repository root or
+/// beside any directory above it, the first in name order, which is a helper's, where the workspace
+/// and the repository are cloned side by side.
 ///
 /// A stand-in until the tools consolidate into one place for every project and the workspace says
 /// where its data is.
@@ -66,12 +64,23 @@ pub fn op_words_dir(repo_root: &Path, named: Option<&str>) -> Option<PathBuf> {
         if inside.is_dir() {
             return Some(inside);
         }
-        let beside = dir.join(WORKSPACE_REPO).join(OP_WORDS_IN_WORKSPACE);
-        if beside.is_dir() {
+        if let Some(beside) = beside(dir) {
             return Some(beside);
         }
     }
     None
+}
+
+/// `.data/op-responses` in a directory inside `dir`, the first in name order.
+fn beside(dir: &Path) -> Option<PathBuf> {
+    let mut found: Vec<PathBuf> = std::fs::read_dir(dir)
+        .ok()?
+        .filter_map(Result::ok)
+        .map(|e| e.path().join(OP_WORDS_IN_WORKSPACE))
+        .filter(|p| p.is_dir())
+        .collect();
+    found.sort();
+    found.into_iter().next()
 }
 
 /// The loaded corpus, plus what it skipped and why.
@@ -224,7 +233,7 @@ impl Corpus {
         if !self.op_read {
             parts.push(format!(
                 "op's captured words were not read: no `{OP_WORDS_IN_WORKSPACE}` was found above the \
-                 repository or in a `{WORKSPACE_REPO}` beside it, and `{OP_WORDS_VAR}` names none"
+                 repository or in a directory beside it, and `{OP_WORDS_VAR}` names none"
             ));
         }
         if self.elsewhere > 0 {

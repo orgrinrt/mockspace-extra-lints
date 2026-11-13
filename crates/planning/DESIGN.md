@@ -1,6 +1,6 @@
-# kaski-planning
+# mockspace-extra-planning
 
-The planning layer of the registry and the rules a schema cannot state over it, held once for every client. It answers to `a_milestone_merge_lands_everything_finished_at_once_before_anything_new_starts` for what a milestone is, to `the_workflow_tools_are_one_data_view_the_reader_configures_with_presets` for the tools that list its rows, and to `a_question_is_a_ticket_filed_by_whoever_has_it_and_reaches_the_trunk_without_being_landed_by_hand` for a write reaching the trunk as part of the act that makes it. It depends on `kaski-tickets` and on nothing of mockspace, the tickets tool and the console build it beside that crate, and it touches no file. The tickets crate depends on it in no way: removing every planning file leaves a registry the tickets crate loads whole.
+The planning layer of the registry and the rules a schema cannot state over it, held once for every client. It answers to `a_milestone_merge_lands_everything_finished_at_once_before_anything_new_starts` for what a milestone is, to `the_workflow_tools_are_one_data_view_the_reader_configures_with_presets` for the tools that list its rows, and to `a_question_is_a_ticket_filed_by_whoever_has_it_and_reaches_the_trunk_without_being_landed_by_hand` for a write reaching the trunk as part of the act that makes it. It depends on `mockspace-extra-ticket-model` and on nothing of mockspace, the tickets tool and the console build it beside that crate, and it touches no file. The tickets crate depends on it in no way: removing every planning file leaves a registry the tickets crate loads whole.
 
 ## The plan
 

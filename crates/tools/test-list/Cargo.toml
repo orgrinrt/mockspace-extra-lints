@@ -1,5 +1,5 @@
 [package]
-name = "test-list"
+name = "mockspace-extra-test-list"
 description = "Lists every test of every crate with its file, line, name, place and ignore reason, reading the source and building nothing."
 version.workspace = true
 edition.workspace = true
@@ -9,4 +9,5 @@ publish.workspace = true
 [dependencies]
 # the trait crate under the name the generated collector gives it; the engine patches every spelling
 # of it to the one it is built from
-mockspace = { package = "mockspace-lint-rules", git = "ssh://git@github.com/hiisi-digital/mockspace.git", branch = "dev" }
+mockspace.workspace = true
+registry-lints.workspace = true

@@ -6,7 +6,7 @@
 //! The rows a planning edit appends: each continues the head of its chain, a fork is refused, and a
 //! row that would break a rule of the plan is refused with the rule's sentence.
 
-use kaski_planning::write::{
+use mockspace_extra_planning::write::{
     Stamp,
     Value,
     epoch_fact,
@@ -15,7 +15,7 @@ use kaski_planning::write::{
     scope_fact,
     window_fact,
 };
-use kaski_planning::{Home, NAMESPACES, Plan};
+use mockspace_extra_planning::{Home, NAMESPACES, Plan};
 
 fn plan(text: &str) -> Plan {
     Plan::from_texts(&NAMESPACES, [("p.toml", text)]).unwrap()
@@ -52,7 +52,7 @@ const STAMP: Stamp = Stamp {
     tag: "ab12",
 };
 
-fn text(row: &kaski_planning::NewRow, field: &str) -> Option<String> {
+fn text(row: &mockspace_extra_planning::NewRow, field: &str) -> Option<String> {
     row.fields
         .iter()
         .find(|(k, _)| k == field)

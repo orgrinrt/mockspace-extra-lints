@@ -32,7 +32,7 @@ const COMMON: &[&str] = &[
     "the", "a", "an", "and", "or", "of", "to", "is", "it", "that", "this", "in", "on", "for",
     "with", "as", "by", "at", "from", "not", "no", "never", "always", "what", "which", "than",
     "then", "so", "but", "its", "be", "are", "was", "were", "has", "have", "had", "any", "every",
-    "one", "two", "may", "must", "can", "does", "do", "kaski", "same", "rather", "already", "only",
+    "one", "two", "may", "must", "can", "does", "do", "same", "rather", "already", "only",
     "each", "other", "their", "them", "where",
 ];
 
@@ -79,11 +79,14 @@ const SOFT_DENOMINATOR: usize = 6;
 
 pub struct ParallelStatements;
 
-fn distinctive(text: &str) -> BTreeSet<String> {
+/// The words of `text` that say which statement it is: none of [`COMMON`], none of three letters or
+/// fewer, and not the project's own name, which a project's statements name as often as `same`.
+fn distinctive(text: &str, project: &str) -> BTreeSet<String> {
+    let project = project.to_lowercase();
     text.to_lowercase()
         .split(|c: char| !c.is_alphanumeric())
         .filter(|w| w.len() > 3)
-        .filter(|w| !COMMON.contains(w))
+        .filter(|w| !COMMON.contains(w) && *w != project)
         .map(str::to_string)
         .collect()
 }
@@ -135,6 +138,7 @@ impl Tool for ParallelStatements {
         let scope = ctx.args.first().copied();
         let across = scope == Some(ACROSS);
         let only = scope.filter(|s| *s != ACROSS);
+        let project = registry_lints::project::Project::of(ctx.mock_dir).name;
         let mut out = String::new();
         let mut pairs = 0usize;
         let mut flagged = 0usize;
@@ -172,7 +176,7 @@ impl Tool for ParallelStatements {
                     ungrouped += 1;
                     continue;
                 }
-                let w = distinctive(says);
+                let w = distinctive(says, &project);
                 if w.len() >= POOL_FLOOR {
                     rows.push((q.clone(), group, w));
                 } else {

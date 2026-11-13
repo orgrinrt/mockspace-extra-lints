@@ -5,7 +5,7 @@
 
 //! The sweep that closes the tickets whose only subject the tree lost.
 
-use kaski_tickets::Tree;
+use ticket_model::Tree;
 
 use crate::close_gone::{Sweep, close_gone};
 use crate::testkit::Scratch;
@@ -13,6 +13,10 @@ use crate::testkit::Scratch;
 struct Lost;
 
 impl Tree for Lost {
+    fn crate_prefix(&self) -> &str {
+        "kaski"
+    }
+
     fn gone(&self, name: &str) -> Option<String> {
         (name == "kaski-render").then(|| "ef19a8e0c".to_string())
     }

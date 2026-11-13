@@ -6,7 +6,7 @@
 //! The fields a kind requires, held to a committed ticket as `entry` holds a ticket being moved: a
 //! ticket in a state that needs a holder has them filled, and in any other state it is held to none.
 
-use kaski_tickets::{Store, rules};
+use mockspace_extra_ticket_model::{Store, rules};
 
 const STATES: &str = r#"
 [[ticket_state]]

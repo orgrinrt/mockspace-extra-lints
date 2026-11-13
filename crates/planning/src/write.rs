@@ -7,7 +7,7 @@
 //! the chain it continues, and a chain that is a fork already is refused, since there is then no one
 //! row to continue. Every row is checked against the plan with it added before it is handed out.
 
-use kaski_tickets::Fields;
+use ticket_model::Fields;
 
 use crate::plan::Plan;
 use crate::time::day_of;

@@ -10,9 +10,9 @@
 mod common;
 
 use common::{closed, open, store};
-use kaski_tickets::contracts::shape;
-use kaski_tickets::rules::{self, NewRequest};
-use kaski_tickets::{Fields, Store};
+use mockspace_extra_ticket_model::contracts::shape;
+use mockspace_extra_ticket_model::rules::{self, NewRequest};
+use mockspace_extra_ticket_model::{Fields, Store};
 
 fn ids(s: &Store, path: &str) -> Vec<String> {
     s.changing(path).map(|t| t.id.clone()).collect()

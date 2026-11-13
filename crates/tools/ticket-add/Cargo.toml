@@ -1,5 +1,5 @@
 [package]
-name = "ticket-add"
+name = "mockspace-extra-ticket-add"
 description = "Writes a ticket and its first move into the registry."
 version.workspace = true
 edition.workspace = true
@@ -9,8 +9,8 @@ publish.workspace = true
 [dependencies]
 # the trait crate under the name the generated collector gives it; the engine patches every spelling
 # of it to the one it is built from
-mockspace = { package = "mockspace-lint-rules", git = "ssh://git@github.com/hiisi-digital/mockspace.git", branch = "dev" }
-tickets = { path = "../tickets" }
+mockspace.workspace = true
+tickets.workspace = true
 
 [dev-dependencies]
-tickets = { path = "../tickets", features = ["testkit"] }
+tickets = { workspace = true, features = ["testkit"] }

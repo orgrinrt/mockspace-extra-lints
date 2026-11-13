@@ -73,7 +73,7 @@ pub fn load(mock_dir: &Path) -> Result<Vec<Red>, String> {
 /// The id a test gets: a slug of the crate and the filter, with a short hash of both when the slug
 /// was cut, so two long filters never share one.
 pub fn id_of(krate: &str, test: &str) -> String {
-    let slug = kaski_tickets::rules::slugify(&format!("{krate} {test}"));
+    let slug = ticket_model::rules::slugify(&format!("{krate} {test}"));
     let full = format!("{krate}\u{0}{test}");
     if slug.len() >= 55 {
         let h = full.bytes().fold(0xCBF2_9CE4_8422_2325_u64, |h, b| {

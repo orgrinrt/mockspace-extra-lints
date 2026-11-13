@@ -2,7 +2,7 @@
 name = "mockspace-extra-lints"
 version = "0.1.0"
 edition = "2021"
-description = "Opt-in mockspace lint pack: the rules that only make sense once a project has picked its foundations"
+description = "Opt-in mockspace lint pack: the rules that only make sense once a project has picked its foundations, and a ticket and canon workflow kept in the registry"
 license = "MPL-2.0"
 repository = "https://github.com/orgrinrt/mockspace-extra-lints"
 publish = false
@@ -32,8 +32,82 @@ toml = "0.8"
 # own `toml_edit` is the older 0.22, so the lockfile holds both.
 toml_edit = "0.25"
 
+# The workflow tools and the lints over the ticket, tenet and subject rows, each a crate of
+# `crates/`, reached only with the `workflow` feature.
+mockspace-extra-registry-lints = { path = "crates/registry-lints", optional = true }
+mockspace-extra-already-said = { path = "crates/tools/already-said", optional = true }
+mockspace-extra-build-weigh = { path = "crates/tools/build-weigh", optional = true }
+mockspace-extra-canon = { path = "crates/tools/canon", optional = true }
+mockspace-extra-canon-links = { path = "crates/tools/canon-links", optional = true }
+mockspace-extra-corpus = { path = "crates/tools/corpus", optional = true }
+mockspace-extra-finish = { path = "crates/tools/finish", optional = true }
+mockspace-extra-intent-or-mechanism = { path = "crates/tools/intent-or-mechanism", optional = true }
+mockspace-extra-known-red = { path = "crates/tools/known-red", optional = true }
+mockspace-extra-owed = { path = "crates/tools/owed", optional = true }
+mockspace-extra-parallel-statements = { path = "crates/tools/parallel-statements", optional = true }
+mockspace-extra-quote-check = { path = "crates/tools/quote-check", optional = true }
+mockspace-extra-research-unbundle = { path = "crates/tools/research-unbundle", optional = true }
+mockspace-extra-tackle = { path = "crates/tools/tackle", optional = true }
+mockspace-extra-test-list = { path = "crates/tools/test-list", optional = true }
+mockspace-extra-ticket-add = { path = "crates/tools/ticket-add", optional = true }
+mockspace-extra-ticket-move = { path = "crates/tools/ticket-move", optional = true }
+mockspace-extra-tickets = { path = "crates/tools/tickets", optional = true }
+mockspace-extra-unearth = { path = "crates/tools/unearth", optional = true }
+
+[features]
+# Off unless a consumer names it in its `[lint-crates]` entry. A consumer that keeps its own copy of
+# one of these tools would otherwise register the name twice, and the engine refuses every tool run
+# while a name is registered twice.
+workflow = [
+    "dep:mockspace-extra-registry-lints",
+    "dep:mockspace-extra-already-said",
+    "dep:mockspace-extra-build-weigh",
+    "dep:mockspace-extra-canon",
+    "dep:mockspace-extra-canon-links",
+    "dep:mockspace-extra-corpus",
+    "dep:mockspace-extra-finish",
+    "dep:mockspace-extra-intent-or-mechanism",
+    "dep:mockspace-extra-known-red",
+    "dep:mockspace-extra-owed",
+    "dep:mockspace-extra-parallel-statements",
+    "dep:mockspace-extra-quote-check",
+    "dep:mockspace-extra-research-unbundle",
+    "dep:mockspace-extra-tackle",
+    "dep:mockspace-extra-test-list",
+    "dep:mockspace-extra-ticket-add",
+    "dep:mockspace-extra-ticket-move",
+    "dep:mockspace-extra-tickets",
+    "dep:mockspace-extra-unearth",
+]
+
 [dev-dependencies]
 tempfile = "3"
 # The engine's own config reader, so a test can load a `mockspace.toml` the way a run does.
 # The same URL spelling as above, for the reason given there.
 mockspace = { git = "https://github.com/hiisi-digital/mockspace.git", branch = "dev" }
+
+[workspace]
+members = [".", "crates/registry-lints", "crates/ticket-model", "crates/planning", "crates/tools/*"]
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MPL-2.0"
+publish = false
+
+[workspace.dependencies]
+# The trait crate under the name the moved crates use for it, `mockspace`, and the root's spelling of
+# it, for the reason given on the root's own dependency above.
+mockspace = { package = "mockspace-lint-rules", git = "https://github.com/hiisi-digital/mockspace.git", branch = "dev" }
+# The registry's own slug rule, which an id is held to.
+mockspace-registry = { git = "https://github.com/hiisi-digital/mockspace.git", branch = "dev" }
+# Private, so spelled ssh: over https git waits for a credential nobody supplies.
+muisti = { git = "ssh://git@github.com/orgrinrt/muisti", branch = "dev", default-features = false }
+toml = "1"
+registry-lints = { package = "mockspace-extra-registry-lints", path = "crates/registry-lints" }
+ticket-model = { package = "mockspace-extra-ticket-model", path = "crates/ticket-model" }
+planning = { package = "mockspace-extra-planning", path = "crates/planning" }
+canon = { package = "mockspace-extra-canon", path = "crates/tools/canon" }
+corpus = { package = "mockspace-extra-corpus", path = "crates/tools/corpus" }
+tickets = { package = "mockspace-extra-tickets", path = "crates/tools/tickets" }

@@ -22,8 +22,9 @@ pub use probes::{Outcome, Probe, Via, parse, run};
 /// The views, in the order the help lists them.
 pub const VIEWS: [&str; 3] = ["totals", "rows", "probes"];
 
-/// Where the probe set sits, under the mock directory.
-pub const PROBES: &str = "tools/canon-links/probes.toml";
+/// Where the probe set sits, under the mock directory: the repository's own questions of its canon,
+/// which the pack cannot know, so the repository keeps them beside its registry.
+pub const PROBES: &str = "canon-probes.toml";
 
 /// The report.
 pub struct CanonLinks;

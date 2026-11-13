@@ -1,5 +1,5 @@
 [package]
-name = "kaski-tickets"
+name = "mockspace-extra-ticket-model"
 description = "The tickets of the registry and the rules a move is refused by, read from the texts of the registry's files, for the tickets tool and the console alike."
 version.workspace = true
 edition.workspace = true
@@ -7,6 +7,6 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
-toml = "1"
+toml.workspace = true
 # the check of a lone name, which an id is
-kaski-engine-key.workspace = true
+mockspace-registry.workspace = true

@@ -321,6 +321,7 @@ fn op_s_captured_words_beside_the_repository_are_searched_and_named_as_his() {
     let repo = ws.join("kaski");
     let mock = repo.join("mock");
     std::fs::create_dir_all(mock.join("research/202610031300_minds")).unwrap();
+    std::fs::write(repo.join("mockspace.toml"), "project_name = \"kaski\"\n").unwrap();
     std::fs::create_dir_all(mock.join("design_rounds")).unwrap();
     std::fs::write(
         mock.join("research/202610031300_minds/NOTES.md"),

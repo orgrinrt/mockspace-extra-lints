@@ -6,7 +6,7 @@
 //! What git says of a name a ticket mentions, in a real repository: held once and deleted, held still,
 //! and never held.
 
-use kaski_tickets::Tree;
+use ticket_model::Tree;
 
 use crate::landing::Git;
 use crate::tests_branch::{commit, git};
@@ -30,26 +30,26 @@ fn repository(tag: &str) -> std::path::PathBuf {
 #[test]
 fn a_crate_the_trunk_deleted_is_gone_with_the_commit_that_deleted_it() {
     let dir = repository("lost");
-    let said = Git::at(&dir).gone("kaski-lost").expect("gone");
+    let said = Git::at(&dir).with_crates("kaski".into(), vec!["mock/crates".into()]).gone("kaski-lost").expect("gone");
     assert!(said.contains("delete the lost crate"), "{said}");
 }
 
 #[test]
 fn a_crate_the_trunk_still_holds_is_not_gone() {
     let dir = repository("kept");
-    assert_eq!(Git::at(&dir).gone("kaski-kept"), None);
+    assert_eq!(Git::at(&dir).with_crates("kaski".into(), vec!["mock/crates".into()]).gone("kaski-kept"), None);
 }
 
 #[test]
 fn a_name_the_trunk_never_held_is_not_gone() {
     let dir = repository("never");
-    assert_eq!(Git::at(&dir).gone("kaski-never"), None);
+    assert_eq!(Git::at(&dir).with_crates("kaski".into(), vec!["mock/crates".into()]).gone("kaski-never"), None);
 }
 
 #[test]
 fn a_path_is_gone_when_deleted_and_held_when_it_stands() {
     let dir = repository("path");
-    let git = Git::at(&dir);
+    let git = Git::at(&dir).with_crates("kaski".into(), vec!["mock/crates".into()]);
     assert!(git.gone("mock/crates/kaski-lost/Cargo.toml").is_some());
     assert_eq!(git.gone("mock/crates/kaski-kept/Cargo.toml"), None);
 }
@@ -57,6 +57,6 @@ fn a_path_is_gone_when_deleted_and_held_when_it_stands() {
 #[test]
 fn a_name_asked_twice_is_answered_alike() {
     let dir = repository("twice");
-    let git = Git::at(&dir);
+    let git = Git::at(&dir).with_crates("kaski".into(), vec!["mock/crates".into()]);
     assert_eq!(git.gone("kaski-lost"), git.gone("kaski-lost"));
 }

@@ -6,7 +6,7 @@
 //! Recording `branch`, `pr`, `session` and `needs` on a ticket already added: each path that
 //! writes, and each case the rules refuse, with the file shown unchanged after the refusal.
 
-use kaski_tickets::rules;
+use ticket_model::rules;
 
 use crate::args;
 use crate::testkit::Scratch;

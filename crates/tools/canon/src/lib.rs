@@ -26,23 +26,17 @@ use crate::scope::Scope;
 
 // which files are read, the tiers and how a retired word is matched are owned by the lints directory,
 // where `a-retired-word-stays-out` reads the same files, so the verb and the gate cannot disagree
-#[path = "../../../lints/canon_tree.rs"]
-mod canon_tree;
+use registry_lints::canon_tree;
 mod dropped;
 mod names;
 mod near;
 mod reference;
 mod retired;
-#[path = "../../../lints/retired_words.rs"]
-mod retired_words;
+use registry_lints::retired_words;
 mod rows;
 mod scope;
 mod stats;
-#[cfg(any(test, feature = "testkit"))]
-pub mod testkit;
 mod tree;
-#[path = "../../../lints/tree_walk.rs"]
-pub mod tree_walk;
 mod verbs;
 
 pub use names::named;

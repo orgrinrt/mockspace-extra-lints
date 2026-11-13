@@ -55,7 +55,7 @@ pub fn roots(mock_dir: &Path, op_words: Option<&Path>) -> Vec<Root> {
             shown:       OP_ROOT.to_string(),
             class:       DocClass::Human,
             // The captures are every project's; a capture that never names this one is not read.
-            only_naming: Some(crate::PROJECT.to_string()),
+            only_naming: Some(registry_lints::project::Project::of(mock_dir).name),
         });
     }
     out

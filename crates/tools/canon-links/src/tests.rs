@@ -10,7 +10,6 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, Ordering};
 
-use canon::testkit::{committed, repo_root};
 use mockspace::RegistryView;
 use mockspace::tool::{Outcome as ToolOutcome, Tool, ToolContext, ToolReport, contract_faults};
 
@@ -261,30 +260,4 @@ fn the_probes_view_reads_the_set_from_the_mock_directory() {
         "{}",
         r.output
     );
-}
-
-#[test]
-fn the_committed_probe_set_names_only_tenets_that_exist_and_is_wide_enough() {
-    let reg = committed();
-    let all = canon::tenets(&reg);
-    let text =
-        std::fs::read_to_string(repo_root().join("mock").join(PROBES)).expect("the probe set");
-    let probes = parse(&text).expect("the committed probes parse");
-    assert!(probes.len() >= 30, "{} probes", probes.len());
-    let subjects: BTreeSet<&str> = probes
-        .iter()
-        .flat_map(|p| p.expect.iter())
-        .filter_map(|id| all.iter().find(|t| t.id == id).and_then(|t| t.subject))
-        .collect();
-    assert!(
-        subjects.len() >= 15,
-        "the probes reach {} subjects",
-        subjects.len()
-    );
-    let wrong: Vec<String> = run(&all, &probes)
-        .into_iter()
-        .filter(|o| !o.unknown.is_empty())
-        .map(|o| format!("{}: {:?}", o.probe.ask, o.unknown))
-        .collect();
-    assert!(wrong.is_empty(), "probes naming no tenet: {wrong:?}");
 }

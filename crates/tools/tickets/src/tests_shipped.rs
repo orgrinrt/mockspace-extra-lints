@@ -8,21 +8,22 @@
 
 use std::collections::BTreeSet;
 
-use kaski_tickets::model::Store;
-use kaski_tickets::rules;
+use ticket_model::model::Store;
+use ticket_model::rules;
 use mockspace::{RegistryView, RepoContext, RepoLint};
 
 use crate::lint::ATicketGraphHolds;
-use crate::testkit::{Scratch, committed_registry, repo_root};
+use crate::testkit::{Scratch, shipped_registry};
 
 fn shipped() -> Store {
-    crate::load(&committed_registry()).expect("the committed registry reads")
+    crate::load(&shipped_registry()).expect("the shipped vocabulary reads")
 }
 
-/// The field names `mockspace.toml` declares for a namespace.
+/// The field names the pack's shipped declarations, which a consumer copies into its `mockspace.toml`,
+/// give a namespace.
 fn declared_fields(namespace: &str) -> BTreeSet<String> {
-    let src = std::fs::read_to_string(repo_root().join("mockspace.toml")).expect("mockspace.toml");
-    let doc: toml::Table = src.parse().expect("mockspace.toml parses");
+    let src = std::fs::read_to_string(shipped_registry().join("namespaces.toml")).expect("the shipped declarations");
+    let doc: toml::Table = src.parse().expect("the shipped declarations parse");
     let spaces = doc["registry"]["namespace"].as_array().expect("namespaces");
     let space = spaces
         .iter()
@@ -38,45 +39,8 @@ fn declared_fields(namespace: &str) -> BTreeSet<String> {
         .collect()
 }
 
-/// The skill's "Link by reference" table claims a flag writes a field: each row names flags that
-/// `ticket-add` or `ticket-move` take (or the planning layer's `--span` and `--core`) and a field the
-/// schema declares for a ticket (`--pr` and `pr` were claimed for weeks with neither, 8 November).
 #[test]
-fn every_flag_the_use_tickets_skill_links_by_is_a_flag_of_the_tool_and_a_field_of_the_schema() {
-    let skill =
-        std::fs::read_to_string(repo_root().join("mock/agent/skills/use-tickets/SKILL.md.tmpl"))
-            .expect("the skill template");
-    let table = skill
-        .split("## Link by reference")
-        .nth(1)
-        .and_then(|s| s.split("\n## ").next())
-        .expect("the skill has a link table");
-    let fields = declared_fields("ticket");
-    let mut rows = 0;
-    for line in table.lines().filter(|l| l.starts_with("| `--")) {
-        rows += 1;
-        let mut cells = line.split('|').skip(1);
-        let (flags, field) = (cells.next().unwrap_or(""), cells.next().unwrap_or(""));
-        if field.contains("member row") {
-            continue;
-        }
-        let field = field.trim().trim_matches('`');
-        assert!(
-            fields.contains(field),
-            "the skill names the field `{field}`, which the ticket schema lacks"
-        );
-        for flag in flags.split(',').map(|f| f.trim().trim_matches('`')) {
-            assert!(
-                crate::args::ADD_FLAGS.contains(&flag) || crate::args::MOVE_FLAGS.contains(&flag),
-                "the skill names `{flag}`, which neither ticket-add nor ticket-move takes"
-            );
-        }
-    }
-    assert!(rows >= 10, "the table was read: {rows} rows");
-}
-
-#[test]
-fn the_committed_tickets_pass_the_rules() {
+fn the_shipped_vocabulary_passes_the_rules() {
     let found = rules::check_store(&shipped());
     assert!(found.is_empty(), "{found:?}");
 }
@@ -143,6 +107,7 @@ fn the_lint_gates_the_rows_the_makers_refuse_by() {
             canon_paths: &[],
             open_panels: &[],
             registry:    &registry,
+            ref_files:   &mockspace::src_layout::NO_REF_FILES,
             verdicts:    None,
         };
         ATicketGraphHolds.check_repo(&ctx)

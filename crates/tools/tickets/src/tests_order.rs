@@ -82,7 +82,7 @@ fn a_rank_is_written_as_a_number_in_its_plain_form_and_read_back_as_one() {
     assert_eq!(store.tickets[&neg].rank(), Some(-2));
     let order: Vec<String> = view::list(
         &store,
-        &kaski_planning::Plan::default(),
+        &planning::Plan::default(),
         &view::Filter::default(),
     )
     .into_iter()

@@ -11,6 +11,7 @@ use std::collections::BTreeSet;
 /// inside a crate has none.
 pub fn crate_of(path: &str) -> Option<&str> {
     let parts: Vec<&str> = path.split('/').collect();
+    // FIXME(pack_lints_and_tools_read_the_mock_directory_as_mock): the mock directory is read as `mock`, not as the one `mockspace.toml` declares
     if parts.first() != Some(&"mock") || parts.len() < 4 {
         return None;
     }

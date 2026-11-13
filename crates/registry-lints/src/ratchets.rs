@@ -183,6 +183,7 @@ pub fn judge_unit(
                         row.ticket
                     ),
                 );
+                // FIXME(pack_lints_and_tools_read_the_mock_directory_as_mock): the mock directory is read as `mock`, not as the one `mockspace.toml` declares
                 e.path = Some(format!("mock/{FILE}"));
                 out.push(e);
             }
@@ -214,6 +215,7 @@ pub fn judge_unit(
                     row.ticket
                 ),
             );
+            // FIXME(pack_lints_and_tools_read_the_mock_directory_as_mock): the mock directory is read as `mock`, not as the one `mockspace.toml` declares
             e.path = Some(format!("mock/{FILE}"));
             out.push(e);
         },

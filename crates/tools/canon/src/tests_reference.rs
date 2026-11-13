@@ -13,7 +13,6 @@ use std::path::{Path, PathBuf};
 use mockspace::RegistryView;
 use mockspace::tool::Outcome;
 
-use crate::testkit::{committed, repo_root};
 use crate::tests::{Row, answered, run, scratch, view, write};
 
 /// The fixture's reverse edges, by the row they point at.
@@ -587,61 +586,6 @@ fn the_closing_line_says_how_many_rows_of_how_many_namespaces_were_read() {
 }
 
 // --- the committed registry ----------------------------------------------------------------------
-
-#[test]
-fn every_row_of_the_reference_namespaces_of_the_committed_registry_can_be_shown() {
-    let reg = committed();
-    let repo = repo_root();
-    let mut shown = 0_usize;
-    for ns in ["ikiuni-renderer", "ikiuni", "bevy"] {
-        let rows = reg.rows_in(ns);
-        assert!(!rows.is_empty(), "the committed registry holds `{ns}` rows");
-        for q in rows {
-            let out = run(&reg, &repo, &["show", q]);
-            let text = answered(&out);
-            assert!(text.starts_with(&format!("{q}\n")), "{q}");
-            if let Some(doc) = reg.field(q, "doc") {
-                let l = line_of(text, "doc:");
-                assert!(l.contains(doc), "{q}: {l}");
-            }
-            if let Some(quote) = reg.field(q, "quote") {
-                let block = quote
-                    .lines()
-                    .map(|l| if l.is_empty() { String::new() } else { format!("    {l}") })
-                    .collect::<Vec<_>>()
-                    .join("\n");
-                assert!(
-                    text.contains(&format!("  quote:\n{block}")),
-                    "{q}: the quote is not shown whole"
-                );
-            }
-            shown += 1;
-        }
-    }
-    assert!(shown >= 150, "{shown}");
-}
-
-#[test]
-fn the_committed_reference_namespaces_are_found_by_default_and_left_out_of_the_canon() {
-    let reg = committed();
-    let repo = repo_root();
-    let q = &reg.rows_in("ikiuni-renderer")[0];
-    let slug = q.split_once("::").expect("qualified").1;
-    let text = answered(&run(&reg, &repo, &["find", slug])).to_owned();
-    assert!(
-        listed_in(&text, "ikiuni-renderer")
-            .iter()
-            .any(|id| id == slug),
-        "{text}"
-    );
-    let canon = answered(&run(&reg, &repo, &["find", slug, "--in", "canon"])).to_owned();
-    for (h, _) in sections(&canon) {
-        assert!(
-            h.contains(" tenets carry ") || h.contains(" subject rows carry "),
-            "{h}"
-        );
-    }
-}
 
 #[test]
 fn a_long_id_does_not_push_the_listing_s_words_off_the_screen() {

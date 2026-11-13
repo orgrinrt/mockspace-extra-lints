@@ -9,12 +9,16 @@
 mod common;
 
 use common::{closed, open, store};
-use kaski_tickets::{Tree, stale};
+use mockspace_extra_ticket_model::{Tree, stale};
 
 /// A tree that once held the names it is given, each deleted by a commit, and holds nothing else of them.
 struct Gone(&'static [(&'static str, &'static str)]);
 
 impl Tree for Gone {
+    fn crate_prefix(&self) -> &str {
+        "kaski"
+    }
+
     fn gone(&self, name: &str) -> Option<String> {
         self.0
             .iter()
@@ -122,13 +126,13 @@ fn the_count_is_the_findings_of_the_two_lists() {
 #[test]
 fn an_absolute_path_and_a_parent_path_are_no_names() {
     let names =
-        stale::names_in("see /home/user/kaski and ../x/y and mock/crates/kaski-a/src/lib.rs.");
+        stale::names_in("see /home/user/kaski and ../x/y and mock/crates/kaski-a/src/lib.rs.", "kaski");
     assert_eq!(names, ["mock/crates/kaski-a/src/lib.rs"]);
 }
 
 #[test]
 fn a_directory_is_named_without_its_closing_slash() {
-    assert_eq!(stale::names_in("under mock/benches/ only"), [
+    assert_eq!(stale::names_in("under mock/benches/ only", "kaski"), [
         "mock/benches"
     ]);
 }

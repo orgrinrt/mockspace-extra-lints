@@ -5,19 +5,16 @@
 
 //! What git says of a name a ticket mentions: held by the trunk once and held no more.
 
-use kaski_tickets::Tree;
+use ticket_model::Tree;
 
 use crate::landing::Git;
 
-/// The directories a crate named alone could have been in.
-const CRATE_DIRS: [&str; 1] = ["mock/crates"];
-
 /// The paths a name stands for: a crate in each directory crates live in, a path as it is.
-fn paths(name: &str) -> Vec<String> {
+fn paths(name: &str, crate_dirs: &[String]) -> Vec<String> {
     if name.contains('/') {
         vec![name.to_string()]
     } else {
-        CRATE_DIRS.iter().map(|d| format!("{d}/{name}")).collect()
+        crate_dirs.iter().map(|d| format!("{d}/{name}")).collect()
     }
 }
 
@@ -50,7 +47,7 @@ impl Tree for Git<'_> {
             return said.clone();
         }
         let said = self.trunk().and_then(|trunk| {
-            let all = paths(name);
+            let all = paths(name, &self.crate_dirs);
             if all.iter().any(|p| self.held(&trunk, p)) {
                 return None;
             }
@@ -60,5 +57,9 @@ impl Tree for Git<'_> {
             .borrow_mut()
             .insert(name.to_string(), said.clone());
         said
+    }
+
+    fn crate_prefix(&self) -> &str {
+        &self.prefix
     }
 }

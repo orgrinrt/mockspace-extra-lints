@@ -6,7 +6,7 @@
 //! The member row `ticket-move --span` and `--core` append: one fact, which span a ticket is in and
 //! whether it is core there, naming the row it replaces.
 
-use kaski_planning::Plan;
+use planning::Plan;
 
 use crate::ids::move_id;
 use crate::write::{MemberWrite, MoveRequest, quote};

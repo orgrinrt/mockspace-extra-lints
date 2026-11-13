@@ -7,7 +7,7 @@
 //! each path that writes, each case the rules refuse with the file shown unchanged, and the listing
 //! that finds a ticket by its tag.
 
-use kaski_tickets::rules;
+use ticket_model::rules;
 
 use crate::testkit::{Branches, Scratch};
 use crate::view::{self, Filter};

@@ -61,6 +61,7 @@ const READ: [&str; 6] = ["md", "tmpl", "rs", "toml", "slang", "wgsl"];
 /// The tier of a file, by its path relative to the repository root.
 pub fn tier_of(rel: &Path) -> Tier {
     let s = rel.to_string_lossy().replace('\\', "/");
+    // FIXME(pack_lints_and_tools_read_the_mock_directory_as_mock): the mock directory is read as `mock`, not as the one `mockspace.toml` declares
     if s.starts_with("mock/registry/") {
         Tier::Canon
     } else if s.starts_with("mock/design_rounds/") {

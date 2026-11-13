@@ -1,5 +1,5 @@
 [package]
-name = "build-weigh"
+name = "mockspace-extra-build-weigh"
 description = "Weighs what building one crate costs in bytes, minutes and memory, per profile, from the files the build leaves."
 version.workspace = true
 edition.workspace = true
@@ -9,4 +9,4 @@ publish.workspace = true
 [dependencies]
 # the trait crate under the name the generated collector gives it; the engine patches every spelling
 # of it to the one it is built from
-mockspace = { package = "mockspace-lint-rules", git = "ssh://git@github.com/hiisi-digital/mockspace.git", branch = "dev" }
+mockspace.workspace = true

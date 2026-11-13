@@ -6,14 +6,14 @@
 //! A scratch registry holding the vocabularies the repository ships, for a test that adds and moves
 //! tickets the way a person would.
 //!
-//! The states and the kinds are copied from `mock/registry/ticket/` and never written again here, so
+//! The states and the kinds are copied from the pack's `registry/ticket/` and never written again here, so
 //! a test reads the values every other test and the board read. A test that needs a kind the
 //! repository does not ship adds a row for it to its own scratch and says so.
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, Ordering};
 
-use kaski_tickets::model::Fields;
+use ticket_model::model::Fields;
 
 use crate::write::{self, AddRequest, MoveRequest};
 
@@ -22,9 +22,10 @@ pub fn repo_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..")
 }
 
-/// The committed registry directory.
-pub fn committed_registry() -> PathBuf {
-    repo_root().join("mock/registry")
+/// The vocabulary the pack ships, `registry/` at its root, which a consumer copies into its own
+/// registry.
+pub fn shipped_registry() -> PathBuf {
+    repo_root().join("registry")
 }
 
 /// A temporary registry, removed when it goes out of scope.
@@ -49,7 +50,7 @@ impl Scratch {
         let dir = root.join("ticket");
         std::fs::create_dir_all(&dir).expect("a scratch registry");
         for f in ["states.toml", "kinds.toml"] {
-            std::fs::copy(committed_registry().join("ticket").join(f), dir.join(f))
+            std::fs::copy(shipped_registry().join("ticket").join(f), dir.join(f))
                 .expect("the committed vocabulary");
         }
         Scratch {

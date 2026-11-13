@@ -19,17 +19,11 @@ use crate::retired_words::{
     unit_of,
     words,
 };
-use crate::rows::tenets;
-use crate::testkit::{committed, repo_root};
 use crate::tests::{answered, run, scratch, view, write};
 
 /// The lines of a text that stand, which is what the lint holds a unit to.
 fn scan_text(rel: &Path, body: &str, rules: &[Retiring]) -> Vec<crate::retired_words::Hit> {
     split_text(rel, body, rules).0
-}
-
-fn scan(repo: &Path, rules: &[Retiring], under: Option<&Path>) -> Vec<crate::retired_words::Hit> {
-    split_under(repo, rules, under.as_slice()).0
 }
 
 fn w(text: &str) -> Vec<String> {
@@ -279,43 +273,6 @@ fn forbids_says_what_a_tenet_rules_out_and_what_it_replaces() {
         run(&reg, &d, &["forbids", "nope"]).outcome,
         mockspace::tool::Outcome::Inconclusive { .. }
     ));
-}
-
-#[test]
-fn the_row_that_retires_the_window_lists_what_it_rules_out() {
-    let reg = committed();
-    let all = tenets(&reg);
-    let row = all
-        .iter()
-        .find(|t| t.id == "there_is_no_tract_and_what_is_held_finely_is_where_beings_and_eyes_are")
-        .expect("the row");
-    assert!(row.binds());
-    assert!(
-        !row.rules_out.is_empty(),
-        "nothing can find what the row falsifies without its words"
-    );
-}
-
-/// The control on the real tree: a design whose text carries a retired word only inside longer words is
-/// not flagged, though a plain search for the letters finds it.
-#[test]
-fn a_real_design_with_the_letters_inside_longer_words_is_not_flagged() {
-    let reg = committed();
-    let all = tenets(&reg);
-    let rules = crate::retired::retiring(&all);
-    assert!(!rules.is_empty());
-    let root = repo_root();
-    let rel = Path::new("mock/crates/kaski-clock/DESIGN.md.tmpl");
-    let body = std::fs::read_to_string(root.join(rel)).expect("the design");
-    let letters = rules
-        .iter()
-        .flat_map(|r| &r.terms)
-        .any(|t| body.to_lowercase().contains(&t.to_lowercase()));
-    assert!(
-        letters,
-        "the control needs a design that carries the letters of a retired word"
-    );
-    assert!(scan(&root, &rules, Some(rel)).is_empty());
 }
 
 #[test]

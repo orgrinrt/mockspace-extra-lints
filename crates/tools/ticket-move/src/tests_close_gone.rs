@@ -41,6 +41,8 @@ fn scratch_with_a_deleted_crate() -> Scratch {
     let krate = s.mock.join("mock/crates/kaski-lost");
     std::fs::create_dir_all(&krate).unwrap();
     std::fs::write(krate.join("Cargo.toml"), "x").unwrap();
+    // the prefix a crate is named by, which a ticket naming `kaski-lost` is read against
+    std::fs::write(s.mock.join("mockspace.toml"), "crate_prefix = \"kaski\"\n").unwrap();
     git(&s.mock, &["init", "-q", "-b", "dev"]);
     git(&s.mock, &["add", "mock/crates/kaski-lost/Cargo.toml"]);
     git(&s.mock, &["commit", "-q", "-m", "add the lost crate"]);
@@ -51,12 +53,13 @@ fn scratch_with_a_deleted_crate() -> Scratch {
 
 fn run(s: &Scratch, args: &[&str]) -> ToolReport {
     let crates = BTreeSet::new();
+    let dirs = [s.mock.join("mock/crates")];
     let registry = RegistryView::default();
     TicketMove.run(&ToolContext {
         mock_dir: &s.mock,
         repo_root: &s.mock,
         all_crates: &crates,
-        src_dirs: &[],
+        src_dirs: &dirs,
         args,
         stdin: None,
         registry: &registry,

@@ -7,10 +7,10 @@
 //! it was put with, and his answer closes it. The scratch registry holds the kinds the repository
 //! ships, so these read the same `question` row the board reads.
 
-use kaski_tickets::rules;
+use ticket_model::rules;
 
 use crate::args;
-use crate::testkit::{Scratch, committed_registry};
+use crate::testkit::{Scratch, shipped_registry};
 
 const T0: &str = "2026-10-26T10:00:00Z";
 const T1: &str = "2026-10-26T11:00:00Z";
@@ -26,7 +26,7 @@ const SUBJECT: &[&str] = &["subject::engine"];
 
 #[test]
 fn the_question_kind_is_shipped_with_the_states_a_question_passes_through() {
-    let store = crate::load(&committed_registry()).expect("the committed registry reads");
+    let store = crate::load(&shipped_registry()).expect("the shipped vocabulary reads");
     let kind = store
         .kinds
         .get("question")

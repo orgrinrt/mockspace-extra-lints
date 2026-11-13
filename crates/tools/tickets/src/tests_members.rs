@@ -7,7 +7,7 @@
 //! row it replaces; the listing's epoch tag read from the newest member row; the priority and the
 //! set a ticket holds; and the findings of the planning rules in the check.
 
-use kaski_planning::rules;
+use planning::rules;
 
 use crate::args;
 use crate::testkit::Scratch;
@@ -17,7 +17,7 @@ fn file(s: &Scratch, id: &str) -> String {
     s.read(&format!("ticket/items/{id}.toml"))
 }
 
-fn plan(s: &Scratch) -> kaski_planning::Plan {
+fn plan(s: &Scratch) -> planning::Plan {
     crate::load_plan(&s.root).unwrap()
 }
 

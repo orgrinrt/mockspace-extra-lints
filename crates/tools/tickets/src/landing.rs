@@ -14,7 +14,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 use std::process::Command;
 
-use kaski_tickets::{Finding, Store};
+use ticket_model::{Finding, Store};
 
 /// Where a branch stands against the trunk.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -58,6 +58,10 @@ pub struct Git<'a> {
     heads:           OnceCell<BTreeMap<String, String>>,
     /// What the tree said of a name already, so a name that many tickets repeat is asked of git once.
     pub(crate) gone: RefCell<BTreeMap<String, Option<String>>>,
+    /// The repository's `crate_prefix`, which a crate a ticket names alone starts with.
+    pub(crate) prefix: String,
+    /// The directories crates live in, relative to the root: the source directories of the config.
+    pub(crate) crate_dirs: Vec<String>,
 }
 
 impl<'a> Git<'a> {
@@ -67,7 +71,30 @@ impl<'a> Git<'a> {
             root,
             heads: OnceCell::new(),
             gone: RefCell::new(BTreeMap::new()),
+            prefix: String::new(),
+            crate_dirs: Vec::new(),
         }
+    }
+
+    /// The repository a tool is run in, its crates named and found as its config says: the
+    /// `crate_prefix` and the source directories.
+    pub fn of(ctx: &mockspace::tool::ToolContext<'a>) -> Self {
+        let project = registry_lints::project::Project::of(ctx.mock_dir);
+        let dirs = ctx
+            .src_dirs
+            .iter()
+            .filter_map(|d| d.strip_prefix(ctx.repo_root).ok())
+            .map(|p| p.to_string_lossy().replace('\\', "/"))
+            .collect();
+        Git::at(ctx.repo_root).with_crates(project.prefix, dirs)
+    }
+
+    /// The same repository, its crates named with `prefix` and found under `crate_dirs`.
+    #[must_use]
+    pub fn with_crates(mut self, prefix: String, crate_dirs: Vec<String>) -> Self {
+        self.prefix = prefix;
+        self.crate_dirs = crate_dirs;
+        self
     }
 
     pub(crate) fn git(&self, args: &[&str]) -> Option<std::process::Output> {

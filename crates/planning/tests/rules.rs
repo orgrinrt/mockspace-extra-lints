@@ -6,7 +6,7 @@
 //! The rules over the planning rows: chains and forks, stamps, the shape of a span, and what is read
 //! of the rows as they stand now.
 
-use kaski_planning::{Plan, rules};
+use mockspace_extra_planning::{Plan, rules};
 
 const NS: [&str; 5] = ["plan_span", "member", "window", "milestone_merge", "milestone_scope"];
 
@@ -26,7 +26,7 @@ within = "stretch"
 owner = "coord"
 "#;
 
-fn rows_of(found: Vec<kaski_tickets::Finding>) -> Vec<String> {
+fn rows_of(found: Vec<ticket_model::Finding>) -> Vec<String> {
     found.into_iter().map(|f| f.row).collect()
 }
 

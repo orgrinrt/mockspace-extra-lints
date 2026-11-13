@@ -1,5 +1,5 @@
 [package]
-name = "intent-or-mechanism"
+name = "mockspace-extra-intent-or-mechanism"
 description = "Lists statements naming something that moves when the implementation does: a crate, a type a design declares, a path or a call."
 version.workspace = true
 edition.workspace = true
@@ -9,4 +9,5 @@ publish.workspace = true
 [dependencies]
 # the trait crate under the name the generated collector gives it; the engine patches every spelling
 # of it to the one it is built from
-mockspace = { package = "mockspace-lint-rules", git = "ssh://git@github.com/hiisi-digital/mockspace.git", branch = "dev" }
+mockspace.workspace = true
+registry-lints.workspace = true

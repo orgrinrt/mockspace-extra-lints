@@ -11,8 +11,8 @@
 
 use std::collections::BTreeSet;
 
-use kaski_tickets::model::{Fields, Store};
-use kaski_tickets::rules::Finding;
+use ticket_model::model::{Fields, Store};
+use ticket_model::rules::Finding;
 use mockspace::RegistryView;
 
 /// The links of a ticket that name a canon row: `related` entries as `tenet::<id>` or `subject::<id>`, and

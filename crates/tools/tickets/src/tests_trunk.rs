@@ -66,7 +66,7 @@ impl World {
         std::fs::create_dir_all(registry.join("ticket")).unwrap();
         for f in ["states.toml", "kinds.toml"] {
             std::fs::copy(
-                crate::testkit::committed_registry().join("ticket").join(f),
+                crate::testkit::shipped_registry().join("ticket").join(f),
                 registry.join("ticket").join(f),
             )
             .unwrap();

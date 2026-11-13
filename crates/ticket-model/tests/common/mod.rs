@@ -6,7 +6,7 @@
 //! A scratch registry for the lists over the tickets: two states, one open and one closed, and a task
 //! kind that is either.
 
-use kaski_tickets::Store;
+use mockspace_extra_ticket_model::Store;
 
 const VOCABULARY: &str = r#"
 [[ticket_state]]

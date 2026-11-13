@@ -12,9 +12,9 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use kaski_engine_key::Ident;
-use kaski_tickets::Store;
-use kaski_tickets::rules::slugify;
+use mockspace_registry::is_valid_slug;
+use ticket_model::Store;
+use ticket_model::rules::slugify;
 
 use crate::fixme_markers::Marker;
 use crate::group::{self, Class, How, Item};
@@ -63,6 +63,8 @@ pub struct Inputs<'a> {
     pub all_candidates: &'a BTreeSet<String>,
     pub store:          &'a Store,
     pub subjects:       &'a BTreeSet<String>,
+    /// The project's `crate_prefix`, which a crate's subject is named without.
+    pub prefix:         &'a str,
     /// Nothing was left out by `--only`, so a ticket none of whose markers is found is closed.
     pub full:           bool,
 }
@@ -158,13 +160,14 @@ fn open(store: &Store, id: &str) -> bool {
 
 /// The move that answered a closed ticket: its newest move, where that one carries an answer or
 /// picks. A ticket closed with neither is not answered.
-fn answered<'a>(store: &'a Store, id: &str) -> Option<&'a kaski_tickets::Move> {
+fn answered<'a>(store: &'a Store, id: &str) -> Option<&'a ticket_model::Move> {
     let now = store.now_of(id)?;
     let closed = store.states.get(&now.to).is_some_and(|s| s.closed);
     (closed && (now.gives("answer") || now.gives("picks"))).then_some(now)
 }
 
 /// Whether a file sits under the phase gate, so that editing it needs a round of its own: the
+// FIXME(pack_lints_and_tools_read_the_mock_directory_as_mock): the mock directory is read as `mock`, not as the one `mockspace.toml` declares
 /// per-crate documents and sources. Its marker is left as it is.
 fn gated(rel: &str) -> bool {
     rel.starts_with("mock/crates/")
@@ -342,7 +345,7 @@ pub fn plan(inp: &Inputs<'_>) -> Plan {
             let named = marker
                 .tag
                 .as_deref()
-                .filter(|t| Ident::is(t) && store.tickets.contains_key(*t));
+                .filter(|t| is_valid_slug(t) && store.tickets.contains_key(*t));
             if let Some(id) = named {
                 out.cited += 1;
                 cited_ids.insert(id.to_string());
@@ -406,7 +409,7 @@ pub fn plan(inp: &Inputs<'_>) -> Plan {
             .collect();
         let areas: BTreeSet<String> = order.iter().map(|&i| items[i].area.clone()).collect();
         let subjects: Vec<String> = if areas.len() == 1 {
-            group::subject_of(areas.iter().next().map_or("", String::as_str), inp.subjects)
+            group::subject_of(areas.iter().next().map_or("", String::as_str), inp.prefix, inp.subjects)
                 .into_iter()
                 .collect()
         } else {

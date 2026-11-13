@@ -309,6 +309,7 @@ pub fn recite(text: &str, kind: Kind, from: &str, to: &str) -> Option<String> {
 /// The paths a tool that rewrites markers declares it may write, as a maker declares them: every
 /// authored place a live marker is read in. The registry's own files are under `mock/`.
 pub const WRITES: &[&str] = &[
+    // FIXME(a_maker_tool_s_writes_cannot_name_the_mock_directory): `writes` names `mock`, since a pattern cannot name the mock directory the config declares
     "mock/**",
     "content/**",
     "README.md",
@@ -344,6 +345,7 @@ const NEVER: [&str; 7] = [
 pub fn scope_of(rel: &str) -> Option<Scope> {
     if NEVER.iter().any(|p| rel.starts_with(p)) || rel.split('/').any(|s| s == "node_modules") {
         None
+    // FIXME(pack_lints_and_tools_read_the_mock_directory_as_mock): the mock directory is read as `mock`, not as the one `mockspace.toml` declares
     } else if rel.starts_with("mock/design_rounds/") || rel.starts_with("mock/research/") {
         Some(Scope::Record)
     } else {

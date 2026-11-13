@@ -12,7 +12,7 @@
 
 use std::path::Path;
 
-use kaski_tickets::{Fields, heirs};
+use ticket_model::{Fields, heirs};
 use mockspace::RegistryView;
 
 use crate::write::{MoveRequest, move_ticket};

@@ -41,16 +41,13 @@ pub use index::Index;
 pub use score::{Hit, Search, rank};
 pub use terms::{Query, Source};
 
-/// The project op's captures must name to be read, the rest being about his other projects.
-pub const PROJECT: &str = "kaski";
-
 /// The corpus a tool asks: the research and the rounds under `mock_dir`, and those of op's captured words that name
-/// [`PROJECT`] wherever [`corpus::op_words_dir`] finds them from `repo_root` and the environment.
+/// the project, its `project_name`, wherever [`corpus::op_words_dir`] finds them from `repo_root` and the environment.
 #[must_use]
 pub fn load(mock_dir: &Path, repo_root: &Path) -> Corpus {
     let named = std::env::var(corpus::OP_WORDS_VAR).ok();
     let op = corpus::op_words_dir(repo_root, named.as_deref());
-    Corpus::load_about(mock_dir, op.as_deref(), PROJECT)
+    Corpus::load_about(mock_dir, op.as_deref(), &registry_lints::project::Project::of(mock_dir).name)
 }
 
 // --- the tool face ---------------------------------------------------------------

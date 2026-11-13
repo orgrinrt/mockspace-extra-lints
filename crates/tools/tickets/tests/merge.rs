@@ -14,9 +14,9 @@
 use std::path::Path;
 use std::process::Command;
 
-use kaski_tickets::rules;
-use tickets::load;
-use tickets::testkit::Scratch;
+use ticket_model::rules;
+use mockspace_extra_tickets::load;
+use mockspace_extra_tickets::testkit::Scratch;
 
 const T1: &str = "2026-10-23T11:00:00Z";
 const T2: &str = "2026-10-23T12:00:00Z";
@@ -74,10 +74,15 @@ fn repo(with_driver: bool) -> (Scratch, String) {
     )
     .unwrap();
     if with_driver {
-        // the launcher reads the engine pin from the project it is told of, which a scratch repository is not
-        let root = tickets::testkit::repo_root()
-            .canonicalize()
-            .expect("the repository root");
+        // the launcher reads the engine pin from the project it is told of, which a scratch repository
+        // is not, so a project beside it names the engine's trunk and nothing else
+        let root = s.mock.join("project");
+        std::fs::create_dir_all(root.join("mock")).expect("the project");
+        std::fs::write(
+            root.join("mockspace.toml"),
+            "mockspace_branch = \"dev\"\nproject_name = \"scratch\"\nmock_dir = \"mock\"\n",
+        )
+        .expect("the project's config");
         let cfg = format!(
             "MOCK_ROOT={} {} merge-registry %O %A %B %P %L",
             root.display(),

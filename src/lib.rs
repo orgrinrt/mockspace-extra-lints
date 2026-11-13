@@ -14,7 +14,9 @@
 //! ```
 //!
 //! A path dependency works the same way where the two sit beside each other in
-//! one workspace.
+//! one workspace. With `features = ["workflow"]` on the entry, [`collect`] also
+//! hands over the registry lints and the workflow tools of `crates/`, whose
+//! namespace declarations and starting rows are in `registry/`.
 //!
 //! Emitting every lint from one place is the point, since a policy several repos
 //! share stays in step that way, where a copy per repo drifts and nothing says
@@ -110,55 +112,94 @@ use crate::tools::coverage::Coverage;
 use crate::tools::near_copies::NearCopies;
 use crate::tools::rulings_with_no_verbatim::RulingsWithNoVerbatim;
 
-mockspace_lint_rules::lint_pack! {
-    lints: [
-        NoAlloc,
-        NoStd,
-        NoBareOption,
-        NoBareResult,
-        NoBareNumeric,
-        NoBareString,
-        NoBareStaticStr,
-        NoDynDispatch,
-        NoRuntimeSpawn,
-        NoRuntimeRegistration,
-        NoPublicRawField,
-        NoVecInTraitSig,
-        ReExportForeignNames,
-        StrategyMarkerRequired,
-        SemanticAliasNudge,
-        TraitFirstSignatures,
-        ArvoTypesOnly,
-        LintAllowRequiresTaskId,
-    ],
-    workspace_lints: [
-        WritingStyle,
-    ],
-    repo_lints: [
-        CatalogueIgnore::default(),
-        AGitDependencyIsNotPinned::default(),
-        NoSourceIncludeInTest::default(),
-        NoSupersededCitation::default(),
-        OneRelationField::default(),
-        SlangFileSize::default(),
-        SlangNoDuplicateFn::default(),
-        SlangSingleSource::default(),
-        SlangWritingStyle::default(),
-    ],
-    // Both carry configuration, so they are constructed rather than named as
-    // unit structs. The macro takes expressions for exactly this case.
-    message_lints: [
-        CommitStyle::default(),
-        ForgeBody::default(),
-        MessageAttribution::default(),
-    ],
-    // Tools ride the same cdylib as the lints and `mock tools` enumerates them
-    // identically, so a consumer gets these by depending on the pack and needs
-    // no `<mock>/tools/` directory of its own. See `tools` for which checks
-    // belong here rather than in one repository.
-    tools: [
-        Coverage,
-        NearCopies,
-        RulingsWithNoVerbatim,
-    ],
+/// Hand every lint and tool of the pack to the engine: the pack's own, and with the `workflow`
+/// feature the registry lints and the workflow tools of `crates/`.
+pub fn collect(pack: &mut mockspace_lint_rules::LintPack) {
+    own::collect(pack);
+    #[cfg(feature = "workflow")]
+    workflow::collect(pack);
+}
+
+/// The registry lints and the workflow tools, each crate handing over its own.
+#[cfg(feature = "workflow")]
+mod workflow {
+    pub fn collect(pack: &mut mockspace_lint_rules::LintPack) {
+        mockspace_extra_registry_lints::collect(pack);
+        mockspace_extra_already_said::collect(pack);
+        mockspace_extra_build_weigh::collect(pack);
+        mockspace_extra_canon::collect(pack);
+        mockspace_extra_canon_links::collect(pack);
+        mockspace_extra_corpus::collect(pack);
+        mockspace_extra_finish::collect(pack);
+        mockspace_extra_intent_or_mechanism::collect(pack);
+        mockspace_extra_known_red::collect(pack);
+        mockspace_extra_owed::collect(pack);
+        mockspace_extra_parallel_statements::collect(pack);
+        mockspace_extra_quote_check::collect(pack);
+        mockspace_extra_research_unbundle::collect(pack);
+        mockspace_extra_tackle::collect(pack);
+        mockspace_extra_test_list::collect(pack);
+        mockspace_extra_ticket_add::collect(pack);
+        mockspace_extra_ticket_move::collect(pack);
+        mockspace_extra_tickets::collect(pack);
+        mockspace_extra_unearth::collect(pack);
+    }
+}
+
+/// The lints and tools of this crate's own `src/`.
+mod own {
+    use super::*;
+
+    mockspace_lint_rules::lint_pack! {
+        lints: [
+            NoAlloc,
+            NoStd,
+            NoBareOption,
+            NoBareResult,
+            NoBareNumeric,
+            NoBareString,
+            NoBareStaticStr,
+            NoDynDispatch,
+            NoRuntimeSpawn,
+            NoRuntimeRegistration,
+            NoPublicRawField,
+            NoVecInTraitSig,
+            ReExportForeignNames,
+            StrategyMarkerRequired,
+            SemanticAliasNudge,
+            TraitFirstSignatures,
+            ArvoTypesOnly,
+            LintAllowRequiresTaskId,
+        ],
+        workspace_lints: [
+            WritingStyle,
+        ],
+        repo_lints: [
+            CatalogueIgnore::default(),
+            AGitDependencyIsNotPinned::default(),
+            NoSourceIncludeInTest::default(),
+            NoSupersededCitation::default(),
+            OneRelationField::default(),
+            SlangFileSize::default(),
+            SlangNoDuplicateFn::default(),
+            SlangSingleSource::default(),
+            SlangWritingStyle::default(),
+        ],
+        // Both carry configuration, so they are constructed rather than named as
+        // unit structs. The macro takes expressions for exactly this case.
+        message_lints: [
+            CommitStyle::default(),
+            ForgeBody::default(),
+            MessageAttribution::default(),
+        ],
+        // Tools ride the same cdylib as the lints and `mock tools` enumerates them
+        // identically, so a consumer gets these by depending on the pack and needs
+        // no `<mock>/tools/` directory of its own. See `tools` for which checks
+        // belong here rather than in one repository.
+        tools: [
+            Coverage,
+            NearCopies,
+            RulingsWithNoVerbatim,
+        ],
+    }
 }

@@ -9,11 +9,11 @@
 
 use std::path::{Path, PathBuf};
 
-use kaski_planning::derive::{Class, Facts, milestone_report, span_report};
-use kaski_planning::roadmap::Roadmap;
-use kaski_planning::time::{date_of, day_of};
-use kaski_planning::{NAMESPACES, Plan};
-use kaski_tickets::Store;
+use mockspace_extra_planning::derive::{Class, Facts, milestone_report, span_report};
+use mockspace_extra_planning::roadmap::Roadmap;
+use mockspace_extra_planning::time::{date_of, day_of};
+use mockspace_extra_planning::{NAMESPACES, Plan};
+use ticket_model::Store;
 
 fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
     for e in std::fs::read_dir(dir).unwrap() {
@@ -425,30 +425,6 @@ fn the_roadmap_puts_epochs_in_lanes_by_owner_draft_milestones_as_goalposts_and_f
     assert_eq!(Roadmap::of(&plan, &facts, None, Some(&keep)).bars.len(), 1);
 }
 
-#[test]
-fn the_registry_as_shipped_derives_for_every_ticket_and_every_span() {
-    let texts = shipped_texts();
-    let files = borrowed(&texts);
-    let plan = Plan::from_texts(&NAMESPACES, files.iter().copied()).unwrap();
-    let store = Store::from_texts(files.iter().copied()).unwrap();
-    let facts = Facts::of(&plan, &store, day("2026-11-02"), 3);
-    assert_eq!(facts.iter().count(), store.tickets.len());
-    let spans: Vec<_> = plan.rows_of("plan_span").map(|r| r.id.clone()).collect();
-    assert!(!spans.is_empty());
-    for id in &spans {
-        let r = span_report(&plan, &facts, id).unwrap();
-        let c = r.counts;
-        assert_eq!(c.counted(), c.open + c.active + c.stopped + c.done);
-        assert!(r.core.iter().all(|t| r.members.contains(t)));
-    }
-    let road = Roadmap::of(&plan, &facts, None, None);
-    assert!(road.first <= road.last);
-    assert!(
-        road.lanes.iter().map(|l| l.epochs.len()).sum::<usize>() >= 4,
-        "the four epochs the registry ships"
-    );
-}
-
 /// Every combination of closed, held, needs met and satisfies with the class it is, written out and not
 /// derived from the rule, so the sixteen are each seen. A reader that holds the flags and not a state asks
 /// `from_flags`, and a state asks `of`, which is the same answer.
@@ -478,7 +454,7 @@ fn the_class_of_the_four_flags_is_one_function_for_all_sixteen() {
             class,
             "closed {closed}, held {held}, met {met}, satisfies {satisfies}"
         );
-        let state = kaski_tickets::State {
+        let state = ticket_model::State {
             id: "s".into(),
             column: 0,
             needs_holder: held,

@@ -15,10 +15,7 @@ use std::path::Path;
 
 use mockspace::tool::{ArgSpec, Purpose, Tool, ToolContext, ToolReport};
 
-#[path = "../../../lints/fixme_markers.rs"]
-pub mod fixme_markers;
-#[path = "../../../lints/tree_walk.rs"]
-pub mod tree_walk;
+use registry_lints::fixme_markers;
 
 /// The live files that hold a marker citing `from`, each with the text it has once the marker cites
 /// `to`. Nothing is written; this only reads.
@@ -208,7 +205,7 @@ fn close_gone(ctx: &ToolContext<'_>) -> ToolReport {
     let at = tickets::args::at(flag("--at"));
     let successor = flag("--for").copied();
     let cited = |id: &str| !citing(ctx.repo_root, id).is_empty();
-    let git = tickets::landing::Git::at(ctx.repo_root);
+    let git = tickets::landing::Git::of(ctx);
     let swept = tickets::close_gone::close_gone(
         &tickets::registry_dir(ctx.mock_dir),
         &git,

@@ -215,19 +215,19 @@ fn the_area_of_a_path_is_its_crate_its_content_pack_or_its_tooling() {
 fn a_subject_is_named_only_where_the_registry_has_a_row_for_it() {
     let subjects: BTreeSet<String> = ["weather", "workflow", "content"].map(String::from).into();
     assert_eq!(
-        subject_of("kaski-weather", &subjects).as_deref(),
+        subject_of("kaski-weather", "kaski", &subjects).as_deref(),
         Some("weather")
     );
-    assert_eq!(subject_of("kaski-sim", &subjects), None);
+    assert_eq!(subject_of("kaski-sim", "kaski", &subjects), None);
     assert_eq!(
-        subject_of("content/kaski", &subjects).as_deref(),
+        subject_of("content/kaski", "kaski", &subjects).as_deref(),
         Some("content")
     );
     assert_eq!(
-        subject_of("tool owed", &subjects).as_deref(),
+        subject_of("tool owed", "kaski", &subjects).as_deref(),
         Some("workflow")
     );
-    assert_eq!(subject_of("mock design", &BTreeSet::new()), None);
+    assert_eq!(subject_of("mock design", "kaski", &BTreeSet::new()), None);
 }
 
 #[test]
