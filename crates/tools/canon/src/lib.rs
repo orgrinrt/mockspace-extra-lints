@@ -200,28 +200,30 @@ mockspace::lint_pack! {
 mod tests;
 
 #[cfg(test)]
-mod tests_near;
+mod near_tests;
 
 #[cfg(test)]
-mod tests_stats;
+mod stats_tests;
 
 #[cfg(test)]
-mod tests_retired;
+mod retired_tests;
 
 #[cfg(test)]
-mod tests_dropped;
+mod dropped_tests;
 
 #[cfg(test)]
-mod tests_check;
+mod check_tests;
 
 #[cfg(test)]
-mod tests_closing;
+mod closing_tests;
 
 #[cfg(test)]
-mod tests_reference;
+mod reference_tests;
+#[cfg(test)]
+mod relations_tests;
 
 #[cfg(test)]
-mod tests_heirs;
+mod heirs_tests;
 
 #[cfg(test)]
-mod tests_standing;
+mod standing_tests;

@@ -7,7 +7,7 @@
 //! refused for it writes nothing. The markers it hands on are the `ticket-move` tool's.
 
 use crate::testkit::Scratch;
-use crate::tests_tags::{added, file, moved, moves};
+use crate::tags_tests::{added, file, moved, moves};
 use crate::{args, load, write};
 
 fn state_of(s: &Scratch, id: &str) -> String {

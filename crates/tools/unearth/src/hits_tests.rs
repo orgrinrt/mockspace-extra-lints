@@ -11,7 +11,7 @@ use corpus::day::ymd;
 use mockspace::RegistryView;
 
 use super::*;
-use crate::tests_corpus::{DOC, Planted, registry, run};
+use crate::corpus_tests::{DOC, Planted, registry, run};
 
 fn put(dir: &Planted, rel: &str, text: &str) {
     let path = dir.0.join(rel);

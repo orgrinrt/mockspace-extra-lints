@@ -441,7 +441,7 @@ mockspace::lint_pack! {
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
-mod tests_hits;
+mod hits_tests;
 
 #[cfg(test)]
-mod tests_corpus;
+mod corpus_tests;

@@ -317,35 +317,35 @@ mockspace::lint_pack! {
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
-mod tests_answerable;
+mod answerable_tests;
 #[cfg(test)]
-mod tests_branch;
+mod branch_tests;
 #[cfg(test)]
-mod tests_choice;
+mod choice_tests;
 #[cfg(test)]
-mod tests_contracts;
+mod contracts_tests;
 #[cfg(test)]
-mod tests_links;
+mod links_tests;
 #[cfg(test)]
-mod tests_members;
+mod members_tests;
 #[cfg(test)]
-mod tests_order;
+mod order_tests;
 #[cfg(test)]
-mod tests_question;
+mod question_tests;
 #[cfg(test)]
-mod tests_refs;
+mod refs_tests;
 #[cfg(test)]
-mod tests_shipped;
+mod shipped_tests;
 #[cfg(test)]
-mod tests_successor;
+mod successor_tests;
 #[cfg(test)]
-mod tests_supersedes;
+mod supersedes_tests;
 #[cfg(test)]
-mod tests_tags;
+mod tags_tests;
 #[cfg(test)]
-mod tests_tracks;
+mod tracks_tests;
 #[cfg(test)]
-mod tests_trunk;
+mod trunk_tests;
 
 /// The tickets that may have stopped being true, one line each and then the count, or nothing where there
 /// are none. A list a person reads: it fails nothing.
@@ -375,13 +375,13 @@ fn stale_lines(store: &Store, tree: &impl Tree, heirs: &Heirs) -> String {
 }
 
 #[cfg(test)]
-mod tests_tree;
+mod tree_tests;
 
 #[cfg(test)]
-mod tests_repoint;
+mod repoint_tests;
 
 #[cfg(test)]
-mod tests_stale;
+mod stale_tests;
 
 #[cfg(test)]
-mod tests_close_gone;
+mod close_gone_tests;

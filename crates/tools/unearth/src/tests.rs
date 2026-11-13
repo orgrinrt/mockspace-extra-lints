@@ -6,7 +6,7 @@ use mockspace::tool::ToolContext;
 
 use super::*;
 use crate::render::citation_base_rate;
-use crate::tests_corpus::registry;
+use crate::corpus_tests::registry;
 
 #[test]
 fn the_cap_keeps_the_keywords_that_discriminate_rather_than_the_early_alphabet() {

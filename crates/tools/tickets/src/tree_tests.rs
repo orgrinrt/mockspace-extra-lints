@@ -9,7 +9,7 @@
 use ticket_model::Tree;
 
 use crate::landing::Git;
-use crate::tests_branch::{commit, git};
+use crate::branch_tests::{commit, git};
 
 fn repository(tag: &str) -> std::path::PathBuf {
     let dir = std::env::temp_dir().join(format!("tickets-tree-{tag}-{}", std::process::id()));

@@ -237,3 +237,5 @@ mockspace::lint_pack! {
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod scope_tests;

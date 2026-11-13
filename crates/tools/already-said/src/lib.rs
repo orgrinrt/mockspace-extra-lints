@@ -350,7 +350,7 @@ fn registry_stem(needle: &str) -> String {
 mod tests;
 
 #[cfg(test)]
-mod tests_run;
+mod run_tests;
 
 mockspace::lint_pack! {
     tools: [AlreadySaid::default()],

@@ -342,7 +342,7 @@ fn a_pick_that_is_not_one_of_the_options_is_refused() {
 fn a_stamp_is_tagged_for_the_console_s_chip_when_it_is_added_or_called_one() {
     // 7 November: four stamps were missing from the console's stamp chip for want of the tag (proposal A7).
     // Mutation: the tag not written on a move whose why calls it a stamp, or not on an add whose id says so.
-    use crate::tests_tags::{added, moved};
+    use crate::tags_tests::{added, moved};
     let s = Scratch::new();
     let tags = |id: &str| {
         crate::load(&s.root).unwrap().tickets[id]
