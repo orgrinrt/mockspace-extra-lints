@@ -325,21 +325,19 @@ fn public_fields<'a>(body: Node<'a>, src: &str, into: &mut Vec<Node<'a>>) {
         "field_declaration_list" => {
             let mut c = body.walk();
             for field in body.named_children(&mut c) {
-                if field.kind() == "field_declaration" && is_plain_pub(field, src) {
-                    if let Some(ty) = field.child_by_field_name("type") {
+                if field.kind() == "field_declaration" && is_plain_pub(field, src)
+                    && let Some(ty) = field.child_by_field_name("type") {
                         into.push(ty);
                     }
-                }
             }
         },
         "ordered_field_declaration_list" => {
             let mut c = body.walk();
             for child in body.named_children(&mut c) {
-                if child.kind() == "visibility_modifier" && txt(child, src).trim() == "pub" {
-                    if let Some(ty) = child.next_named_sibling() {
+                if child.kind() == "visibility_modifier" && txt(child, src).trim() == "pub"
+                    && let Some(ty) = child.next_named_sibling() {
                         into.push(ty);
                     }
-                }
             }
         },
         "enum_variant_list" => {

@@ -1,0 +1,15 @@
+[package]
+name = "mockspace-extra-unearth"
+description = "Says what the research, the rounds and the maintainer's words hold about a subject, ranked, with the registry's keywords folded in."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+# the trait crate under the name the generated collector gives it; the engine patches every spelling
+# of it to the one it is built from
+mockspace.workspace = true
+corpus.workspace = true
+# the index the query tools ask, which is muisti's: private, so spelled over ssh
+muisti.workspace = true

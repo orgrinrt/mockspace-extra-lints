@@ -1,0 +1,1 @@
+The tickets of the registry and the rules a move is refused by, read from the texts of registry files: the `Store` of states, kinds, tickets and moves, and the checks over it. It opens no file and takes nothing from mockspace beyond the registry's rule for what an id may be, so the tickets tool, its makers and any page built on this crate judge a move alike.

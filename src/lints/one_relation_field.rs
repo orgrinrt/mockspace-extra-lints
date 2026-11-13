@@ -1,7 +1,7 @@
 //! Lint: a registry schema holds its relations in one `ref[]` field, never in a field per target.
 //!
 //! A relation between rows is one field typed `ref[]`, whichever namespace the other row is in. A
-//! schema that also carries a field per target namespace (`bevy`, `ikiuni`, `canon` and the like,
+//! schema that also carries a field per target namespace (`bevy`, `upstream`, `canon` and the like,
 //! typed as that namespace's slugs) has two places to write the same kind of link, and a link
 //! written in either is read by nobody who looks in the other. Nothing in the engine refuses it, so
 //! the schema in `mockspace.toml` is what this reads.

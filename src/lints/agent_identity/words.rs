@@ -83,11 +83,10 @@ pub(super) fn innermost_group(text: &str) -> Option<(usize, usize)> {
 /// when it holds an `@` and no spaces, or a bare name.
 pub(super) fn split_identity(value: &str) -> (&str, &str) {
     let value = value.trim();
-    if let (Some(open), Some(close)) = (value.rfind('<'), value.rfind('>')) {
-        if open < close {
+    if let (Some(open), Some(close)) = (value.rfind('<'), value.rfind('>'))
+        && open < close {
             return (value[.. open].trim(), value[open + 1 .. close].trim());
         }
-    }
     if value.contains('@') && !value.contains(char::is_whitespace) {
         return ("", value);
     }

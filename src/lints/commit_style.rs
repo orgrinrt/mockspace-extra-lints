@@ -149,16 +149,14 @@ impl Lint for CommitStyle {
         if let Some(v) = params.get("require_type") {
             self.require_type = truthy(v);
         }
-        if let Some(v) = params.get("max_subject") {
-            if let Ok(n) = v.trim().parse::<usize>() {
+        if let Some(v) = params.get("max_subject")
+            && let Ok(n) = v.trim().parse::<usize>() {
                 self.max_subject = n;
             }
-        }
-        if let Some(v) = params.get("subject_case") {
-            if let Some(c) = SubjectCase::parse(v) {
+        if let Some(v) = params.get("subject_case")
+            && let Some(c) = SubjectCase::parse(v) {
                 self.subject_case = c;
             }
-        }
         if let Some(v) = params.get("allow_scope") {
             self.allow_scope = truthy(v);
         }
@@ -244,15 +242,14 @@ impl MessageLint for CommitStyle {
         if self.require_blank_line {
             let mut lines = body.lines();
             let _ = lines.next();
-            if let Some(second) = lines.next() {
-                if !second.trim().is_empty() {
+            if let Some(second) = lines.next()
+                && !second.trim().is_empty() {
                     out.push(finding(
                         ctx,
                         "missing-blank-line",
                         "separate subject and body with a blank line",
                     ));
                 }
-            }
         }
 
         out

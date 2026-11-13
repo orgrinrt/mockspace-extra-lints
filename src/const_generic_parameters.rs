@@ -68,8 +68,8 @@ const EXCEPTED: &[&str] = &[
 fn collect(source: &str, node: Node, spans: &mut Vec<Range<usize>>) {
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        if child.kind() == "const_parameter" {
-            if let Some(ty) = child.child_by_field_name("type") {
+        if child.kind() == "const_parameter"
+            && let Some(ty) = child.child_by_field_name("type") {
                 let span = ty.byte_range();
                 if source
                     .get(span.clone())
@@ -78,7 +78,6 @@ fn collect(source: &str, node: Node, spans: &mut Vec<Range<usize>>) {
                     spans.push(span);
                 }
             }
-        }
         collect(source, child, spans);
     }
 }

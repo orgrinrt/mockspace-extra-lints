@@ -1,0 +1,16 @@
+[package]
+name = "mockspace-extra-canon"
+description = "Answers what the canon holds by subject, word and relation, and who names a tenet."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+# the trait crate under the name the generated collector gives it; the engine patches every spelling
+# of it to the one it is built from
+mockspace.workspace = true
+registry-lints.workspace = true
+toml.workspace = true
+corpus.workspace = true
+

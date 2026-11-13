@@ -1,6 +1,6 @@
 # `mockspace-extra-lints`
 
-> An opt-in lint pack for mockspace, for the rules that only make sense once a project has picked its foundations.
+> An opt-in pack of lints and tools for mockspace, for the rules and the workflow that only make sense once a project has picked its foundations.
 
 Mockspace ships the lints every project needs, changelist discipline, document and source agreement, file size and dead crates. This pack holds the ones that only make sense once a project has committed to a particular set of foundations, where the right answer for one codebase is noise for another. It isn't on crates.io and isn't meant to be, since a lint pack is reached through mockspace and not through a dependency graph. It's pre-1.0, so the lints and their keys may move, and it builds on the nightly pinned in `rust-toolchain.toml`.
 
@@ -35,11 +35,17 @@ A repo lint reads the manifests of the consuming repository. `a-git-dependency-i
 
 The pack carries three tools along with the lints, `rulings-with-no-verbatim`, `coverage` and `near-copies`, which `mock tools` lists beside the builtins. All three report and none gates. `near-copies` lists types in different crates that are close without being the same, which `single-source` leaves alone because a gate cannot tell a reinvention from two concepts sharing a word, and with no arguments it reads the crates the branch touched against `origin/dev`. Path globs in the pack are matched from the repository root with `/` as the separator, and the rest of each lint's keys are in its rustdoc.
 
-To build it, run `cargo build --release` and `cargo test` on the pinned nightly. The `mockspace-lint-rules` dependency comes from the mockspace repo over git, and when iterating on both at once a `[patch]` section in `.cargo/config.toml` redirects it without touching the manifest.
+Behind the `workflow` feature there's also a ticket and canon workflow kept in the registry itself. `ticket-add`, `ticket-move` and `tickets` keep tickets as registry rows with their moves, planning and the board, `canon` and `canon-links` answer what the canon holds and how well it's joined, and `corpus`, `already-said` and `unearth` search the research notes, the design rounds and the maintainer's captured words. `owed`, `finish`, `known-red`, `known-red-set`, `tackle`, `test-list`, `build-weigh`, `parallel-statements`, `intent-or-mechanism`, `quote-check` and `research-unbundle` come with them, and seven repo lints hold the tenet, subject and ticket rows, the ticket graph and every `FIXME` to naming a ticket. It's off by default, because a repository keeping its own copy of one of these tools would register the name twice and the engine refuses that. A repository turns it on with `features = ["workflow"]` on its `[lint-crates]` entry, copies the namespace declarations of `registry/namespaces.toml` into its `mockspace.toml` and the states, kinds and roles beside them into its own registry.
+
+The workflow reads everything under the `mock_dir` that `mockspace.toml` declares, and `project_name` and `crate_prefix` from the same file. Content packs are the project's own, so `content_dirs` in the table of each lint and tool that reads them names their directories, a comma separated value under `[lints.<name>]` and a list under `[tools.<name>]`, and none is read where it is unset. `owed` files its tasks for the `holder` in `[tools.owed]`, and for nobody without one. The tools that read the maintainer's captured words take the directory from `maintainer_words` in their own `[tools.<name>]` table, or from `MOCKSPACE_MAINTAINER_WORDS` where that is unset, and read none when neither names one. `maintainer_names` lists whose quoted lines in a note count as those words.
+
+The tools read the mock and content directories a project names, but the ones that write files declare what they write as fixed paths under `mock/` and `content/`, since the engine has no way yet to say "under the mock directory" in that declaration. So in a repository whose `mock_dir` is something other than `mock`, or whose packs sit outside `content/`, the engine refuses `ticket-add`, `ticket-move`, `owed`, `known-red-set`, `research-unbundle` and `build-weigh` when they write there, though what they wrote is right. The tests catalogue those cases and stay ignored until the engine can say it.
+
+To build it, run `cargo build --release` and `cargo test` on the pinned nightly. The `mockspace-lint-rules` dependency comes from the mockspace repo over git, and when iterating on both at once a `[patch]` section in `.cargo/config.toml` redirects it without touching the manifest. The `workflow` feature also pulls in `muisti`, a private repository fetched over ssh, which `corpus`, `already-said`, `unearth` and `canon` search with. The pack's tests turn the feature on through a dev-dependency on the pack itself, so even a plain `cargo test` needs ssh access to `muisti`. With no `Cargo.lock` committed, a first build resolves the whole graph and fetches it too, feature or not.
 
 ## License
 
-> The project is licensed under the **Mozilla Public License 2.0**.
+> The project is licensed under the Mozilla Public License 2.0.
 
 `SPDX-License-Identifier: MPL-2.0`
 

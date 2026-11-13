@@ -1,0 +1,12 @@
+[package]
+name = "mockspace-extra-quote-check"
+description = "Checks that every row quoting another repository's lines quotes them as they are at the revision it cites, and which of those lines no row holds."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+# the trait crate under the name the generated collector gives it; the engine patches every spelling
+# of it to the one it is built from
+mockspace.workspace = true

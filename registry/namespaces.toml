@@ -1,0 +1,944 @@
+# The registry namespaces the `workflow` feature's tools and lints read and write, as a consumer
+# declares them in its `mockspace.toml`. Copy the blocks into it; the rows these namespaces need to
+# start from, the ticket states and kinds and the planning roles, are the other files of this
+# directory, copied into the consumer's registry. The tests of the tools hold their writes to these
+# declarations, so a field a tool writes and this file does not declare fails here first.
+
+[[registry.namespace]]
+key = "subject"
+title = "Subjects"
+description = "What a tenet is about. Every tenet names one."
+
+[[registry.namespace.field]]
+name = "what"
+type = "string"
+required = true
+description = "The subject, in a sentence: what the tenets under it are about."
+
+[[registry.namespace.field]]
+name = "keywords"
+type = "string[]"
+required = false
+description = "The words somebody would search for to find this subject, especially the ones its sentence does not itself use."
+
+[[registry.namespace.field]]
+name = "answers"
+type = "string[]"
+required = false
+description = "What the maintainer answered about this row, one entry each as `<at>: <capture path>`, the time they answered and the capture in the workspace's `.data/the maintainer-responses/` holding their words verbatim. An array, so several can collect over time; an answer attaches to the row it answers and is never written into the row's other fields."
+
+
+[[registry.namespace]]
+key = "tenet"
+title = "Tenets"
+description = "A design commitment: a stance on scope, genre, or a loop, rather than a concrete content object. Its `standing` says whether the maintainer has ratified it."
+
+[[registry.namespace.field]]
+name = "what"
+type = "string"
+required = true
+description = "The commitment, in one or two sentences."
+
+[[registry.namespace.field]]
+name = "because"
+type = "string"
+required = false
+description = "The reasoning behind it, where there is one beyond it being the chosen design."
+
+[[registry.namespace.field]]
+name = "provenance"
+type = "ref[]"
+required = true
+description = "Where it was established."
+
+[[registry.namespace.field]]
+name = "keywords"
+type = "string[]"
+required = false
+description = "The words somebody would search for to find this row."
+
+[[registry.namespace.field]]
+name = "rules_out"
+type = "string[]"
+required = false
+description = "The words and names this tenet rules out of designs, code and content, each a word or a few words in lower case, written in the change that supersedes a tenet, narrows it or retires a concept. A citation by id proves nothing about the text beside it, so a design can cite the tenet that rules a concept out while describing the concept; this is what `mock canon contradicts` and the lint `a-retired-word-stays-out` look for. An identifier is read as its words (`ZoneMap` is `zone` and `map`), and a longer word that contains one is not it. Empty where the tenet rules out no word, which is most of them."
+
+[[registry.namespace.field]]
+name = "superseded_by"
+type = "tenet[]"
+required = false
+description = "The tenets that replace this one. A superseded tenet is kept rather than deleted, so the canon that replaced it is read with it in view; it no longer binds."
+
+[[registry.namespace.field]]
+name = "standing"
+type = "string"
+required = true
+description = "`provisional` where it matters now and the maintainer has not ratified it: read as the best current statement and never cited as settled. `ratified` where the maintainer went through it on a named date, with their answer in the row's `answers`. `demoted` where it is kept as reference for a later canon of its domain and binds nothing. Apart from `superseded_by`: a superseded row does not bind whatever its standing."
+values = ["provisional", "ratified", "demoted"]
+
+[[registry.namespace.field]]
+name = "subject"
+type = "subject"
+required = true
+description = "What it is about. One subject per tenet: where its words touch several, it names the one most of them are about."
+
+[[registry.namespace.field]]
+name = "cites"
+type = "tenet[]"
+required = false
+description = "The other tenets its words name by slug, in the order they are named. A citation and nothing more: whether the row rests on, narrows or departs from what it cites is said in its words, not here."
+
+[[registry.namespace.field]]
+name = "lineage"
+type = "string[]"
+required = false
+description = "The replaced tenets this row names on purpose, as lineage, each as `<replaced id>:<fingerprint>`, the fingerprint being the row's content as the lint `a-live-row-names-no-replaced-row-without-lineage` reads it (FNV-1a over `what`, a newline and `because`, sixteen hex digits). An entry stands only while the row's `what` and `because` are as they were when it was written; the lint's finding prints the entry to write and the row to point at instead. Empty on nearly every row."
+
+[[registry.namespace.field]]
+name = "related"
+type = "ref[]"
+required = false
+description = "Every row this row relates to, written as `namespace::slug` of any namespace, with a file citation such as `research::<dir>::<file>::#<heading>` beside them where the relation rests on a document. This is the one field for a relation: a field per target namespace is wrong. A link is written once, on the one row, and never again on the row it points at; `refsto(<namespace>::<slug>)` and `cargo mock links <namespace>::<slug>` give the other end. What the relation means is said in the row's words, not here. Read row by row, never by a keyword match."
+
+[[registry.namespace.field]]
+name = "answers"
+type = "string[]"
+required = false
+description = "What the maintainer answered about this row, one entry each as `<at>: <capture path>`, the time they answered and the capture in the workspace's `.data/the maintainer-responses/` holding their words verbatim. An array, so several can collect over time; an answer attaches to the row it answers and is never written into the row's other fields."
+
+
+[[registry.namespace]]
+key = "note"
+title = "Notes"
+description = "Something the maintainer left for the work that is not a ratified tenet: a note jotted on the dashboard, or their answer to a question put to them there. Their input and not canon, so it sits outside `canon_paths`; a tenet that their words settle cites the text through its provenance, and a note names the rows, rounds and briefs that act on it. One row per note, the text copied from the capture and never reworded."
+
+[[registry.namespace.field]]
+name = "text"
+type = "string"
+required = true
+description = "The maintainer's words, verbatim, copied field for field from the capture in the workspace's `.data/the maintainer-responses/`. Never reworded, shortened or corrected."
+
+[[registry.namespace.field]]
+name = "at"
+type = "string"
+required = true
+description = "When they wrote it, as the place they wrote it stamped it: `YYYY-MM-DD HH:MM` for a note on the dashboard's notes page, and the ISO time for an answer on its questions page."
+
+[[registry.namespace.field]]
+name = "left_on"
+type = "string"
+required = false
+description = "Where they left it: the dashboard's address and page, or a chat."
+
+[[registry.namespace.field]]
+name = "quote"
+type = "string"
+required = false
+description = "For an inline comment on a document, the text it was made on, copied as it stands there. Absent on a note that is no comment."
+
+[[registry.namespace.field]]
+name = "where"
+type = "string"
+required = false
+description = "For an inline comment on a document, the place of its quote: the document's path, then the heading anchor the quote sits under. Absent on a note that is no comment."
+
+[[registry.namespace.field]]
+name = "question"
+type = "string"
+required = false
+description = "For a note that is their answer to a question put to them, the agenda key of that question."
+
+[[registry.namespace.field]]
+name = "bears_on"
+type = "subject[]"
+required = false
+description = "The subjects the note is about."
+
+[[registry.namespace.field]]
+name = "acted_on_by"
+type = "string[]"
+required = false
+description = "The rows, rounds and briefs that act on it, written out as free text since a round or a brief is no row. Absent when nothing has acted on it yet."
+
+[[registry.namespace.field]]
+name = "answers"
+type = "string[]"
+required = false
+description = "What the maintainer answered about this row, one entry each as `<at>: <capture path>`, the time they answered and the capture in the workspace's `.data/the maintainer-responses/` holding their words verbatim. An array, so several can collect over time; an answer attaches to the row it answers and is never written into the row's other fields."
+
+
+[[registry.namespace]]
+key = "ticket_state"
+title = "Ticket states"
+description = "A column of the board: a state a ticket can be in. One row per state, so a state added is a row and not a change of code."
+
+[[registry.namespace.field]]
+name = "title"
+type = "string"
+required = true
+description = "The column's heading."
+
+[[registry.namespace.field]]
+name = "what"
+type = "string"
+required = true
+description = "What being in this state means, in a sentence."
+
+[[registry.namespace.field]]
+name = "column"
+type = "integer"
+required = true
+description = "Where the column sits on the board, ascending from the left."
+
+[[registry.namespace.field]]
+name = "needs_holder"
+type = "boolean"
+required = true
+description = "Whether a ticket in this state is held by someone: a move into it without a holder is refused."
+
+[[registry.namespace.field]]
+name = "needs_met"
+type = "boolean"
+required = true
+description = "Whether a ticket may enter this state only once every ticket it needs is in a state with `satisfies`."
+
+[[registry.namespace.field]]
+name = "closed"
+type = "boolean"
+required = true
+description = "Whether a ticket in this state is finished with: it is off the open board, and counts for no one's `--next`."
+
+[[registry.namespace.field]]
+name = "satisfies"
+type = "boolean"
+required = true
+description = "Whether a ticket in this state meets a `needs` edge pointing at it. True for `done` only; a dropped ticket closes without meeting one."
+
+
+[[registry.namespace]]
+key = "ticket_kind"
+title = "Ticket kinds"
+description = "A kind of ticket and what it is held to. A kind is a row, so a new kind is a row and no code changes."
+
+[[registry.namespace.field]]
+name = "title"
+type = "string"
+required = true
+description = "The kind's name as the board shows it."
+
+[[registry.namespace.field]]
+name = "what"
+type = "string"
+required = true
+description = "What a ticket of this kind is."
+
+[[registry.namespace.field]]
+name = "states"
+type = "ticket_state[]"
+required = true
+description = "The states a ticket of this kind may be in. A move to any other is refused."
+
+[[registry.namespace.field]]
+name = "initial"
+type = "ticket_state"
+required = true
+description = "The state a new ticket of this kind starts in unless the add names another the kind lists."
+
+[[registry.namespace.field]]
+name = "requires"
+type = "string[]"
+required = false
+description = "Ticket fields that must be filled before the ticket enters a state that needs a holder. A job requires its brief and its branch."
+
+[[registry.namespace.field]]
+name = "satisfied_by"
+type = "string[]"
+required = false
+description = "Move fields of which a move to a state that satisfies carries at least one. A question lists `answer` and `picks`, so it closes with what answered it; a kind listing none closes with nothing asked of the move."
+
+[[registry.namespace.field]]
+name = "view"
+type = "string"
+required = false
+description = "The view a ticket of this kind is opened in, by the name the console's frame knows it: `question` for one put to somebody, `form` for its fields. A kind naming none, or a view the frame does not have, is opened in `form`."
+
+
+[[registry.namespace]]
+key = "ticket"
+title = "Tickets"
+description = "A unit of planned work: a task, a todo, a job a helper runs, a backlog item. Its state and its holder are its newest `ticket_move`, never fields of this row."
+console_direct = true
+
+[[registry.namespace.field]]
+name = "title"
+type = "string"
+required = true
+description = "What the ticket is, in a line."
+
+[[registry.namespace.field]]
+name = "kind"
+type = "ticket_kind"
+required = true
+description = "The kind of ticket, which says which states it may be in."
+
+[[registry.namespace.field]]
+name = "what"
+type = "string"
+required = false
+description = "The ticket in full: the aim, what done looks like, what is known."
+
+[[registry.namespace.field]]
+name = "options"
+type = "string[]"
+required = false
+description = "For a question put to the maintainer, the options it was put with, one string each as a label and what it means, in the order offered and the recommended one first. Their answer is not an option's field: it is an entry of `answers`."
+
+[[registry.namespace.field]]
+name = "needs"
+type = "ticket[]"
+required = false
+description = "The tickets that must be done before this one can be started. What a ticket blocks is the reverse of this, asked of the registry, and is not written."
+
+[[registry.namespace.field]]
+name = "part_of"
+type = "ticket"
+required = false
+description = "The ticket this one is a part of. A ticket others are part of is an epic; no kind says so."
+
+[[registry.namespace.field]]
+name = "superseded_by"
+type = "ticket[]"
+required = false
+description = "The tickets that make this one stale: they retire, port or replace its work. While one of them is open the tooling never takes this one next, and it flags a lane, a brief or a branch still on it."
+
+[[registry.namespace.field]]
+name = "related"
+type = "ref[]"
+required = false
+description = "Every row the work relates to beyond the tickets in `needs` and `part_of`, written as `namespace::slug` of any namespace: a design, a reference row, a tenet (`tenet::<slug>`, which `mock canon check` asks of the canon before a brief is sent), a subject (`subject::<slug>`, what the work is about), another ticket. This is the one field for a relation: a field per target namespace is wrong. A link is written once, on the one row, and never again on the row it points at; `refsto(<namespace>::<slug>)` and `cargo mock links <namespace>::<slug>` give the other end."
+
+[[registry.namespace.field]]
+name = "repos"
+type = "string[]"
+required = false
+description = "The repositories the work writes in, as `owner/name`."
+
+[[registry.namespace.field]]
+name = "branch"
+type = "string"
+required = false
+description = "The branch the work is done on."
+
+[[registry.namespace.field]]
+name = "set"
+type = "string"
+required = false
+description = "The name a helper's set of jobs shares on its one branch. Two tickets hold one branch only when both hold the same set."
+
+[[registry.namespace.field]]
+name = "choice"
+type = "string"
+required = false
+description = "Whether a question takes one pick or several: `one` or `many`, absent read as `one`. A ticket that says it holds `options` to choose among. A move that closes a question with two or more picks is refused unless this says `many`. The console renders `one` as a single pick and `many` as checkboxes."
+
+[[registry.namespace.field]]
+name = "priority"
+type = "integer"
+required = false
+description = "How much the work matters, larger first, apart from where it sits in its column. A ticket with none sorts after prioritised ones."
+
+[[registry.namespace.field]]
+name = "brief"
+type = "string"
+required = false
+description = "The brief's path on the coordination channel, for a job."
+
+[[registry.namespace.field]]
+name = "session"
+type = "string"
+required = false
+description = "The cloud session running it, where there is one."
+
+[[registry.namespace.field]]
+name = "preview"
+type = "string[]"
+required = false
+description = "Pages deployed somewhere that the ticket depends on, a question about a prototype or a preview above all, each an http or https address. The console opens each in a sheet over the question, in a frame, under a link that opens it in a tab."
+
+[[registry.namespace.field]]
+name = "rank"
+type = "integer"
+required = false
+description = "Where the ticket sits within its column, smaller first. A guess to tune: a ticket with none sorts after ranked ones, then by when it was added."
+
+[[registry.namespace.field]]
+name = "answers"
+type = "string[]"
+required = false
+description = "What the maintainer answered about this row, one entry each as `<at>: <capture path>`, the time they answered and the capture in the workspace's `.data/the maintainer-responses/` holding their words verbatim. An array, so several can collect over time; an answer attaches to the row it answers and is never written into the row's other fields."
+
+[[registry.namespace.field]]
+name = "shows"
+type = "string"
+required = false
+description = "The result a track ends in, stated as something a person can see. A ticket holding it is a track, and the tickets that are part of it are its steps; the track kind requires it."
+
+[[registry.namespace.field]]
+name = "contracts"
+type = "string[]"
+required = false
+description = "The contracts the work changes, each a crate and a type joined by `::`, such as `engine-contracts::SeaStateView`. A brief that reads a contract finds the open tickets changing it with `tickets contract <path>`, a bare type name matching the type in any crate."
+
+[[registry.namespace.field]]
+name = "tags"
+type = "string[]"
+required = false
+description = "Free strings that mark the ticket, one each, such as `provisional-stamp` on a question that stamps a call while the maintainer is away. No row stands behind a tag, so a new one needs no change here; `tickets list --tag` finds the tickets holding one, matched whole."
+
+
+[[registry.namespace]]
+key = "ticket_move"
+title = "Ticket moves"
+description = "One change of a ticket's state and holder. Complete in itself, so the newest one of a ticket, by `at` and then by id, is the ticket's state and holder and nothing is folded."
+console_direct = true
+
+[[registry.namespace.field]]
+name = "ticket"
+type = "ticket"
+required = true
+description = "The ticket that moved."
+
+[[registry.namespace.field]]
+name = "to"
+type = "ticket_state"
+required = true
+description = "The state it moved into."
+
+[[registry.namespace.field]]
+name = "by"
+type = "string"
+required = true
+description = "Who made the move, as a channel name."
+
+[[registry.namespace.field]]
+name = "at"
+type = "string"
+required = true
+description = "When the move was made, UTC, as `YYYY-MM-DDTHH:MM:SSZ`. The time it was made and not the time it was written to the registry."
+
+[[registry.namespace.field]]
+name = "holder"
+type = "string"
+required = false
+description = "Who holds the ticket from this move, as a channel name: the maintainer, a helper, the coordinator, or a sub agent as `<parent>.<role>`. Absent when nobody does."
+
+[[registry.namespace.field]]
+name = "why"
+type = "string"
+required = false
+description = "Why it moved, where the move is not self-evident."
+
+[[registry.namespace.field]]
+name = "answer"
+type = "string"
+required = false
+description = "The words a question was answered with, on the move that closes it. Only a move to a state that satisfies carries one."
+
+[[registry.namespace.field]]
+name = "picks"
+type = "string[]"
+required = false
+description = "The options a question was answered by, each one of its `options` word for word, in the order chosen. Only a move to a state that satisfies carries them."
+
+
+[[registry.namespace]]
+key = "milestone"
+title = "Milestones"
+description = "A dev to main merge, recorded before it happens as a goalpost or after as a fact. Whether it is reached is derived from its milestone_merge rows and never stored."
+
+[[registry.namespace.field]]
+name = "title"
+type = "string"
+required = true
+description = "The milestone's name."
+
+[[registry.namespace.field]]
+name = "goal"
+type = "string"
+required = false
+description = "A sentence on what the milestone is for, on a milestone recorded before its merge."
+
+[[registry.namespace.field]]
+name = "planned_on"
+type = "date"
+required = false
+description = "The day the merge is planned for."
+
+
+[[registry.namespace]]
+key = "milestone_merge"
+title = "Milestone merges"
+description = "The merge of one repository to main that reaches a milestone, appended after the merge."
+
+[[registry.namespace.field]]
+name = "milestone"
+type = "milestone"
+required = true
+description = "The milestone the merge reaches."
+
+[[registry.namespace.field]]
+name = "repo"
+type = "repo"
+required = true
+description = "The repository merged."
+
+[[registry.namespace.field]]
+name = "merge"
+type = "string"
+required = true
+description = "The merge commit."
+
+[[registry.namespace.field]]
+name = "at"
+type = "string"
+required = true
+description = "When it merged, UTC, as YYYY-MM-DDTHH:MM:SSZ."
+
+[[registry.namespace.field]]
+name = "by"
+type = "string"
+required = true
+description = "Who recorded it, as a channel name."
+
+
+[[registry.namespace]]
+key = "plan_span"
+title = "Spans"
+description = "The interval between two milestones is a stretch, planned false. An epoch is a planned run inside a stretch, planned true, owned by one coordinator, and epochs may run in parallel in one stretch."
+
+[[registry.namespace.field]]
+name = "title"
+type = "string"
+required = true
+description = "The span's name as a view shows it."
+
+[[registry.namespace.field]]
+name = "what"
+type = "string"
+required = true
+description = "What the span is, in a sentence."
+
+[[registry.namespace.field]]
+name = "planned"
+type = "boolean"
+required = true
+description = "True for an epoch, false for a stretch."
+
+[[registry.namespace.field]]
+name = "after"
+type = "milestone"
+required = false
+description = "On a stretch, the milestone it starts after. Absent for the first."
+
+[[registry.namespace.field]]
+name = "until"
+type = "milestone"
+required = false
+description = "On a stretch, the milestone it winds down into. Absent while open."
+
+[[registry.namespace.field]]
+name = "within"
+type = "plan_span"
+required = false
+description = "On an epoch, the stretch it runs in."
+
+[[registry.namespace.field]]
+name = "owner"
+type = "string"
+required = false
+description = "On an epoch, the coordinator who owns it, as a channel name."
+
+[[registry.namespace.field]]
+name = "planned_start"
+type = "date"
+required = false
+description = "On an epoch, the day it is planned to start."
+
+[[registry.namespace.field]]
+name = "planned_end"
+type = "date"
+required = false
+description = "On an epoch, the day it is planned to end."
+
+
+[[registry.namespace]]
+key = "milestone_scope"
+title = "Milestone scope"
+description = "One ticket targeted at one milestone, appended and naming the row it replaces. A draft milestone is a goalpost whose scope is the tickets that must be done before its merge."
+
+[[registry.namespace.field]]
+name = "ticket"
+type = "ticket"
+required = true
+description = "The ticket targeted."
+
+[[registry.namespace.field]]
+name = "milestone"
+type = "milestone"
+required = false
+description = "The milestone it is targeted at. Absent means taken out of scope."
+
+[[registry.namespace.field]]
+name = "over"
+type = "milestone_scope"
+required = false
+description = "The scope row of this ticket this one replaces."
+
+[[registry.namespace.field]]
+name = "at"
+type = "string"
+required = false
+description = "When it was written, UTC. With by, or neither."
+
+[[registry.namespace.field]]
+name = "by"
+type = "string"
+required = false
+description = "Who wrote it, as a channel name."
+
+
+[[registry.namespace]]
+key = "member"
+title = "Span members"
+description = "Which span a ticket is in and whether it is core there. One fact per row, naming the row it replaces."
+
+[[registry.namespace.field]]
+name = "ticket"
+type = "ticket"
+required = true
+description = "The ticket."
+
+[[registry.namespace.field]]
+name = "span"
+type = "plan_span"
+required = false
+description = "The span it is in. Absent means it left."
+
+[[registry.namespace.field]]
+name = "core"
+type = "boolean"
+required = false
+description = "Whether it is core work of the span. True when absent."
+
+[[registry.namespace.field]]
+name = "over"
+type = "member"
+required = false
+description = "The member row of this ticket this one replaces."
+
+[[registry.namespace.field]]
+name = "at"
+type = "string"
+required = false
+description = "When it was written, UTC. With by, or neither."
+
+[[registry.namespace.field]]
+name = "by"
+type = "string"
+required = false
+description = "Who wrote it, as a channel name."
+
+
+[[registry.namespace]]
+key = "window"
+title = "Planned windows"
+description = "A ticket's planned bar. One fact per row, naming the row it replaces."
+
+[[registry.namespace.field]]
+name = "ticket"
+type = "ticket"
+required = true
+description = "The ticket."
+
+[[registry.namespace.field]]
+name = "planned_start"
+type = "date"
+required = false
+description = "The day it is planned to start."
+
+[[registry.namespace.field]]
+name = "planned_end"
+type = "date"
+required = false
+description = "The day it is planned to end."
+
+[[registry.namespace.field]]
+name = "over"
+type = "window"
+required = false
+description = "The window row of this ticket this one replaces."
+
+[[registry.namespace.field]]
+name = "at"
+type = "string"
+required = false
+description = "When it was written, UTC. With by, or neither."
+
+[[registry.namespace.field]]
+name = "by"
+type = "string"
+required = false
+description = "Who wrote it, as a channel name."
+
+
+[[registry.namespace]]
+key = "plan_slot"
+title = "Helper slots"
+description = "Whose slot a helper ticket runs on, one row per start."
+
+[[registry.namespace.field]]
+name = "ticket"
+type = "ticket"
+required = true
+description = "The ticket."
+
+[[registry.namespace.field]]
+name = "of"
+type = "string"
+required = true
+description = "The coordinator lending or owning the slot, as a channel name."
+
+[[registry.namespace.field]]
+name = "at"
+type = "string"
+required = true
+description = "When it started, UTC."
+
+[[registry.namespace.field]]
+name = "by"
+type = "string"
+required = true
+description = "Who wrote it, as a channel name."
+
+
+[[registry.namespace]]
+key = "change"
+title = "Changes"
+description = "The unit of change, the analogue of a pull request on our own refs: written where landings group, a change over several repositories or a helper's set, and never required of a landing."
+
+[[registry.namespace.field]]
+name = "title"
+type = "string"
+required = true
+description = "The change's name."
+
+[[registry.namespace.field]]
+name = "what"
+type = "string"
+required = false
+description = "What the change is, in a sentence."
+
+[[registry.namespace.field]]
+name = "branches"
+type = "string[]"
+required = true
+description = "The branches of the change, one per repository, each a letkajenkka path under the root git."
+
+
+[[registry.namespace]]
+key = "landing"
+title = "Landings"
+description = "One landing of one repository, appended after the push."
+
+[[registry.namespace.field]]
+name = "change"
+type = "change"
+required = false
+description = "The change it belongs to, where there is one."
+
+[[registry.namespace.field]]
+name = "repo"
+type = "repo"
+required = true
+description = "The repository landed in."
+
+[[registry.namespace.field]]
+name = "head"
+type = "string"
+required = true
+description = "The branch head landed."
+
+[[registry.namespace.field]]
+name = "merge"
+type = "string"
+required = true
+description = "The merge commit."
+
+[[registry.namespace.field]]
+name = "onto"
+type = "string"
+required = true
+description = "The branch landed onto, as a path under the root git."
+
+[[registry.namespace.field]]
+name = "gate"
+type = "string"
+required = true
+description = "gated or reviewed."
+
+[[registry.namespace.field]]
+name = "at"
+type = "string"
+required = true
+description = "When it landed, UTC."
+
+[[registry.namespace.field]]
+name = "by"
+type = "string"
+required = true
+description = "Who landed it, as a channel name."
+
+
+[[registry.namespace]]
+key = "review"
+title = "Reviews"
+description = "A verdict over a change or a range, append-only."
+
+[[registry.namespace.field]]
+name = "of"
+type = "string"
+required = true
+description = "The change or the milestone reviewed, as a path."
+
+[[registry.namespace.field]]
+name = "head"
+type = "string"
+required = false
+description = "The head the verdict is of."
+
+[[registry.namespace.field]]
+name = "verdict"
+type = "string"
+required = true
+description = "pass, changes or note."
+
+[[registry.namespace.field]]
+name = "reviewer"
+type = "string"
+required = true
+description = "Who reviewed, as a channel name."
+
+[[registry.namespace.field]]
+name = "at"
+type = "string"
+required = true
+description = "When, UTC."
+
+[[registry.namespace.field]]
+name = "why"
+type = "string"
+required = false
+description = "The findings in a sentence."
+
+
+[[registry.namespace]]
+key = "repo"
+title = "Repositories"
+description = "A repository the work writes in. A repository is a row so every ticket and landing spells it alike."
+
+[[registry.namespace.field]]
+name = "title"
+type = "string"
+required = true
+description = "The repository's name as a view shows it."
+
+[[registry.namespace.field]]
+name = "name"
+type = "string"
+required = true
+description = "owner/name on the forge."
+
+
+[[registry.namespace]]
+key = "plan_kind_role"
+title = "Planning's reading of a ticket kind"
+description = "What a ticket kind means to progress, read by planning so the tickets layer knows no planning."
+
+[[registry.namespace.field]]
+name = "ticket_kind"
+type = "ticket_kind"
+required = true
+description = "The kind."
+
+[[registry.namespace.field]]
+name = "work"
+type = "boolean"
+required = true
+description = "Whether tickets of the kind count as work in progress figures."
+
+[[registry.namespace.field]]
+name = "complication"
+type = "boolean"
+required = true
+description = "Whether an open ticket of the kind is a declared complication."
+
+
+[[registry.namespace]]
+key = "plan_state_role"
+title = "Planning's reading of a ticket state"
+description = "What a ticket state means to planning."
+
+[[registry.namespace.field]]
+name = "ticket_state"
+type = "ticket_state"
+required = true
+description = "The state."
+
+[[registry.namespace.field]]
+name = "starts"
+type = "boolean"
+required = true
+description = "Whether the first move into the state is when work began."
+
+
+[[registry.namespace]]
+key = "known_red"
+title = "Known reds"
+description = "A test that is red on `dev`, so a helper that meets it on a branch knows whose it is without building `dev`. One row per test."
+
+[[registry.namespace.field]]
+name = "crate"
+type = "string"
+required = true
+description = "The crate the test is in, as `cargo mock test -p <crate>` takes it."
+
+[[registry.namespace.field]]
+name = "test"
+type = "string"
+required = true
+description = "The test filter exactly as `cargo mock test -p <crate> -- <filter>` takes it."
+
+[[registry.namespace.field]]
+name = "sha"
+type = "string"
+required = true
+description = "The `dev` sha the test was seen red at, which says how stale the row is."
+
+[[registry.namespace.field]]
+name = "by"
+type = "string"
+required = true
+description = "Who found it, a channel name."
+
+[[registry.namespace.field]]
+name = "at"
+type = "string"
+required = true
+description = "When it was found, as `YYYY-MM-DDTHH:MM:SSZ`."
+
+[[registry.namespace.field]]
+name = "why"
+type = "string"
+required = true
+description = "Whose the red is: a ticket id, or a line saying what is wrong."
+
