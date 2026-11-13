@@ -95,7 +95,7 @@ pub(crate) fn paths(
             .map(slashed)
     };
     let skipped = |path: &Path, entry: &Entry| {
-        entry.is_dir()
+        Entry::is_dir(entry)
             && (entry.name().starts_with('.')
                 || SKIPPED.contains(&entry.name())
                 || rel_of(path).is_some_and(|rel| skip.contains(&rel)))
