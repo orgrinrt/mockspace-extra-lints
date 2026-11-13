@@ -66,7 +66,7 @@ struct Planted(PathBuf);
 
 impl Planted {
     fn new(name: &str) -> Self {
-        let dir = std::env::temp_dir().join(format!("kaski-tackle-{name}-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("tackle-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(dir.join("research")).unwrap();
         Self(dir)
@@ -122,7 +122,7 @@ fn run_about(mock: &Path, reg: &RegistryView, args: &[&str], about: &[String]) -
             registry: reg,
         },
         about,
-        &|| corpus::repo::ready_at(Some(&cache), mock, mock, None),
+        &|| corpus::repo::ready_at(Some(&cache), mock, mock, None, &[]),
     )
 }
 
@@ -272,13 +272,13 @@ fn an_absent_corpus_is_not_an_empty_one() {
 }
 
 // -----------------------------------------------------------------------
-// kaski's shape: subjects are `subject::` rows, a tenet names one in its
+// A canon's shape: subjects are `subject::` rows, a tenet names one in its
 // `subject` field, a superseded tenet no longer binds, and `workflow` is
-// about how kaski is built rather than about the game.
+// about how the project is built rather than about the game.
 // -----------------------------------------------------------------------
 
 /// A registry with its reverse edges, built the way the engine builds them from the typed fields
-/// kaski declares: `subject`, `cites` and `superseded_by`.
+/// a registry declares: `subject`, `cites` and `superseded_by`.
 fn linked(rows: &[(&str, &[(&str, &str)])]) -> RegistryView {
     let mut map: Map<String, RowFields> = Map::new();
     let mut back: Map<String, Vec<String>> = Map::new();
@@ -304,7 +304,7 @@ fn linked(rows: &[(&str, &[(&str, &str)])]) -> RegistryView {
     RegistryView::new(map, back)
 }
 
-fn kaski_canon() -> RegistryView {
+fn sample_canon() -> RegistryView {
     linked(&[
         ("subject::sky", &[
             ("what", "The sky and its light."),
@@ -316,7 +316,7 @@ fn kaski_canon() -> RegistryView {
         ]),
         ("subject::workflow", &[(
             "what",
-            "How kaski is built and checked.",
+            "How the project is built and checked.",
         )]),
         ("tenet::the_sun_rises", &[
             ("subject", "sky"),
@@ -341,13 +341,13 @@ fn kaski_canon() -> RegistryView {
 
 #[test]
 fn a_subject_with_research_behind_it_and_little_written_is_sent_to_read() {
-    let p = Planted::new("kaski-unread");
+    let p = Planted::new("sample-unread");
     p.file(
         "202610031000_weather/NOTES.md",
         "# Weather\n\nA front carries moisture and rain across the planet. A front stalls on \
          mountains. Rain falls where a front meets cold air. Moisture rises from the sea.\n",
     );
-    let out = run_in(&p.0, &kaski_canon(), &["next"]).output;
+    let out = run_in(&p.0, &sample_canon(), &["next"]).output;
     assert!(out.contains("TACKLE NEXT: weather"), "{out}");
     assert!(out.contains("GO AND READ"), "{out}");
 }
@@ -355,8 +355,8 @@ fn a_subject_with_research_behind_it_and_little_written_is_sent_to_read() {
 #[test]
 fn the_workflow_subject_is_weighed_and_never_picked() {
     // `workflow` holds nothing, so it is the thinnest subject there is, and it
-    // is about how kaski is built rather than the game.
-    let out = run(&kaski_canon(), &["next"]).output;
+    // is about how the project is built rather than the game.
+    let out = run(&sample_canon(), &["next"]).output;
     let line = out.lines().find(|l| {
         l.trim_end()
             .ends_with("workflow  (about the work, never picked)")
@@ -371,7 +371,7 @@ fn with_no_subject_named_about_the_work_the_thinnest_is_picked_whatever_it_is() 
     // because of its name, so with nothing named it is the thinnest subject and is picked.
     let out = run_about(
         Path::new("/nonexistent-mock-dir"),
-        &kaski_canon(),
+        &sample_canon(),
         &["next"],
         &[],
     )
@@ -465,7 +465,7 @@ fn a_tenet_marking_something_left_open_counts_as_a_named_hole() {
 fn the_subject_a_tenet_names_is_not_a_relation_between_tenets() {
     // Every tenet names its subject, so counting that edge makes every row look
     // connected. An island is a tenet citing no tenet and cited by none.
-    let reg = kaski_canon();
+    let reg = sample_canon();
     let crates = std::collections::BTreeSet::new();
     let dirs: Vec<PathBuf> = Vec::new();
     let ctx = ToolContext {

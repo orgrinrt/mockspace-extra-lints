@@ -102,7 +102,7 @@ pub fn own_sizes(profile_dir: &Path, crate_name: &str) -> Own {
 }
 
 /// Whether a file in `deps` is `crate_name`'s: `[lib]<crate_name with underscores>-<16 hex>[.ext]`.
-/// The hash after the name is what tells `kaski-sim` from `kaski-sim-extra`, whose own name continues
+/// The hash after the name is what tells `app-sim` from `app-sim-extra`, whose own name continues
 /// where this one's hash would start.
 pub fn is_own_artefact(file_name: &str, crate_name: &str) -> bool {
     let stem = crate_name.replace('-', "_");

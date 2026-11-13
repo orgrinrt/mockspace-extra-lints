@@ -6,8 +6,8 @@
 //! apart with nothing anywhere saying they were ever the same rule.
 //!
 //! A registry makes the pair findable rather than fixing it: rows sharing a
-//! subject, saying overlapping things, are candidates. Ported from kamu, where the
-//! grouping field was `topic`; here it is a tenet's `subject`.
+//! subject, saying overlapping things, are candidates. The grouping field is a
+//! tenet's `subject`.
 //!
 //! **A tool because every hit needs reading.** Two rows about one subject
 //! *should* share vocabulary, and the design deliberately splits a general rule
@@ -23,11 +23,11 @@ use std::collections::BTreeSet;
 
 use mockspace::tool::{ArgSpec, NotALint, Purpose, Tool, ToolContext, ToolReport};
 
-/// Words carrying no subject. Not a stop-word list from anywhere: kamu's, where
-/// every member occurred in most statements, and kaski's own, measured over its
-/// 315 tenets: `same` is in 115 statements, `rather` 86, `already` 76, `only` 77,
-/// `each` 88, and none of them says which statement it is. `player` and `world`
-/// are as common and stay, because they do.
+/// Words carrying no subject. Not a stop-word list from anywhere: each member was
+/// measured as occurring in most statements of one canon of 315 tenets. `same` is
+/// in 115 statements, `rather` 86, `already` 76, `only` 77, `each` 88, and none
+/// of them says which statement it is. `player` and `world` are as common and
+/// stay, because they do.
 const COMMON: &[&str] = &[
     "the", "a", "an", "and", "or", "of", "to", "is", "it", "that", "this", "in", "on", "for",
     "with", "as", "by", "at", "from", "not", "no", "never", "always", "what", "which", "than",
@@ -55,7 +55,7 @@ const COMMON: &[&str] = &[
 /// can move it against their own corpus rather than inherit one measured on
 /// somebody else's. Re-measure before moving it.
 ///
-/// Over kaski's canon when this was ported, 296 binding tenets: 1987 same-subject
+/// Over one canon of 296 binding tenets: 1987 same-subject
 /// pairs with 11 at or above 40, and 54946 pairs across every subject with 51. The
 /// eleven read as a rule beside the arm that applies it, which is the question this
 /// shortlist is for, so the number is kept.
@@ -96,13 +96,12 @@ const GROUP: &str = "subject";
 
 /// The argument that puts every binding statement in one group, whatever its subject.
 ///
-/// kaski's subjects are a first binning, op's words being "we can polish later, important that we get
-/// some categorization and binning to start with", so one rule written into two subjects is a pair a
-/// per-subject comparison cannot see.
+/// A project's subjects may be a first binning rather than a settled one, so one rule written into two
+/// subjects is a pair a per-subject comparison cannot see.
 const ACROSS: &str = "across";
 
-/// The fields a row states its content in, the first one present being read. kaski's rows state it
-/// in `what`; the rest are kamu's, harmless where no row carries them.
+/// The fields a row states its content in, the first one present being read. A field no row carries
+/// costs nothing.
 const STATEMENT: &[&str] = &["what", "says", "does", "use"];
 
 impl Tool for ParallelStatements {
@@ -257,9 +256,9 @@ impl Tool for ParallelStatements {
 /// Every pair sharing a group, with the share of the smaller statement the
 /// other also carries.
 ///
-/// **Over one pool, whatever namespace each row came from.** This lived inside
-/// the namespace loop in kamu, so a ruling and a proposal about the same topic were
-/// never compared, which is the commonest way a canon repeats itself: a proposal
+/// **Over one pool, whatever namespace each row came from.** Compared within each
+/// namespace alone, a ruling and a proposal about the same topic would never be
+/// compared, which is the commonest way a canon repeats itself: a proposal
 /// ratified into a ruling and left standing beside it.
 fn same_group_pairs(rows: &[(String, String, BTreeSet<String>)]) -> Vec<(usize, usize, usize)> {
     let mut out = Vec::new();

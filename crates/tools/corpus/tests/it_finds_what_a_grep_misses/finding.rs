@@ -6,7 +6,7 @@ use super::*;
 fn a_document_using_other_words_is_found_through_registry_keywords() {
     // The real case. The question says "two surfaces"; the corpus says "broker
     // with two backends" and never says surface. A grep for the question
-    // returns nothing, which is what happened and what was reported to op.
+    // returns nothing, which is what happened and what was reported to the maintainer.
     let d = Planted::new("otherwords");
     d.file(
         "panel/04_taxonomy.md",

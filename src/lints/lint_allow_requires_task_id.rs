@@ -9,15 +9,13 @@
 //! silencing a gate they did not want to satisfy, and only one of those is
 //! meant to survive.
 //!
-//! The lint used to demand `tracked: #<id>` alongside, and no longer does. Op's
-//! call: no standard was ever settled for what that identifier refers to, so it
-//! pointed at nothing and was written to satisfy the lint rather than to be
-//! followed. A number nobody can resolve is worse than no number, because it
-//! reads as an audit trail.
+//! No `tracked: #<id>` is demanded alongside: no standard settles what such an
+//! identifier refers to, so it would point at nothing and be written to satisfy
+//! the lint rather than to be followed. A number nobody can resolve is worse
+//! than no number, because it reads as an audit trail.
 //!
-//! The name is left as it is. Renaming it would silently disable the lint in
-//! every consumer's `mockspace.toml` at once, which is the opposite of what
-//! this change is for.
+//! The name keeps its `task_id`, since renaming it would silently disable the
+//! lint in every consumer's `mockspace.toml` at once.
 
 use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Reach, Severity};
 

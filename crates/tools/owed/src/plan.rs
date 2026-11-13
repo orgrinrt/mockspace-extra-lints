@@ -22,8 +22,8 @@ use crate::group::{self, Class, How, Item};
 /// Who `owed` is, in the moves it makes.
 pub const BY: &str = "owed";
 
-/// Who holds what `owed` files: the coordinator, whose agents evaluate it. Never `op`, who is put a
-/// question only by an agent that has read the code and the canon.
+/// Who holds what `owed` files: the coordinator, whose agents evaluate it. Never the maintainer, who
+/// is put a question only by an agent that has read the code and the canon.
 pub const HOLDER: &str = "coord";
 
 /// The heading of the list of markers in a ticket's `what`.
@@ -32,13 +32,13 @@ pub const COVERS: &str = "Covers:";
 /// What a task filed by `owed` says to the agent that takes it. A question written from a marker
 /// alone has neither the context nor the options a reader of the code and the canon gives it, so
 /// `owed` files none, and the agent files the question it finds there is.
-const EVALUATE: &str = "\n\nAn agent is to evaluate each marker below: read the code at its place and the canon (`mock canon find`, `mock canon subject`), then do one of three things. Put a question to op, with a subject and real options, where the canon is silent and the gap is op's to settle. Settle the marker, where the code or the canon already answers it. Drop the marker, where it names nothing owed. This task files no question of its own, and the line of each marker is where it stood when the task was filed.";
+const EVALUATE: &str = "\n\nAn agent is to evaluate each marker below: read the code at its place and the canon (`mock canon find`, `mock canon subject`), then do one of three things. Put a question to the maintainer, with a subject and real options, where the canon is silent and the gap is the maintainer's to settle. Settle the marker, where the code or the canon already answers it. Drop the marker, where it names nothing owed. This task files no question of its own, and the line of each marker is where it stood when the task was filed.";
 
 /// The line that names the file a candidate task is about.
 pub const CANDIDATE: &str = "Candidate file: ";
 
 /// What a task for a candidate file says to the agent that takes it.
-const RATIFY: &str = "\n\nAn agent is to read the candidate against the canon and the code, and then to put it to op as a question with a subject and the options ratify, ratify changed and refuse, or to settle it without him where the canon already answers.";
+const RATIFY: &str = "\n\nAn agent is to read the candidate against the canon and the code, and then to put it to the maintainer as a question with a subject and the options ratify, ratify changed and refuse, or to settle it without the maintainer where the canon already answers.";
 
 /// A file with markers in it.
 pub struct File {
@@ -178,7 +178,7 @@ fn answered_what(store: &Store, question: &str, locations: &[(String, String)]) 
     let t = &store.tickets[question];
     let mv = answered(store, question);
     let mut out = format!(
-        "Markers cite the question `{question}`, which op answered. Filed by `mock owed`; the markers cite this ticket and it closes when none is left.\n\nThe question: {}\n",
+        "Markers cite the question `{question}`, which was answered. Filed by `mock owed`; the markers cite this ticket and it closes when none is left.\n\nThe question: {}\n",
         t.one("title")
     );
     if !t.many("options").is_empty() {
@@ -289,7 +289,7 @@ fn what_of(g: &group::Group, items: &[Item], locations: &[(String, String)]) -> 
         if n == 1 { "" } else { "s" }
     );
     if g.class.owes_a_decision() {
-        out.push_str("\n\nThe canon is silent on these, or the marker says op decides.");
+        out.push_str("\n\nThe canon is silent on these, or the marker says the maintainer decides.");
     }
     out.push_str(EVALUATE);
     out.push_str(&format!("\n\n{COVERS}\n"));

@@ -12,7 +12,7 @@
 //! carrying a term is an ordinary and often correct state.
 
 use corpus::day::{today, ymd};
-use mockspace::tool::{ArgSpec, NotALint, Purpose, Tool, ToolContext, ToolReport};
+use mockspace::tool::{ArgSpec, ConfigKey, NotALint, Purpose, Tool, ToolContext, ToolParams, ToolReport};
 use muisti::repo::Query as AskQuery;
 
 /// Fields that are citations rather than prose, and are not searched.
@@ -37,7 +37,11 @@ use muisti::repo::Query as AskQuery;
 /// exclusion is the same defect one rung down.
 const NOT_PROSE: &[&str] = &["provenance", "cites", "superseded_by", "subject", "related"];
 
-pub struct AlreadySaid;
+/// The tool, holding where the project keeps the maintainer's captured words.
+#[derive(Default)]
+pub struct AlreadySaid {
+    maintainer: corpus::Maintainer,
+}
 
 impl Tool for AlreadySaid {
     fn name(&self) -> &'static str {
@@ -60,6 +64,14 @@ impl Tool for AlreadySaid {
         }]
     }
 
+    fn config_keys(&self) -> &[ConfigKey] {
+        corpus::maintainer::KEYS
+    }
+
+    fn configure(&mut self, params: &ToolParams) {
+        self.maintainer.configure(params);
+    }
+
     fn help(&self) -> &'static str {
         "Every row carrying the term, with the field it appears in. An empty \
          result means nothing here takes the subject, which is the answer that \
@@ -68,12 +80,8 @@ impl Tool for AlreadySaid {
 
     fn run(&self, ctx: &ToolContext<'_>) -> ToolReport {
         // the rows are the working tree's, so the answer says first when that tree is behind `origin/dev`
-        // or the trunk could not be fetched: a question op answered there reads as open here
-        let op_words = corpus::corpus::op_words_dir(
-            ctx.repo_root,
-            std::env::var(corpus::corpus::OP_WORDS_VAR).ok().as_deref(),
-        );
-        let ready = corpus::repo::ready(ctx.mock_dir, ctx.repo_root, op_words.as_deref());
+        // or the trunk could not be fetched: a question answered there reads as open here
+        let ready = corpus::repo::ready(ctx.mock_dir, ctx.repo_root, Some(&self.maintainer));
         self.run_over(ctx, &ready)
     }
 }
@@ -178,9 +186,9 @@ impl AlreadySaid {
         out.push_str(&format!("\n{found} of {examined} rows carry it.\n"));
 
         // And the research, because the registry is about two percent of what
-        // this project has written. A `0 of N rows` answer read as an absence is
-        // what licensed asking op the same question three times, and every one
-        // of those was answered in a panel file this line would have named.
+        // a project has written. A `0 of N rows` answer read as an absence
+        // licenses asking a question the research already answered, in a file
+        // this line would have named.
         // The phrase itself, not every word of it. The registry half above is a
         // substring match on the whole needle, and the corpus half was splitting
         // it and scoring any document carrying any word: `already-said
@@ -345,5 +353,5 @@ mod tests;
 mod tests_run;
 
 mockspace::lint_pack! {
-    tools: [AlreadySaid],
+    tools: [AlreadySaid::default()],
 }

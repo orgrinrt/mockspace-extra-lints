@@ -128,8 +128,8 @@ pub fn carries_verbatim(ctx: &ToolContext<'_>, q: &str) -> bool {
 /// Whether the row is outside what this tool asks about at all.
 ///
 /// A ruling stamped by converging experts was never resting on somebody's
-/// restatement of op, because it does not rest on op. So it is not a hole, and
-/// it is also not a row that carries his words: those are two different things
+/// restatement of the maintainer, because it does not rest on the maintainer. So
+/// it is not a hole, and it is also not a row that carries the maintainer's words: those are two different things
 /// and this answers only the first.
 ///
 /// The lookup is a lookup rather than an assumption: a corpus not declaring the
@@ -212,7 +212,7 @@ fn one(ctx: &ToolContext<'_>, rows: &[String], key: &str) -> ToolReport {
     if outside_the_question(ctx, q) {
         s.push_str(
             "  and it is not asked to: `ratified_by` is `experts`, so the row rests on their\n  \
-             converging rather than on op, and it is left out of the report.\n",
+             converging rather than on the maintainer, and it is left out of the report.\n",
         );
     }
     // Written as a filter rather than a let-chain: this pack is edition 2021

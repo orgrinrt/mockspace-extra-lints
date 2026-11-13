@@ -22,16 +22,16 @@ fn a_heading_outranks_a_mention_in_passing() {
 }
 
 #[test]
-fn op_outranks_a_note_and_a_note_outranks_a_sketch_saying_the_same_thing() {
+fn the_maintainer_s_words_outrank_a_note_and_a_note_outranks_a_sketch_saying_the_same_thing() {
     let d = Planted::new("kind");
     let body = "the realm directs what its scholars study\n";
     d.file("202610031300_minds/NOTES.md", body)
         .file("sketches/scholars.rs", body);
-    let op = d.mock().join("words");
-    std::fs::create_dir_all(&op).unwrap();
-    std::fs::write(op.join("202610040900_op-on-research.md"), body).unwrap();
+    let words = d.mock().join("words");
+    std::fs::create_dir_all(&words).unwrap();
+    std::fs::write(words.join("202610040900_on-research.md"), body).unwrap();
 
-    let corpus = Corpus::load_with(d.mock(), Some(&op));
+    let corpus = Corpus::load_with(d.mock(), Some(&words));
     let hits: Vec<String> = rank(
         &corpus,
         &Index::build(&corpus),
@@ -45,11 +45,11 @@ fn op_outranks_a_note_and_a_note_outranks_a_sketch_saying_the_same_thing() {
     assert_eq!(
         hits,
         vec![
-            "op-responses/202610040900_op-on-research.md".to_string(),
+            "maintainer-words/202610040900_on-research.md".to_string(),
             "research/202610031300_minds/NOTES.md".to_string(),
             "research/sketches/scholars.rs".to_string(),
         ],
-        "op's words are where a settled answer lives, and a sketch the weakest"
+        "the maintainer's words are where a settled answer lives, and a sketch the weakest"
     );
 }
 

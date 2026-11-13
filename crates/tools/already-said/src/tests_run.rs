@@ -41,7 +41,7 @@ struct Mock(PathBuf);
 
 impl Mock {
     fn new(name: &str, roots: &[&str], docs: &[(&str, &str)]) -> Self {
-        let dir = std::env::temp_dir().join(format!("kaski-already-said-{name}"));
+        let dir = std::env::temp_dir().join(format!("already-said-{name}"));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).expect("a mock directory");
         for r in roots {
@@ -61,13 +61,13 @@ impl Drop for Mock {
 }
 
 fn run(mock: &Mock, reg: &RegistryView, args: &[&str]) -> ToolReport {
-    run_with(mock, reg, &ready_at(None, &mock.0, &mock.0, None), args)
+    run_with(mock, reg, &ready_at(None, &mock.0, &mock.0, None, &[]), args)
 }
 
 fn run_with(mock: &Mock, reg: &RegistryView, index: &Ready, args: &[&str]) -> ToolReport {
     let crates = BTreeSet::new();
     let dirs: Vec<PathBuf> = Vec::new();
-    AlreadySaid.answer(
+    AlreadySaid::default().answer(
         &ToolContext {
             mock_dir: &mock.0,
             repo_root: &mock.0,
@@ -306,41 +306,40 @@ fn a_corpus_that_could_not_be_read_says_so_rather_than_reporting_no_hits() {
 }
 
 // -----------------------------------------------------------------------
-// kaski's shape: op's captured words sit outside the repository, and a
+// The maintainer's captured words sit outside the repository, and a
 // superseded tenet no longer binds.
 // -----------------------------------------------------------------------
 
 #[test]
-fn op_s_captured_words_beside_the_repository_are_searched_and_named_as_his() {
-    // The question this tool exists for is whether op has answered it. His
-    // words sit in the workspace's `.data/op-responses`, outside the mock
-    // directory, and a tool that never reads them says nothing about what
-    // he said.
-    let ws = std::env::temp_dir().join("kaski-already-said-op-ws");
+fn the_maintainer_s_captured_words_outside_the_repository_are_searched_and_named_as_theirs() {
+    // The question this tool exists for is whether the maintainer has
+    // answered it. Their words sit in a directory outside the mock directory,
+    // and a tool that never reads them says nothing about what was said.
+    let ws = std::env::temp_dir().join("already-said-words-ws");
     let _ = std::fs::remove_dir_all(&ws);
-    let repo = ws.join("kaski");
+    let repo = ws.join("granary");
     let mock = repo.join("mock");
     std::fs::create_dir_all(mock.join("research/202610031300_minds")).unwrap();
-    std::fs::write(repo.join("mockspace.toml"), "project_name = \"kaski\"\n").unwrap();
+    std::fs::write(repo.join("mockspace.toml"), "project_name = \"granary\"\n").unwrap();
     std::fs::create_dir_all(mock.join("design_rounds")).unwrap();
     std::fs::write(
         mock.join("research/202610031300_minds/NOTES.md"),
         "# Minds\n\nA mind weighs its options.\n",
     )
     .unwrap();
-    let op = ws.join("clause-dev/.data/op-responses");
-    std::fs::create_dir_all(&op).unwrap();
+    let words = ws.join("words");
+    std::fs::create_dir_all(&words).unwrap();
     std::fs::write(
-        op.join("202610040900_op-on-kaski-research.md"),
-        "# kaski: who directs research\n\n> the realm sets what is studied, a scholar chooses how\n",
+        words.join("202610040900_on-granary-research.md"),
+        "# granary: who directs research\n\n> the realm sets what is studied, a scholar chooses how\n",
     )
     .unwrap();
 
     let reg = registry(&[("tenet::a", CITED)]);
     let crates = BTreeSet::new();
     let dirs: Vec<PathBuf> = Vec::new();
-    let index = ready_at(None, &mock, &repo, Some(&op));
-    let out = AlreadySaid
+    let index = ready_at(None, &mock, &repo, Some(&words), &[]);
+    let out = AlreadySaid::default()
         .answer(
             &ToolContext {
                 mock_dir:   &mock,
@@ -356,10 +355,10 @@ fn op_s_captured_words_beside_the_repository_are_searched_and_named_as_his() {
         .output;
     let _ = std::fs::remove_dir_all(&ws);
     assert!(
-        out.contains("op-responses/202610040900_op-on-kaski-research.md:3  [human,"),
-        "op's capture is found and named as his: {out}"
+        out.contains("maintainer-words/202610040900_on-granary-research.md:3  [human,"),
+        "the maintainer's capture is found and named as theirs: {out}"
     );
-    assert!(!out.contains("op's captured words were not read"), "{out}");
+    assert!(!out.contains("captured words were not read"), "{out}");
 }
 
 #[test]
@@ -418,7 +417,7 @@ fn behind_world(name: &str) -> (PathBuf, PathBuf, PathBuf) {
             String::from_utf8_lossy(&out.stderr)
         );
     };
-    let base = std::env::temp_dir().join(format!("kaski-already-said-behind-{name}"));
+    let base = std::env::temp_dir().join(format!("already-said-behind-{name}"));
     let _ = std::fs::remove_dir_all(&base);
     std::fs::create_dir_all(base.join("origin.git")).unwrap();
     git(&base.join("origin.git"), &[
@@ -441,7 +440,7 @@ fn behind_world(name: &str) -> (PathBuf, PathBuf, PathBuf) {
 fn run_at(tree: &std::path::Path, reg: &RegistryView) -> ToolReport {
     let crates = BTreeSet::new();
     let dirs: Vec<PathBuf> = Vec::new();
-    AlreadySaid.run_over(
+    AlreadySaid::default().run_over(
         &ToolContext {
             mock_dir:   tree,
             repo_root:  tree,
@@ -451,7 +450,7 @@ fn run_at(tree: &std::path::Path, reg: &RegistryView) -> ToolReport {
             stdin:      None,
             registry:   reg,
         },
-        &ready_at(None, tree, tree, None),
+        &ready_at(None, tree, tree, None, &[]),
     )
 }
 

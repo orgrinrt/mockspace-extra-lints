@@ -15,16 +15,16 @@ use mockspace::RegistryView;
 /// The separator the engine joins a list field with.
 const JOIN: &str = ", ";
 
-/// Whether op has ratified a tenet, or demoted it, read from its `standing`. The set is the one
+/// Whether the maintainer has ratified a tenet, or demoted it, read from its `standing`. The set is the one
 /// `mockspace.toml` declares for the field, closed there, and named here once.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Standing {
-    /// It matters now and op has not ratified it, pending his walk: the best current statement, never
+    /// It matters now and the maintainer has not ratified it yet: the best current statement, never
     /// cited as settled.
     Provisional,
-    /// Op went through it on a named date, his answer in the row's `answers`.
+    /// The maintainer went through it on a named date, with the answer in the row's `answers`.
     Ratified,
-    /// His walk does not go through it now: kept as reference for a later canon of its domain, binding
+    /// The maintainer does not go through it now: kept as reference for a later canon of its domain, binding
     /// nothing.
     Demoted,
     /// The field is absent or holds a word outside the set, which the schema refuses; read so a test
@@ -61,7 +61,7 @@ impl Standing {
 pub struct Tenet<'a> {
     /// Its id, the slug every citation names.
     pub id:            &'a str,
-    /// Whether op has ratified it or demoted it. Apart from `superseded_by`: a superseded row does not
+    /// Whether the maintainer has ratified it or demoted it. Apart from `superseded_by`: a superseded row does not
     /// bind whatever its standing.
     pub standing:      Standing,
     /// The subject it names, where it names one.

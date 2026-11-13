@@ -2,7 +2,7 @@
 // Copyright (c) 2026                   orgrinrt                 ort@hiisi.digital
 // SPDX-License-Identifier: MPL-2.0     https://mozilla.org/MPL/2.0        contact@hiisi.digital
 //--------------------------------------------------------------------------------------------------
-//! A move's id. A ticket's id is a slug of its title, which `kaski-tickets` makes.
+//! A move's id. A ticket's id is a slug of its title, which the ticket model crate makes.
 
 use ticket_model::rules::slugify;
 

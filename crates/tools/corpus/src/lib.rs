@@ -3,14 +3,14 @@
 // SPDX-License-Identifier: MPL-2.0     https://mozilla.org/MPL/2.0        contact@hiisi.digital
 //--------------------------------------------------------------------------------------------------
 
-//! `mock corpus`, and the search over the research, the rounds and op's captured words that
-//! `already-said`, `unearth` and `tackle` link.
+//! `mock corpus`, and the search over the research, the rounds and the maintainer's captured words
+//! that `already-said`, `unearth` and `tackle` link.
 //!
-//! The registry is a few hundred rows. The research notes, the round transcripts and op's captured
-//! words hold the argument, the evidence and most of the answers, and a tool reading only the rows
-//! answers from a fraction of the material, confidently, and is believed. Ported from kamu's
-//! `corpus`, where the same questions reached op three times over because the tool asked said
-//! nothing about what the research held.
+//! The registry is a few hundred rows. The research notes, the round transcripts and the
+//! maintainer's captured words hold the argument, the evidence and most of the answers, and a tool
+//! reading only the rows answers from a fraction of the material, confidently, and is believed. A
+//! tool asked whether something was already settled has to say what the research held, or the same
+//! question goes back to the maintainer again.
 //!
 //! # The shape
 //!
@@ -29,6 +29,7 @@ pub mod corpus;
 pub mod day;
 pub mod doc;
 pub mod index;
+pub mod maintainer;
 pub mod repo;
 pub mod score;
 pub mod terms;
@@ -38,16 +39,21 @@ use std::path::Path;
 pub use corpus::Corpus;
 pub use doc::{Doc, Kind};
 pub use index::Index;
+pub use maintainer::Maintainer;
 pub use score::{Hit, Search, rank};
 pub use terms::{Query, Source};
 
-/// The corpus a tool asks: the research and the rounds under `mock_dir`, and those of op's captured words that name
-/// the project, its `project_name`, wherever [`corpus::op_words_dir`] finds them from `repo_root` and the environment.
+/// The corpus a tool asks: the research and the rounds under `mock_dir`, and those of the
+/// maintainer's captured words that name the project, its `project_name`, from the directory
+/// `maintainer` names.
 #[must_use]
-pub fn load(mock_dir: &Path, repo_root: &Path) -> Corpus {
-    let named = std::env::var(corpus::OP_WORDS_VAR).ok();
-    let op = corpus::op_words_dir(repo_root, named.as_deref());
-    Corpus::load_about(mock_dir, op.as_deref(), &registry_lints::project::Project::of(mock_dir).name)
+pub fn load(mock_dir: &Path, repo_root: &Path, maintainer: &Maintainer) -> Corpus {
+    let words = maintainer.words_dir(repo_root);
+    Corpus::load_about(
+        mock_dir,
+        words.as_deref(),
+        &registry_lints::project::Project::of(mock_dir).name,
+    )
 }
 
 // --- the tool face ---------------------------------------------------------------
@@ -56,14 +62,17 @@ pub fn load(mock_dir: &Path, repo_root: &Path) -> Corpus {
 // `already-said`, `unearth` and `tackle` link, and none of them can answer this, because a report
 // about the search is not a search.
 
-use mockspace::tool::{ArgSpec, NotALint, Purpose, Tool, ToolContext, ToolReport};
+use mockspace::tool::{ArgSpec, ConfigKey, NotALint, Purpose, Tool, ToolContext, ToolParams, ToolReport};
 
 /// What the corpus holds, so an empty search result can be believed or not.
 ///
 /// The question this answers is the one nobody asks until a tool has already misled them: was the
 /// material even read? A search reporting nothing over four documents and one reporting nothing over
 /// four hundred are different claims, and the output of a search does not distinguish them.
-pub struct CorpusReport;
+#[derive(Default)]
+pub struct CorpusReport {
+    maintainer: Maintainer,
+}
 
 impl Tool for CorpusReport {
     fn name(&self) -> &'static str {
@@ -82,21 +91,29 @@ impl Tool for CorpusReport {
         &[]
     }
 
+    fn config_keys(&self) -> &[ConfigKey] {
+        maintainer::KEYS
+    }
+
+    fn configure(&mut self, params: &ToolParams) {
+        self.maintainer.configure(params);
+    }
+
     fn help(&self) -> &'static str {
         "The inventory `already-said`, `unearth` and `tackle` search. Run it when a search comes \
-         back empty and the emptiness matters: a root missing from disk, op's captured words not \
-         found, or an extension nobody thought to read, is the difference between an absence and a \
-         blind spot."
+         back empty and the emptiness matters: a root missing from disk, the maintainer's captured \
+         words not read, or an extension nobody thought to read, is the difference between an \
+         absence and a blind spot."
     }
 
     fn run(&self, ctx: &ToolContext<'_>) -> ToolReport {
-        let corpus = load(ctx.mock_dir, ctx.repo_root);
+        let corpus = load(ctx.mock_dir, ctx.repo_root, &self.maintainer);
         report(&corpus, ctx.mock_dir)
     }
 }
 
 /// The report over a loaded corpus, apart from where it was loaded from, so it can be tested over a
-/// corpus with and without op's words whatever the machine running the test has.
+/// corpus with and without the maintainer's words whatever the machine running the test has.
 fn report(corpus: &Corpus, mock_dir: &Path) -> ToolReport {
     if corpus.is_empty() {
         return ToolReport::inconclusive(format!(
@@ -133,20 +150,20 @@ fn report(corpus: &Corpus, mock_dir: &Path) -> ToolReport {
             corpus.missing.join(", ")
         ));
     }
-    if corpus.op_read {
-        out.push_str("  op's captured words were read\n");
+    if corpus.words_read {
+        out.push_str("  the maintainer's captured words were read\n");
         if corpus.elsewhere > 0 {
             out.push_str(&format!(
-                "  {} of op's captures name no `{}` and were held out as about another project\n",
+                "  {} of the maintainer's captures name no `{}` and were held out as about another \
+                 project\n",
                 corpus.elsewhere,
                 corpus.about.as_deref().unwrap_or_default()
             ));
         }
     } else {
         out.push_str(&format!(
-            "  op's captured words were not read: none found from the repository, and `{}` names \
-             none\n",
-            corpus::OP_WORDS_VAR
+            "  {}\n",
+            maintainer::unread(corpus.words_named.as_deref())
         ));
     }
     if corpus.skipped.is_empty() {
@@ -175,7 +192,7 @@ fn report(corpus: &Corpus, mock_dir: &Path) -> ToolReport {
 }
 
 mockspace::lint_pack! {
-    tools: [CorpusReport],
+    tools: [CorpusReport::default()],
 }
 
 // `run` itself. Everything under `doc`, `terms`, `index` and `score` is tested against the pieces,
@@ -196,7 +213,7 @@ mod tests {
     impl Planted {
         fn new(name: &str) -> Self {
             let dir =
-                std::env::temp_dir().join(format!("kaski-corpus-{name}-{}", std::process::id()));
+                std::env::temp_dir().join(format!("corpus-report-{name}-{}", std::process::id()));
             let _ = std::fs::remove_dir_all(&dir);
             std::fs::create_dir_all(&dir).unwrap();
             Self(dir)
@@ -274,22 +291,30 @@ mod tests {
     }
 
     #[test]
-    fn op_s_words_are_counted_under_their_own_kind_or_said_to_be_unread() {
-        let p = Planted::new("op");
+    fn the_maintainer_s_words_are_counted_under_their_own_kind_or_said_to_be_unread() {
+        let p = Planted::new("maintainer");
         p.file("research/a/NOTES.md", "prose")
-            .file("words/202610040900_op-on-kaski.md", "his words");
+            .file("words/202610040900_on-the-project.md", "the maintainer's words");
         let out = run(&p.0).output;
-        assert!(out.contains("op's captured words were not read"), "{out}");
-        assert!(!out.contains("   op\n"), "{out}");
+        assert!(
+            out.contains("the maintainer's captured words were not read: name their directory"),
+            "{out}"
+        );
+        assert!(!out.contains("   maintainer\n"), "{out}");
 
-        // THE CONTROL. Read, they are counted as his and the line says so.
+        // A directory named and absent is said to be absent, and nothing is counted under the kind.
+        let out = run_with(&p.0, &p.0.join("no-such-words")).output;
+        assert!(out.contains("no-such-words`, named for them, is not a directory"), "{out}");
+        assert!(!out.contains("   maintainer\n"), "{out}");
+
+        // THE CONTROL. Read, they are counted under their kind and the line says so.
         let out = run_with(&p.0, &p.0.join("words")).output;
-        assert!(out.contains("op's captured words were read"), "{out}");
-        let op_line = out
+        assert!(out.contains("the maintainer's captured words were read"), "{out}");
+        let words_line = out
             .lines()
-            .find(|l| l.ends_with("   op"))
+            .find(|l| l.ends_with("   maintainer"))
             .unwrap_or_default();
-        assert!(op_line.contains("    1 documents"), "{out}");
+        assert!(words_line.contains("    1 documents"), "{out}");
     }
 
     #[test]

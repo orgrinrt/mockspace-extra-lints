@@ -1,7 +1,7 @@
 //! This repository's index, as the query tools ask it.
 //!
 //! The index itself is muisti's: its documents, their classes and days, the ranking and the copy
-//! folding. What is kaski's is which directories feed it, where the canon's rows sit, and what a
+//! folding. What is this crate's is which directories feed it, where the canon's rows sit, and what a
 //! tool is told when the index could not be had, which is said to every question and never read
 //! as an empty answer.
 
@@ -13,7 +13,8 @@ pub use muisti::repo::RepoIndex as Index;
 use muisti::repo::cache::{cache_root, index_file};
 use muisti::repo::{DocClass, RepoIndex, Root, RowSpec};
 
-use crate::corpus::{OP_ROOT, ROOTS};
+use crate::corpus::{MAINTAINER_ROOT, ROOTS};
+use crate::maintainer::{Maintainer, unread};
 
 /// The class a directory under the mock dir is read as: the rounds are design, the rest research.
 const fn class_of(shown: &str) -> DocClass {
@@ -25,10 +26,10 @@ const fn class_of(shown: &str) -> DocClass {
     }
 }
 
-/// The directories the index reads: the mock dir's research and rounds, and op's captured words
-/// where a directory for them was found.
+/// The directories the index reads: the mock dir's research and rounds, and the maintainer's
+/// captured words where `maintainer_words` names a directory that exists.
 #[must_use]
-pub fn roots(mock_dir: &Path, op_words: Option<&Path>) -> Vec<Root> {
+pub fn roots(mock_dir: &Path, maintainer_words: Option<&Path>) -> Vec<Root> {
     let mut out: Vec<Root> = ROOTS
         .iter()
         .map(|r| {
@@ -49,12 +50,12 @@ pub fn roots(mock_dir: &Path, op_words: Option<&Path>) -> Vec<Root> {
             only_naming: None,
         });
     }
-    if let Some(dir) = op_words {
+    if let Some(dir) = maintainer_words.filter(|d| d.is_dir()) {
         out.push(Root {
             dir:         dir.to_path_buf(),
-            shown:       OP_ROOT.to_string(),
+            shown:       MAINTAINER_ROOT.to_string(),
             class:       DocClass::Human,
-            // The captures are every project's; a capture that never names this one is not read.
+            // The captures may cover several projects; a capture that never names this one is not read.
             only_naming: Some(registry_lints::project::Project::of(mock_dir).name),
         });
     }
@@ -65,16 +66,22 @@ pub fn roots(mock_dir: &Path, op_words: Option<&Path>) -> Vec<Root> {
 pub struct Ready {
     pub index: RepoIndex,
     /// What is owed to the reader of an answer: a cache that could not be opened and was replaced
-    /// by one in memory, a refresh that failed and left the index as it stood.
+    /// by one in memory, a refresh that failed and left the index as it stood, the maintainer's
+    /// words left unread.
     pub notes: Vec<String>,
 }
 
 /// The repository's index, opened in the user cache, or in memory where that cannot be had, and
 /// refreshed from the roots. Never fails: a failure is a note, and an index that holds nothing
 /// says so through its own report.
+///
+/// The maintainer's captured words are read from the directory `maintainer` names, and their
+/// quoted lines lifted under the names it gives. A tool that does not ask about them passes `None`.
 #[must_use]
-pub fn ready(mock_dir: &Path, repo_root: &Path, op_words: Option<&Path>) -> Ready {
-    ready_at(cache_root().as_deref(), mock_dir, repo_root, op_words)
+pub fn ready(mock_dir: &Path, repo_root: &Path, maintainer: Option<&Maintainer>) -> Ready {
+    let words = maintainer.and_then(|m| m.words_dir(repo_root));
+    let names = maintainer.map_or(&[][..], Maintainer::names);
+    ready_at(cache_root().as_deref(), mock_dir, repo_root, words.as_deref(), names)
 }
 
 /// [`ready`] with the cache directory given, so a test keeps its index out of the user's.
@@ -83,9 +90,13 @@ pub fn ready_at(
     cache: Option<&Path>,
     mock_dir: &Path,
     repo_root: &Path,
-    op_words: Option<&Path>,
+    maintainer_words: Option<&Path>,
+    maintainer_names: &[String],
 ) -> Ready {
     let mut notes = Vec::new();
+    if !maintainer_words.is_some_and(Path::is_dir) {
+        notes.push(unread(maintainer_words));
+    }
     let opened = cache
         .map(|c| index_file(c, repo_root))
         .ok_or_else(|| "there is no user cache directory".to_string())
@@ -109,8 +120,8 @@ pub fn ready_at(
         },
     };
     index.set_row_spec(Some(registry_spec()));
-    index.set_speakers(SPEAKERS.iter().map(|s| (*s).to_string()));
-    if let Err(e) = index.refresh(&roots(mock_dir, op_words), Some(repo_root)) {
+    index.set_speakers(maintainer_names.iter().cloned());
+    if let Err(e) = index.refresh(&roots(mock_dir, maintainer_words), Some(repo_root)) {
         notes.push(format!(
             "the refresh failed and the index stands as it was: {e}"
         ));
@@ -120,11 +131,6 @@ pub fn ready_at(
         notes,
     }
 }
-
-/// The names whose quoted words in a note are read as op's: what a note, ported from the ikiuni
-/// repositories or written here, attributes to them is op's own, whatever the note's own class.
-/// The owner's account name is not one: persona files are named after it and speak as an agent.
-pub const SPEAKERS: &[&str] = &["op", "lead designer"];
 
 /// The registry directory under the mock dir, read as canon: its files are documents and its rows
 /// and edges are the index's.
@@ -255,7 +261,7 @@ pub fn askable(question: &str) -> bool {
 pub fn found_by(h: &muisti::repo::RepoHit) -> String {
     let mut out = String::new();
     if h.quoted {
-        out.push_str(", op's words quoted in this note");
+        out.push_str(", the maintainer's words quoted in this note");
     }
     if !h.text && !h.keywords.is_empty() {
         out.push_str(&format!(", keywords: {}", h.keywords.join(" ")));

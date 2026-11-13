@@ -6,9 +6,10 @@
 //! `every-fixme-names-a-ticket`: a placeholder marker cites the ticket opened for it.
 //!
 //! A marker is the word `FIXME`, the id of a ticket in parentheses, a colon and the reason. The
-//! workspace rule fixes the shape and `cargo mock owed` files the tickets and rewrites the markers to
+//! shape is fixed here and `cargo mock owed` files the tickets and rewrites the markers to
 //! it; this refuses what is left: a marker with no parentheses, with a tag such as `canon silent` or
-//! `op` in them, with the id of a ticket the registry does not have, or with no colon after the head.
+//! `maintainer` in them, with the id of a ticket the registry does not have, or with no colon after
+//! the head.
 //! A finding names the file and the line, and the fix is `cargo mock owed`, or the id of a ticket
 //! opened by hand.
 //!

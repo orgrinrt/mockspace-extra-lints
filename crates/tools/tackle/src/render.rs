@@ -123,25 +123,27 @@ pub(crate) fn render_brief(
     match driver {
         "unread" => out.push_str(
             "GO AND READ, BEFORE YOU DERIVE ANYTHING.\n\n\
-             This is thin because what was said is in the research, the rounds or op's captures and \
-             never reached the canon. `mock unearth <subject> uncited` ranks that material and shows \
-             what no row cites yet; `mock already-said <term>` says which rows already carry a word.\n\n\
-             Where op's words settle something, it becomes a tenet in this subject's file citing them \
-             by heading, as the workflow says. Where the research argues something op has not said, \
-             it is a question for op, put with what the tools returned.\n\n",
+             This is thin because what was said is in the research, the rounds or the maintainer's \
+             captures and never reached the canon. `mock unearth <subject> uncited` ranks that \
+             material and shows what no row cites yet; `mock already-said <term>` says which rows \
+             already carry a word.\n\n\
+             Where the maintainer's words settle something, it becomes a tenet in this subject's file \
+             citing them by heading. Where the research argues something the maintainer has not said, \
+             it is a question for the maintainer, put with what the tools returned.\n\n",
         ),
         "moving" => out.push_str(
             "THIS SUBJECT IS STILL MOVING.\n\n\
              Much of what was written here has been superseded. Read each replacement beside what it \
              replaced with `mock canon related <id>`, check `mock parallel-statements <subject>` for a \
              binding row still saying what a superseded one said, and check with `mock already-said` \
-             whether op's latest words settle what is still open.\n\n",
+             whether the maintainer's latest words settle what is still open.\n\n",
         ),
         "gaps" => out.push_str(
             "THE HOLES ARE ALREADY NAMED.\n\n\
              This subject's rows mark more left open than any other's, so somebody has done the \
-             finding already. Read them. A hole the research or op's captures already close is a \
-             transcription, found with `mock unearth`; one they do not close is a question for op.\n\n",
+             finding already. Read them. A hole the research or the maintainer's captures already \
+             close is a transcription, found with `mock unearth`; one they do not close is a question \
+             for the maintainer.\n\n",
         ),
         "islands" => out.push_str(
             "THE ROWS HERE ARE JOINED TO NOTHING.\n\n\
@@ -152,17 +154,17 @@ pub(crate) fn render_brief(
         ),
         _ => out.push_str(
             "LITTLE BINDS HERE.\n\n\
-             Start with `mock unearth <subject>`, which reads the research, the rounds and op's \
-             captures rather than the rows, because thin here does not always mean unthought. What op \
-             has said becomes tenets citing his words. What nobody has asked him is researched wide \
-             first, by category before variant, and then put to him as a question with the options \
-             and what the tools returned.\n\n",
+             Start with `mock unearth <subject>`, which reads the research, the rounds and the \
+             maintainer's captures rather than the rows, because thin here does not always mean \
+             unthought. What the maintainer has said becomes tenets citing those words. What nobody \
+             has asked is researched wide first, by category before variant, and then put to the \
+             maintainer as a question with the options and what the tools returned.\n\n",
         ),
     }
 
     out.push_str(
-        "A tenet rests on op's words, so the work ends in rows citing what he said or in questions \
-         for him, never in a row resting on a helper's judgement. A list of what nobody has decided \
-         about this subject is not a result; it restates this output.\n",
+        "A tenet rests on the maintainer's words, so the work ends in rows citing what was said or \
+         in questions for the maintainer, never in a row resting on a helper's judgement. A list of \
+         what nobody has decided about this subject is not a result; it restates this output.\n",
     );
 }

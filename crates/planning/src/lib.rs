@@ -5,8 +5,7 @@
 
 //! The planning rows of the registry and the rules a schema cannot state over them, read from the
 //! texts of the registry's files. No file access and nothing of mockspace, and the tickets crate
-//! names nothing of this one. The design is this crate's `DESIGN.md.tmpl` and
-//! `mock/WORKFLOW.md.tmpl`, "Planning".
+//! names nothing of this one. The design is this crate's `DESIGN.md`.
 
 pub mod derive;
 pub mod plan;

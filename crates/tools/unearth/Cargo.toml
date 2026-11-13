@@ -1,6 +1,6 @@
 [package]
 name = "mockspace-extra-unearth"
-description = "Says what the research, the rounds and op's words hold about a subject, ranked, with the registry's keywords folded in."
+description = "Says what the research, the rounds and the maintainer's words hold about a subject, ranked, with the registry's keywords folded in."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

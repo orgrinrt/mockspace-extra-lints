@@ -212,7 +212,7 @@ pub mod testkit {
     pub fn scratch(tag: &str) -> PathBuf {
         static N: AtomicU32 = AtomicU32::new(0);
         let d = std::env::temp_dir().join(format!(
-            "kaski-canon-lint-{tag}-{}-{}",
+            "canon-lint-{tag}-{}-{}",
             std::process::id(),
             N.fetch_add(1, Ordering::Relaxed)
         ));

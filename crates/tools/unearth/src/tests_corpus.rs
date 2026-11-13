@@ -17,7 +17,7 @@ pub(crate) struct Planted(pub(crate) PathBuf);
 
 impl Planted {
     pub(crate) fn new(name: &str) -> Self {
-        let dir = std::env::temp_dir().join(format!("kaski-unearth-{name}-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("unearth-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(dir.join("research")).unwrap();
         Self(dir)
@@ -25,7 +25,7 @@ impl Planted {
 
     /// A mock directory with no roots at all on disk.
     fn bare(name: &str) -> Self {
-        let dir = std::env::temp_dir().join(format!("kaski-unearth-{name}-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("unearth-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         Self(dir)
@@ -34,7 +34,7 @@ impl Planted {
     /// Every declared root present and every one of them empty, which is
     /// the only way to reach an empty corpus that is missing nothing.
     fn all_roots_empty(name: &str) -> Self {
-        let dir = std::env::temp_dir().join(format!("kaski-unearth-{name}-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("unearth-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         for root in corpus::corpus::ROOTS {
             std::fs::create_dir_all(dir.join(root)).unwrap();
@@ -70,7 +70,7 @@ pub(crate) fn registry(rows: &[(&str, &[(&str, &str)])]) -> RegistryView {
 
 /// The index over what is planted, kept in memory so a test never touches the user's cache.
 pub(crate) fn planted_index(dir: &Planted) -> Ready {
-    ready_at(None, &dir.0, &dir.0, None)
+    ready_at(None, &dir.0, &dir.0, None, &[])
 }
 
 pub(crate) fn run(dir: &Planted, reg: &RegistryView, args: &[&str]) -> ToolReport {
@@ -401,6 +401,6 @@ fn a_row_carrying_the_subject_with_no_keywords_is_not_reported_as_no_row_at_all(
 }
 
 // -----------------------------------------------------------------------
-// kaski's shape: op's captured words beside the repository, a citation by
+// The maintainer's captured words beside the repository, a citation by
 // heading into a research note, and a superseded tenet.
 // -----------------------------------------------------------------------

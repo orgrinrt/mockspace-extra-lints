@@ -6,7 +6,7 @@
 //! Whether a ticket's branch has landed on the trunk, asked of git, and where that disagrees with the
 //! ticket.
 //!
-//! `kaski-tickets` judges rows and touches no repository, so the question of git is this tool's. It is
+//! The ticket model crate judges rows and touches no repository, so the question of git is this tool's. It is
 //! asked through `Trunk`, which the repository answers and a test answers from a table.
 
 use std::cell::{OnceCell, RefCell};

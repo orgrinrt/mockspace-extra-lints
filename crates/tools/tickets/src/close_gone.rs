@@ -6,7 +6,7 @@
 //! `ticket-move --close-gone`: every open ticket whose only subject the tree lost is moved to its kind's
 //! closing state.
 //!
-//! Which tickets those are and what their kind closes to is `kaski-tickets`'s `closable` and
+//! Which tickets those are and what their kind closes to is the ticket model crate's `closable` and
 //! `closing_state`; this is only the write, one move per ticket, each judged by the same rules as any
 //! other move. The markers that cite a closed ticket are the caller's, which hands them on to the
 //! successor, so this takes the question of whether a ticket is cited as a function.

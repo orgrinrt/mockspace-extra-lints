@@ -5,8 +5,8 @@
 
 //! `mock owed [--dry] [--only <patterns>] [--no-fetch]`: a task held by the coordinator for every
 //! placeholder marker that cites none, and for every candidate file waiting to be ratified. It files
-//! no question: an agent evaluates the task against the code and the canon, and puts a question to op
-//! only with a subject and real options.
+//! no question: an agent evaluates the task against the code and the canon, and puts a question to the
+//! maintainer only with a subject and real options.
 //!
 //! What owes work is written down where it is, as a marker in the code or a candidate file in the
 //! research, and a person comes to it by finding it. This files each as a ticket on the registry,
@@ -100,7 +100,7 @@ impl Tool for Owed {
     }
 
     fn help(&self) -> &'static str {
-        "Reads every authored file for placeholder markers, and the research for candidate files. A marker that cites no ticket is grouped with the markers that say the same, a task is filed for the group on the registry, in the backlog and held by the coordinator, and the marker is rewritten to cite it, keeping its reason. A canon silence, a tag of op and a candidate file are tasks too, never questions: the task says an agent is to evaluate each marker against the code and the canon, and the list gives each marker with its file and line as it stood then. A marker an earlier run listed on a ticket cites that ticket again and files nothing, whatever line it has moved to. A ticket this filed whose markers are all gone is closed, a task as done and a question filed before this as dropped. Silent when there is nothing to do. `--dry` says what it would do and writes nothing, `--only` takes comma separated patterns, `*` standing for any run of characters, and limits the run to the files they match, so nothing is closed, and `--no-fetch` does not fetch the trunk to say whether the tree is behind it."
+        "Reads every authored file for placeholder markers, and the research for candidate files. A marker that cites no ticket is grouped with the markers that say the same, a task is filed for the group on the registry, in the backlog and held by the coordinator, and the marker is rewritten to cite it, keeping its reason. A canon silence, a `maintainer` tag and a candidate file are tasks too, never questions: the task says an agent is to evaluate each marker against the code and the canon, and the list gives each marker with its file and line as it stood then. A marker an earlier run listed on a ticket cites that ticket again and files nothing, whatever line it has moved to. A ticket this filed whose markers are all gone is closed, a task as done and a question filed before this as dropped. Silent when there is nothing to do. `--dry` says what it would do and writes nothing, `--only` takes comma separated patterns, `*` standing for any run of characters, and limits the run to the files they match, so nothing is closed, and `--no-fetch` does not fetch the trunk to say whether the tree is behind it."
     }
 
     fn run(&self, ctx: &ToolContext<'_>) -> ToolReport {

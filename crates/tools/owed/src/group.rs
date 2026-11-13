@@ -31,8 +31,8 @@ const GIST_CHARS: usize = 100;
 pub enum Class {
     /// The canon is silent on it: a decision is owed.
     CanonSilent,
-    /// Its tag says op must settle it: a decision is owed.
-    Op,
+    /// Its tag says the maintainer must settle it: a decision is owed.
+    Maintainer,
     /// A stand-in for what is to come.
     StandIn,
     /// No tag.
@@ -49,22 +49,22 @@ impl Class {
         };
         match tag.to_ascii_lowercase().replace(['-', '_'], " ").as_str() {
             "canon silent" => Class::CanonSilent,
-            "op" => Class::Op,
+            "maintainer" => Class::Maintainer,
             "stand in" | "standin" => Class::StandIn,
             _ => Class::Seam(tag.to_string()),
         }
     }
 
-    /// Whether the markers of this class owe a decision of op or of the canon, which the task says.
+    /// Whether the markers of this class owe a decision of the maintainer or of the canon, which the task says.
     pub fn owes_a_decision(&self) -> bool {
-        matches!(self, Class::CanonSilent | Class::Op)
+        matches!(self, Class::CanonSilent | Class::Maintainer)
     }
 
     /// What the markers of the class are called, in the plural.
     pub fn plural(&self) -> String {
         match self {
             Class::CanonSilent => "canon silences".to_string(),
-            Class::Op => "points for op".to_string(),
+            Class::Maintainer => "points for the maintainer".to_string(),
             Class::StandIn => "stand-ins".to_string(),
             Class::Unmarked => "unmarked placeholders".to_string(),
             Class::Seam(tag) => format!("placeholders tagged {tag}"),

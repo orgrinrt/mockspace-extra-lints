@@ -245,7 +245,7 @@ pub fn add(registry: &Path, r: &AddRequest) -> Result<String, String> {
 /// When a rule refuses it, the id is taken, or the file cannot be written.
 pub fn add_with(store: &Store, registry: &Path, r: &AddRequest) -> Result<String, String> {
     check_who_when(&r.by, &r.at)?;
-    // the checks are `kaski-tickets`', which the console runs on the same request
+    // the checks are the ticket model crate's, so anything built on it refuses the same request
     let made = rules::new_ticket(store, &rules::NewRequest {
         title:   r.title.clone(),
         id:      r.id.clone(),

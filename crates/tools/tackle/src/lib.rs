@@ -6,19 +6,12 @@
 //! What to work on next, chosen by weighing every signal the canon carries.
 //!
 //! Work drifts toward whatever is cheapest to decide, and nothing reports the drift because every
-//! unit produces real output. Ported from kamu, where op's objection to ranking on one number was
-//! that it should be a weighed complex scoring instead of one or the other, with all things playing
-//! into it.
+//! unit produces real output. So the ranking weighs several signals together rather than one number.
 //!
 //! Five signals per subject: how little binds in it, how much research sits behind it per row
 //! already written, how much of it has been superseded, how many of its rows mark something left
 //! open, and how many of its rows neither cite nor are cited by another tenet. [`score`] carries
 //! the weights and why each is there.
-//!
-//! kamu's third signal was the share of a topic an expert proposed rather than op ratified. Every
-//! kaski tenet is op's, so that signal has nothing to measure here; the nearest kaski measure is how
-//! much of a subject has been superseded, which says it is still moving. kamu's fourth read a `gap`
-//! field no kaski row carries; here it reads the words a tenet marks something open with.
 //!
 //! A tool because it is a ranking with weights nobody has justified. They are judgements, stated in
 //! the source and printed in the output.
@@ -32,6 +25,8 @@ use mockspace::tool::{
     ArgSpec, ConfigKey, NotALint, Purpose, Tool, ToolContext, ToolParams, ToolReport,
 };
 
+use corpus::maintainer::{NAMES_KEY, WORDS_KEY};
+
 use crate::render::{render_brief, render_namespaces, render_table};
 
 /// The key of `[tools.tackle]` naming the subjects that are about how the project is built rather
@@ -39,7 +34,7 @@ use crate::render::{render_brief, render_namespaces, render_table};
 const ABOUT_THE_WORK: &str = "about_the_work";
 
 /// The words a tenet marks something left open with, matched in its `what` and `because` ignoring
-/// case. Measured over the canon when this was ported: `not yet` in 7 statements, `left open` 4, `is
+/// case. Measured over one canon when this was written: `not yet` in 7 statements, `left open` 4, `is
 /// open` 3, `open question` 2, `stand-in` 2. `later` (22) and `until` (23) are left out, being as
 /// often a sequence as a hole. A stand-in for a field saying what a row leaves open.
 const OPEN_MARKS: &[&str] = &["not yet", "left open", "is open", "open question", "stand-in"];
@@ -50,11 +45,13 @@ const CORPUS_DEPTH: usize = 10;
 /// How many of a subject's own keywords join its corpus question.
 const SUBJECT_TERMS: usize = 12;
 
-/// The tool, holding the subjects its project names as about the work. Scored, printed, never
-/// picked, for the reason in [`score::PICKABLE`]. None unless the project names them.
+/// The tool, holding the subjects its project names as about the work, and where the project keeps
+/// the maintainer's captured words. The subjects about the work are scored, printed and never
+/// picked, for the reason in [`score::PICKABLE`], and there are none unless the project names them.
 #[derive(Default)]
 pub struct Tackle {
     about_the_work: Vec<String>,
+    maintainer:     corpus::Maintainer,
 }
 
 impl Tool for Tackle {
@@ -79,16 +76,21 @@ impl Tool for Tackle {
     }
 
     fn config_keys(&self) -> &[ConfigKey] {
-        &[ConfigKey {
-            name:        ABOUT_THE_WORK,
-            description: "the subject ids about how the project is built rather than about what it builds: weighed and printed, never picked; none when unset",
-        }]
+        &[
+            ConfigKey {
+                name:        ABOUT_THE_WORK,
+                description: "the subject ids about how the project is built rather than about what it builds: weighed and printed, never picked; none when unset",
+            },
+            WORDS_KEY,
+            NAMES_KEY,
+        ]
     }
 
     fn configure(&mut self, params: &ToolParams) {
         if let Some(subjects) = params.list(ABOUT_THE_WORK) {
             self.about_the_work = subjects.to_vec();
         }
+        self.maintainer.configure(params);
     }
 
     fn help(&self) -> &'static str {
@@ -96,12 +98,12 @@ impl Tool for Tackle {
          it, how much of it is superseded, how many of its rows mark something left open, and how \
          many of its rows cite or are cited by nothing. Prints all five per subject, then names one \
          and says which signal placed it, because the brief differs: a thin subject wants research \
-         and a question for op, and a subject with unread research wants somebody to go and read it."
+         and a question for the maintainer, and a subject with unread research wants somebody to go and read it."
     }
 
     fn run(&self, ctx: &ToolContext<'_>) -> ToolReport {
         run_with(ctx, &self.about_the_work, &|| {
-            corpus::repo::ready(ctx.mock_dir, ctx.repo_root, None)
+            corpus::repo::ready(ctx.mock_dir, ctx.repo_root, Some(&self.maintainer))
         })
     }
 }

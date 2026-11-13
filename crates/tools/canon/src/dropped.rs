@@ -8,10 +8,10 @@
 //!
 //! A tenet that is replaced is a concept the canon changed, and a rename (a grid that became a frame) is
 //! the shape of change a design most easily survives: the old word stays in the prose and the new row
-//! is cited beside it. Nobody has said, for the 83 replaced tenets, which words they retired, and
-//! `rules_out` is a canon edit that is op's to ratify. This is the triage under it: it reads the replaced
-//! row and its successors, names the words only the old one carried, and counts where they still stand,
-//! so the person ratifying starts from the words with lines behind them and not from eighty-three rows.
+//! is cited beside it. Which words a replaced tenet retired is recorded in `rules_out`, a canon edit the
+//! maintainer ratifies. This is the triage under it: it reads the replaced row and its successors, names
+//! the words only the old one carried, and counts where they still stand, so the person ratifying starts
+//! from the words with lines behind them and not from every replaced row at once.
 //! It reports candidates and gates nothing: a word dropped in a rewording ("thinks", "thinking") is
 //! counted the same as one that was retired.
 

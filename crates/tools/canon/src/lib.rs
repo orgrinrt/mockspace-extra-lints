@@ -165,7 +165,7 @@ fn scope_of(ctx: &ToolContext<'_>, verb: &str) -> Result<Scope, String> {
 
 /// `check <id>...`: silent when every tenet named exists, still binds and is ratified; one line naming each
 /// provisional one, which is no finding and exits 0, since a tenet that matters now is provisional until
-/// op's walk and nothing would pass otherwise; one blocking finding for each that is no tenet, is
+/// the maintainer goes through it and nothing would pass otherwise; one blocking finding for each that is no tenet, is
 /// superseded or is demoted. A brief names the rows its job derives from, and a job built on a row that
 /// is gone, replaced or demoted is built on nothing, so the coordinator asks before it dispatches.
 fn check_report(ids: &[&str], registry: &RegistryView) -> ToolReport {

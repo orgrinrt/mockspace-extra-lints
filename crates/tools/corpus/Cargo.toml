@@ -1,6 +1,6 @@
 [package]
 name = "mockspace-extra-corpus"
-description = "Searches the research, the rounds and op's captured words, and reports what the corpus holds."
+description = "Searches the research, the rounds and the maintainer's captured words, and reports what the corpus holds."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

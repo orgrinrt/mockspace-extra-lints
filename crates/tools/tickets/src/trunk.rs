@@ -5,9 +5,9 @@
 
 //! The tickets as the trunk holds them, and what is said when they are read from anywhere else.
 //!
-//! A ticket is real for op only on `origin/dev`, so the commands that answer from the tickets answer
+//! A ticket counts once it is on `origin/dev`, so the commands that answer from the tickets answer
 //! from there: they fetch it and read the registry at that commit, whatever the working tree holds.
-//! A tree that fell behind used to answer with a question still open that op had answered on `dev`.
+//! A tree that fell behind would answer with a question still open that was answered on `dev`.
 //! When the trunk cannot be read, or the tree was asked for with `--tree`, the answer opens with a
 //! notice that says what it read instead and how far behind the trunk that is.
 
@@ -304,7 +304,7 @@ pub fn read(root: &Path, mock_dir: &Path, opts: Opts) -> Result<Reading, String>
             store,
             plan,
             notice: format!(
-                "origin/{TRUNK} is not in this repository{why}, so this is the working tree of {}, which may be behind what op has answered.\n",
+                "origin/{TRUNK} is not in this repository{why}, so this is the working tree of {}, which may be behind what has been answered there.\n",
                 root.display()
             ),
             degraded: true,
@@ -314,7 +314,7 @@ pub fn read(root: &Path, mock_dir: &Path, opts: Opts) -> Result<Reading, String>
     let notice = match fetched {
         Some(Err(why)) => {
             format!(
-                "origin/{TRUNK} was not fetched ({why}); this is origin/{TRUNK} as it was {}, and op may have answered since.\n",
+                "origin/{TRUNK} was not fetched ({why}); this is origin/{TRUNK} as it was {}, and questions may have been answered since.\n",
                 age(root)
             )
         },
@@ -353,7 +353,7 @@ pub fn tree_notice(root: &Path, fetch_first: bool) -> String {
     if let Some(n) = behind(root).filter(|n| *n > 0) {
         notice.push_str(&format!(
             "this answer reads the working tree of {}, which is {n} commit{} behind origin/{TRUNK}; \
-             rows op has answered or added since are not in it. `git merge origin/{TRUNK}` brings them.\n",
+             rows answered or added since are not in it. `git merge origin/{TRUNK}` brings them.\n",
             root.display(),
             if n == 1 { "" } else { "s" }
         ));

@@ -285,8 +285,9 @@ fn a_tag_naming_a_seam_gathers_its_markers_into_one_task() {
 }
 
 /// Every class of marker and a candidate file, once each: nothing `owed` files is a question, held by
-/// op, waiting, or carrying options, whatever the marker says of the canon or of op.
-const EVERY_CLASS: &str = "// §(canon silent): how a front moves over a ridge\n// §(op): whether rain wets the ground\n// §(stand-in): a flat roof for now\n// §: the wind is not read\n// §(gpu-pass): the pass is a copy\n";
+/// the maintainer, waiting, or carrying options, whatever the marker says of the canon or of the
+/// maintainer.
+const EVERY_CLASS: &str = "// §(canon silent): how a front moves over a ridge\n// §(maintainer): whether rain wets the ground\n// §(stand-in): a flat roof for now\n// §: the wind is not read\n// §(gpu-pass): the pass is a copy\n";
 const CANDIDATE_FILE: &str = "mock/research/20261028_weather/CANDIDATE_weather.md";
 
 #[test]
@@ -322,7 +323,7 @@ fn nothing_owed_files_is_a_question_whatever_the_marker_says() {
 #[test]
 fn a_task_for_a_canon_silence_asks_an_agent_to_evaluate_each_marker_and_lists_its_line() {
     let r = Repo::new();
-    r.write(SIM, "fn a() {}\n// §(canon silent): how a front moves over a ridge\n// §(op): whether rain wets the ground\n");
+    r.write(SIM, "fn a() {}\n// §(canon silent): how a front moves over a ridge\n// §(maintainer): whether rain wets the ground\n");
     r.run(&[]);
     let s = r.store();
     assert_eq!(s.tickets.len(), 2);
@@ -332,7 +333,7 @@ fn a_task_for_a_canon_silence_asks_an_agent_to_evaluate_each_marker_and_lists_it
             what.contains("An agent is to evaluate each marker"),
             "{what}"
         );
-        assert!(what.contains("a question to op"), "{what}");
+        assert!(what.contains("a question to the maintainer"), "{what}");
     }
     let listed: Vec<String> = s
         .tickets
@@ -449,7 +450,7 @@ fn a_candidate_file_becomes_one_task_that_says_how_to_put_it_to_op() {
     );
     assert!(
         what.contains("ratify, ratify changed and refuse"),
-        "the options an agent puts it to op with: {what}"
+        "the options an agent puts it to the maintainer with: {what}"
     );
     let (_, state, holder) = &r.board()[id];
     assert_eq!((state.as_str(), holder.as_str()), ("backlog", "coord"));
@@ -471,7 +472,7 @@ fn closed_rounds_the_research_and_generated_files_are_read_for_no_ticket() {
         "mock/design_rounds/2026/202610010000_topic.x.md",
         "§(canon silent): a quotation\n",
     );
-    r.write("mock/research/20261028_x/NOTES.md", "§(op): a quotation\n");
+    r.write("mock/research/20261028_x/NOTES.md", "§(maintainer): a quotation\n");
     r.write("docs/DESIGN.md", "§: generated\n");
     r.write("mock/vendor/a/src/lib.rs", "// §: vendored\n");
     let snap = r.snapshot();
@@ -669,7 +670,7 @@ fn a_list_written_before_lines_were_listed_is_matched_as_it_was() {
 
 const FREE: &str = "mock/tools/roofs/src/lib.rs";
 
-/// A question put to op, then moved to `to`, with the answer and picks a move carries.
+/// A question put to the maintainer, then moved to `to`, with the answer and picks a move carries.
 fn question_closed(r: &Repo, id: &str, to: &str, answer: &str, picks: &[&str]) {
     let store = r.store();
     let registry = r.root.join("mock/registry");
