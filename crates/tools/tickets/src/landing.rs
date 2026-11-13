@@ -79,7 +79,7 @@ impl<'a> Git<'a> {
     /// The repository a tool is run in, its crates named and found as its config says: the
     /// `crate_prefix` and the source directories.
     pub fn of(ctx: &mockspace::tool::ToolContext<'a>) -> Self {
-        let project = registry_lints::project::Project::of(ctx.mock_dir);
+        let project = registry_lints::project::Project::of(&mockspace::reading::Reading::new(ctx.repo_root).view(), ctx.mock_dir);
         let dirs = ctx
             .src_dirs
             .iter()

@@ -30,8 +30,10 @@ pub struct Line {
 /// A registry row's own `id = "..."` line declares the tenet rather than naming it, and is not counted.
 pub fn mentions<'a>(repo: &Path, known: &BTreeSet<&'a str>) -> BTreeMap<&'a str, Vec<Line>> {
     let mut out: BTreeMap<&'a str, Vec<Line>> = BTreeMap::new();
-    for rel in files(repo) {
-        let Ok(body) = std::fs::read_to_string(repo.join(&rel)) else {
+    let reading = mockspace::reading::Reading::new(repo);
+    let view = reading.view();
+    for rel in files(&view, repo) {
+        let Some(body) = view.text(repo.join(&rel)) else {
             continue;
         };
         let tier = tier_of(&rel);

@@ -10,7 +10,8 @@ use std::collections::BTreeSet;
 
 use ticket_model::model::Store;
 use ticket_model::rules;
-use mockspace::{RegistryView, RepoContext, RepoLint};
+use mockspace::testkit::check_repo;
+use mockspace::{RegistryView, RepoInput};
 
 use crate::lint::ATicketGraphHolds;
 use crate::testkit::{Scratch, shipped_registry};
@@ -98,7 +99,7 @@ fn the_lint_gates_the_rows_the_makers_refuse_by() {
     let crates = BTreeSet::new();
     let registry = RegistryView::default();
     let check = |s: &Scratch| {
-        let ctx = RepoContext {
+        check_repo(&ATicketGraphHolds, RepoInput {
             mock_dir:    &s.mock,
             repo_root:   &s.mock,
             all_crates:  &crates,
@@ -106,11 +107,9 @@ fn the_lint_gates_the_rows_the_makers_refuse_by() {
             invocation:  None,
             canon_paths: &[],
             open_panels: &[],
-            registry:    &registry,
             ref_files:   &mockspace::src_layout::NO_REF_FILES,
-            verdicts:    None,
-        };
-        ATicketGraphHolds.check_repo(&ctx)
+            registry:    &registry,
+        })
     };
     let s = Scratch::new();
     let a = s.add("Chicken", &[]).unwrap();

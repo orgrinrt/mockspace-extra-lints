@@ -424,11 +424,11 @@ fn contradicts_with_a_path_among_several_that_is_not_there_names_it() {
 fn split_under_with_no_path_reads_the_whole_repository_and_with_paths_only_those() {
     let d = tree();
     let rules = [rule()];
-    let whole = split_under(&d, &rules, &[]).0;
+    let whole = split_under(&mockspace::reading::Reading::new(&d).view(), &d, &rules, &[]).0;
     assert_eq!(whole.len(), 2, "{whole:?}");
-    let one = split_under(&d, &rules, &[Path::new("mock/crates/kaski-a/src")]).0;
+    let one = split_under(&mockspace::reading::Reading::new(&d).view(), &d, &rules, &[Path::new("mock/crates/kaski-a/src")]).0;
     assert_eq!(one.len(), 1, "{one:?}");
-    let two = split_under(&d, &rules, &[
+    let two = split_under(&mockspace::reading::Reading::new(&d).view(), &d, &rules, &[
         Path::new("mock/crates/kaski-a/src"),
         Path::new("mock/crates/kaski-a/DESIGN.md.tmpl"),
     ])

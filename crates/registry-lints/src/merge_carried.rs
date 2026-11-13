@@ -11,11 +11,14 @@
 //! the merge neither adds nor changes it. A marker found in neither is the merge's own, and so is one
 //! whose words the resolution changed.
 //!
-//! Git is asked and nothing is cached: the answer is the repository's state at the moment of the call.
+//! Git is asked through the view: the answer is the repository's state when the reading first asked
+//! it, and the question is in the unit's trace, so a saved finding replays only while git answers the
+//! same.
 
 use std::collections::BTreeSet;
 use std::path::Path;
-use std::process::Command;
+
+use mockspace::View;
 
 use crate::fixme_markers::{self, Kind};
 
@@ -23,31 +26,26 @@ use crate::fixme_markers::{self, Kind};
 pub type Identity = (Option<String>, String);
 
 /// The output of `git` run in `repo`, where it succeeded and printed text.
-pub fn git(repo: &Path, args: &[&str]) -> Option<String> {
-    let out = Command::new("git")
-        .arg("-C")
-        .arg(repo)
-        .args(args)
-        .output()
-        .ok()?;
-    if !out.status.success() {
+pub fn git(view: &View<'_>, repo: &Path, args: &[&str]) -> Option<String> {
+    let answer = view.git_in(repo, args);
+    if !answer.ok() {
         return None;
     }
-    String::from_utf8(out.stdout).ok()
+    String::from_utf8(answer.stdout().to_vec()).ok()
 }
 
 /// Whether a merge is in progress in the repository at `repo`.
-pub fn in_progress(repo: &Path) -> bool {
-    git(repo, &["rev-parse", "-q", "--verify", "MERGE_HEAD"]).is_some()
+pub fn in_progress(view: &View<'_>, repo: &Path) -> bool {
+    git(view, repo, &["rev-parse", "-q", "--verify", "MERGE_HEAD"]).is_some()
 }
 
 /// The markers `rel` held at `HEAD` and at `MERGE_HEAD`, read as a file of kind `kind`.
 ///
 /// A parent that does not hold the file contributes none.
-pub fn carried(repo: &Path, rel: &str, kind: Kind) -> BTreeSet<Identity> {
+pub fn carried(view: &View<'_>, repo: &Path, rel: &str, kind: Kind) -> BTreeSet<Identity> {
     let mut out = BTreeSet::new();
     for rev in ["HEAD", "MERGE_HEAD"] {
-        let Some(text) = git(repo, &["show", &format!("{rev}:{rel}")]) else {
+        let Some(text) = git(view, repo, &["show", &format!("{rev}:{rel}")]) else {
             continue;
         };
         for m in fixme_markers::scan(&text, kind) {

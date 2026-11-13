@@ -38,7 +38,7 @@
 use std::collections::BTreeSet;
 use std::path::Path;
 
-use mockspace::{Lint, LintError, RegistryView, RepoContext, RepoLint, Severity};
+use mockspace::{Lint, LintError, RegistryView, RepoContext, RepoLint, Severity, View};
 
 use crate::fixme_markers::{self, Scope};
 use crate::retired_words::unit_of;
@@ -64,7 +64,8 @@ impl Lint for EveryFixmeNamesATicket {
 
 impl RepoLint for EveryFixmeNamesATicket {
     fn check_repo(&self, ctx: &RepoContext) -> Vec<LintError> {
-        check(ctx.repo_root, ctx.registry(), &ratchets::read(ctx.mock_dir))
+        let view = ctx.view();
+        check(view, ctx.repo_root, ctx.registry(), &ratchets::read(view, ctx.mock_dir))
     }
 }
 
@@ -75,7 +76,7 @@ fn is_slug(s: &str) -> bool {
             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
 }
 
-fn check(repo: &Path, reg: &RegistryView, rows: &[ratchets::Row]) -> Vec<LintError> {
+fn check(view: &View<'_>, repo: &Path, reg: &RegistryView, rows: &[ratchets::Row]) -> Vec<LintError> {
     let closed = ratchets::closed_tickets(reg);
     let answered = ratchets::answered_tickets(reg);
     let waivers = ratchets::of(rows, NAME);
@@ -86,9 +87,9 @@ fn check(repo: &Path, reg: &RegistryView, rows: &[ratchets::Row]) -> Vec<LintErr
         .map(|q| q.split_once("::").map_or(q.as_str(), |(_, id)| id))
         .collect();
     let fix = "run `cargo mock owed` to file the ticket and rewrite the marker, or write the id of the ticket you opened";
-    let merging = merge_carried::in_progress(repo);
+    let merging = merge_carried::in_progress(view, repo);
     let mut out = Vec::new();
-    for source in fixme_markers::sources(repo) {
+    for source in fixme_markers::sources(view, repo) {
         if source.scope != Scope::Live {
             continue;
         }
@@ -144,7 +145,7 @@ fn check(repo: &Path, reg: &RegistryView, rows: &[ratchets::Row]) -> Vec<LintErr
             };
             if merging
                 && carried
-                    .get_or_insert_with(|| merge_carried::carried(repo, &source.rel, source.kind))
+                    .get_or_insert_with(|| merge_carried::carried(view, repo, &source.rel, source.kind))
                     .contains(&merge_carried::identity(&m))
             {
                 continue;
@@ -193,6 +194,7 @@ fn check(repo: &Path, reg: &RegistryView, rows: &[ratchets::Row]) -> Vec<LintErr
 mod tests {
     use super::*;
     use crate::canon_rows::testkit::{git, scratch, view, write};
+    use mockspace::reading::Reading;
 
     /// The marker word is written `§` here, so this file holds no marker of its own.
     fn t(s: &str) -> String {
@@ -243,7 +245,7 @@ mod tests {
         for (rel, body) in files {
             write(&d, rel, &t(body));
         }
-        check(&d, &reg(), &[])
+        check(&Reading::new(&d).view(), &d, &reg(), &[])
     }
 
     const SRC: &str = "mock/crates/kaski-a/src/lib.rs";
@@ -324,7 +326,7 @@ mod tests {
         for (rel, body) in files {
             write(&d, rel, &t(body));
         }
-        check(&d, &reg(), rows)
+        check(&Reading::new(&d).view(), &d, &reg(), rows)
     }
 
     #[test]
@@ -489,7 +491,7 @@ mod tests {
     #[test]
     fn a_merge_does_not_judge_the_markers_either_parent_carried() {
         let d = merging();
-        let f = check(&d, &reg(), &[]);
+        let f = check(&Reading::new(&d).view(), &d, &reg(), &[]);
         assert!(f.is_empty(), "{f:?}");
     }
 
@@ -497,7 +499,7 @@ mod tests {
     fn a_merge_still_judges_the_marker_it_adds() {
         let d = merging();
         write(&d, ADDED, &t("// §: the merge's own\n"));
-        let f = check(&d, &reg(), &[]);
+        let f = check(&Reading::new(&d).view(), &d, &reg(), &[]);
         assert_eq!(f.len(), 1, "{f:?}");
         assert_eq!(f[0].path.as_deref(), Some(ADDED));
     }
@@ -506,7 +508,7 @@ mod tests {
     fn a_carried_marker_whose_words_the_merge_changed_is_the_merges_own() {
         let d = merging();
         write(&d, SIDE, &t("// §: reworded in the resolution\n"));
-        let f = check(&d, &reg(), &[]);
+        let f = check(&Reading::new(&d).view(), &d, &reg(), &[]);
         assert_eq!(f.len(), 1, "{f:?}");
         assert_eq!(f[0].path.as_deref(), Some(SIDE));
     }
@@ -520,7 +522,7 @@ mod tests {
             MAIN,
             &t("// §: from main\n// §: a second, added by the merge\n"),
         );
-        let f = check(&d, &reg(), &[]);
+        let f = check(&Reading::new(&d).view(), &d, &reg(), &[]);
         assert_eq!(f.len(), 1, "{f:?}");
         assert_eq!(f[0].line, 2);
     }
@@ -530,7 +532,7 @@ mod tests {
         // the control for the three above: it is the merge in progress that excuses them
         let d = merging();
         git(&d, &["commit", "-q", "-m", "merge"]);
-        let f = check(&d, &reg(), &[]);
+        let f = check(&Reading::new(&d).view(), &d, &reg(), &[]);
         assert_eq!(f.len(), 2, "{f:?}");
     }
 }

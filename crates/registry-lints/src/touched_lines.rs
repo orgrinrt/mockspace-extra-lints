@@ -19,6 +19,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
+use mockspace::View;
+
 use crate::merge_carried::{git, in_progress};
 
 /// The refs the trunk is looked for under, the first that exists.
@@ -122,9 +124,9 @@ pub struct Change {
 }
 
 /// The commit the change at `repo` started from, or `None` where there is no trunk to compare with.
-pub fn base(repo: &Path) -> Option<String> {
+pub fn base(view: &View<'_>, repo: &Path) -> Option<String> {
     let trunk = TRUNKS.iter().find_map(|name| {
-        git(repo, &[
+        git(view, repo, &[
             "rev-parse",
             "-q",
             "--verify",
@@ -132,16 +134,16 @@ pub fn base(repo: &Path) -> Option<String> {
         ])
     })?;
     let trunk = trunk.trim().to_owned();
-    if in_progress(repo) {
-        let on_trunk = git(repo, &["rev-parse", "-q", "--verify", "MERGE_HEAD"])
+    if in_progress(view, repo) {
+        let on_trunk = git(view, repo, &["rev-parse", "-q", "--verify", "MERGE_HEAD"])
             .map(|m| m.trim().to_owned())
-            .is_some_and(|m| git(repo, &["merge-base", "--is-ancestor", &m, &trunk]).is_some());
+            .is_some_and(|m| git(view, repo, &["merge-base", "--is-ancestor", &m, &trunk]).is_some());
         if on_trunk {
             return Some(trunk);
         }
     }
     Some(
-        git(repo, &["merge-base", "HEAD", &trunk])
+        git(view, repo, &["merge-base", "HEAD", &trunk])
             .map(|b| b.trim().to_owned())
             .filter(|b| !b.is_empty())
             .unwrap_or(trunk),
@@ -149,13 +151,13 @@ pub fn base(repo: &Path) -> Option<String> {
 }
 
 /// The change at `repo`, or what stopped it being read.
-pub fn read(repo: &Path) -> Result<Change, String> {
-    let base = base(repo).ok_or_else(|| {
+pub fn read(view: &View<'_>, repo: &Path) -> Result<Change, String> {
+    let base = base(view, repo).ok_or_else(|| {
         "there is no `origin/dev` or `dev` to compare the change with; fetch `origin dev`"
             .to_owned()
     })?;
     // The prefixes are named so a user's `diff.noprefix` or `diff.mnemonicPrefix` cannot change what is read.
-    let diff = git(repo, &[
+    let diff = git(view, repo, &[
         "-c",
         "core.quotepath=false",
         "diff",
@@ -171,7 +173,7 @@ pub fn read(repo: &Path) -> Result<Change, String> {
     ])
     .ok_or_else(|| format!("`git diff {base}` failed in `{}`", repo.display()))?;
     let mut touched = Touched::from_diff(&diff);
-    let untracked = git(repo, &[
+    let untracked = git(view, repo, &[
         "-c",
         "core.quotepath=false",
         "ls-files",
@@ -189,14 +191,25 @@ pub fn read(repo: &Path) -> Result<Change, String> {
 }
 
 /// `rel` as it stood at `rev`, or `None` where it did not exist.
-pub fn file_at(repo: &Path, rev: &str, rel: &str) -> Option<String> {
-    git(repo, &["show", &format!("{rev}:{rel}")])
+pub fn file_at(view: &View<'_>, repo: &Path, rev: &str, rel: &str) -> Option<String> {
+    git(view, repo, &["show", &format!("{rev}:{rel}")])
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::canon_rows::testkit::{git as run, scratch, write};
+    use mockspace::reading::Reading;
+
+    /// The change at `d`, read through a reading of its own, since a reading asks git once.
+    fn change(d: &Path) -> Result<Change, String> {
+        read(&Reading::new(d).view(), d)
+    }
+
+    /// What git answers in `d`, through a reading of its own.
+    fn ask(d: &Path, args: &[&str]) -> Option<String> {
+        git(&Reading::new(d).view(), d, args)
+    }
 
     /// A repository whose `dev` holds `file` as `text`, on a branch `work` cut from it.
     fn on_work(file: &str, text: &str) -> std::path::PathBuf {
@@ -253,7 +266,7 @@ mod tests {
         let d = on_work("mock/a.rs", "one\ntwo\nthree\n");
         write(&d, "mock/a.rs", "one\nTWO\nthree\nfour\n");
         write(&d, "mock/new.rs", "x\ny\n");
-        let c = read(&d).expect("a change");
+        let c = change(&d).expect("a change");
         assert!(c.touched.holds("mock/a.rs", 2) && c.touched.holds("mock/a.rs", 4));
         assert!(!c.touched.holds("mock/a.rs", 1) && !c.touched.holds("mock/a.rs", 3));
         assert!(
@@ -262,7 +275,7 @@ mod tests {
         );
         assert_eq!(
             c.base,
-            git(&d, &["rev-parse", "dev"]).unwrap().trim(),
+            ask(&d, &["rev-parse", "dev"]).unwrap().trim(),
             "the base is where the work was cut from"
         );
     }
@@ -274,7 +287,7 @@ mod tests {
         run(&d, &["commit", "-q", "-am", "first"]);
         write(&d, "mock/a.rs", "ONE\ntwo\nTHREE\n");
         run(&d, &["add", "mock/a.rs"]);
-        let c = read(&d).expect("a change");
+        let c = change(&d).expect("a change");
         assert!(c.touched.holds("mock/a.rs", 1) && c.touched.holds("mock/a.rs", 3));
         assert!(!c.touched.holds("mock/a.rs", 2));
     }
@@ -283,7 +296,7 @@ mod tests {
     fn a_file_moved_without_a_changed_line_touches_none() {
         let d = on_work("mock/old.rs", "one\ntwo\nthree\nfour\nfive\nsix\n");
         run(&d, &["mv", "mock/old.rs", "mock/moved.rs"]);
-        let c = read(&d).expect("a change");
+        let c = change(&d).expect("a change");
         assert!(!c.touched.holds("mock/moved.rs", 2), "{c:?}");
     }
 
@@ -298,7 +311,7 @@ mod tests {
         run(&d, &["add", "mock/c.rs"]);
         run(&d, &["commit", "-q", "-m", "theirs"]);
         run(&d, &["switch", "-q", "work"]);
-        let c = read(&d).expect("a change");
+        let c = change(&d).expect("a change");
         assert!(c.touched.holds("mock/b.rs", 1));
         assert!(!c.touched.holds("mock/c.rs", 1), "{c:?}");
     }
@@ -315,7 +328,7 @@ mod tests {
         write(&d, "mock/a.rs", "one\nTWO\nthree\n");
         run(&d, &["commit", "-q", "-am", "theirs"]);
         run(&d, &["switch", "-q", "work"]);
-        let c = read(&d).expect("a change");
+        let c = change(&d).expect("a change");
         assert!(c.touched.holds("mock/b.rs", 1));
         assert!(!c.touched.holds("mock/a.rs", 2), "{c:?}");
     }
@@ -346,13 +359,13 @@ mod tests {
             "dev:refs/remotes/origin/dev",
         ]);
         assert!(
-            git(&clone, &["merge-base", "HEAD", "origin/dev"]).is_none(),
+            ask(&clone, &["merge-base", "HEAD", "origin/dev"]).is_none(),
             "the clone is meant to hold no fork point"
         );
-        let c = read(&clone).expect("a change");
+        let c = change(&clone).expect("a change");
         assert_eq!(
             c.base,
-            git(&clone, &["rev-parse", "origin/dev"]).unwrap().trim()
+            ask(&clone, &["rev-parse", "origin/dev"]).unwrap().trim()
         );
         assert!(c.touched.holds("mock/b.rs", 1), "{c:?}");
     }
@@ -369,7 +382,7 @@ mod tests {
         run(&d, &["commit", "-q", "-m", "theirs"]);
         run(&d, &["switch", "-q", "work"]);
         run(&d, &["merge", "-q", "--no-commit", "--no-ff", "dev"]);
-        let c = read(&d).expect("a change");
+        let c = change(&d).expect("a change");
         assert!(c.touched.holds("mock/b.rs", 1));
         assert!(
             !c.touched.holds("mock/c.rs", 1),
@@ -384,21 +397,21 @@ mod tests {
         write(&d, "f.rs", "x\n");
         run(&d, &["add", "f.rs"]);
         run(&d, &["commit", "-q", "-m", "base"]);
-        let why = read(&d).expect_err("nothing to compare with");
+        let why = change(&d).expect_err("nothing to compare with");
         assert!(why.contains("origin/dev"), "{why}");
     }
 
     #[test]
     fn a_directory_that_is_no_repository_has_no_change_to_read() {
-        assert!(read(&scratch("touched-no-git")).is_err());
+        assert!(change(&scratch("touched-no-git")).is_err());
     }
 
     #[test]
     fn file_at_reads_a_file_as_the_base_held_it_and_none_where_it_did_not() {
         let d = on_work("mock/a.rs", "one\n");
         write(&d, "mock/a.rs", "two\n");
-        let base = read(&d).expect("a change").base;
-        assert_eq!(file_at(&d, &base, "mock/a.rs").as_deref(), Some("one\n"));
-        assert_eq!(file_at(&d, &base, "mock/none.rs"), None);
+        let base = change(&d).expect("a change").base;
+        assert_eq!(file_at(&Reading::new(&d).view(), &d, &base, "mock/a.rs").as_deref(), Some("one\n"));
+        assert_eq!(file_at(&Reading::new(&d).view(), &d, &base, "mock/none.rs"), None);
     }
 }

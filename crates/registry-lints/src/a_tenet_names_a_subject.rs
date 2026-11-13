@@ -11,7 +11,7 @@
 
 use std::path::Path;
 
-use mockspace::{Lint, LintError, RepoContext, RepoLint, Severity};
+use mockspace::{Lint, LintError, RepoContext, RepoLint, Severity, View};
 
 use crate::canon_rows::{finding, written_tenets};
 
@@ -35,15 +35,15 @@ impl Lint for ATenetNamesASubject {
 
 impl RepoLint for ATenetNamesASubject {
     fn check_repo(&self, ctx: &RepoContext) -> Vec<LintError> {
-        check(ctx.mock_dir, ctx.registry())
+        check(ctx.view(), ctx.mock_dir, ctx.registry())
     }
 }
 
-fn check(mock_dir: &Path, reg: &mockspace::RegistryView) -> Vec<LintError> {
+fn check(view: &View<'_>, mock_dir: &Path, reg: &mockspace::RegistryView) -> Vec<LintError> {
     let registry = mock_dir.join("registry");
     let is_subject = |s: &str| reg.row(&format!("subject::{s}")).is_some();
     let mut out = Vec::new();
-    for w in written_tenets(&registry) {
+    for w in written_tenets(view, &registry) {
         // where to look for it, and nothing more
         let shown = w
             .file
@@ -71,7 +71,7 @@ fn check(mock_dir: &Path, reg: &mockspace::RegistryView) -> Vec<LintError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::canon_rows::testkit::{ctx, scratch, view, write};
+    use crate::canon_rows::testkit::{check, scratch, view, write};
 
     fn reg() -> mockspace::RegistryView {
         view(&[
@@ -82,8 +82,7 @@ mod tests {
 
     fn findings(d: &Path) -> Vec<String> {
         let r = reg();
-        ATenetNamesASubject
-            .check_repo(&ctx(d, &r))
+        check(&ATenetNamesASubject, d, &r)
             .into_iter()
             .map(|e| e.message)
             .collect()

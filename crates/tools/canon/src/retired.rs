@@ -162,7 +162,7 @@ pub fn contradicts_answer(repo: &Path, all: &[Tenet<'_>], paths: &[&str]) -> (St
         );
     }
     let named: Vec<&Path> = under.iter().map(PathBuf::as_path).collect();
-    let (hits, excused) = split_under(repo, &rules, &named);
+    let (hits, excused) = split_under(&mockspace::reading::Reading::new(repo).view(), repo, &rules, &named);
     let mut by_rule: BTreeMap<&str, Vec<&Hit>> = BTreeMap::new();
     for h in &hits {
         by_rule.entry(h.rule.as_str()).or_default().push(h);

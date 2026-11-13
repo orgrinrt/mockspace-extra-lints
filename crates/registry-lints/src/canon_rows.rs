@@ -16,7 +16,7 @@
 
 use std::path::{Path, PathBuf};
 
-use mockspace::{LintError, RegistryView};
+use mockspace::{LintError, RegistryView, View};
 
 use crate::tree_walk::with_extension;
 
@@ -120,10 +120,10 @@ fn quoted<'a>(line: &'a str, key: &str) -> Option<&'a str> {
 }
 
 /// Every tenet written in any registry file under `registry`.
-pub fn written_tenets(registry: &Path) -> Vec<Written> {
+pub fn written_tenets(view: &View<'_>, registry: &Path) -> Vec<Written> {
     let mut out = Vec::new();
-    for file in with_extension(registry, "toml", &[]) {
-        let Ok(body) = std::fs::read_to_string(&file) else {
+    for file in with_extension(view, registry, "toml", &[]) {
+        let Some(body) = view.text(&file) else {
             continue;
         };
         let mut open: Option<Written> = None;
@@ -156,14 +156,15 @@ pub fn written_tenets(registry: &Path) -> Vec<Written> {
 
 #[cfg(test)]
 pub mod testkit {
-    //! Building a view and a repository context in a test.
+    //! Building a registry view in a test, and running a repository lint over a directory the way the
+    //! runner hands one over.
 
     use std::collections::{BTreeMap, BTreeSet};
     use std::path::{Path, PathBuf};
-    use std::sync::OnceLock;
     use std::sync::atomic::{AtomicU32, Ordering};
 
-    use mockspace::{RegistryView, RepoContext};
+    use mockspace::testkit::check_repo;
+    use mockspace::{LintError, RegistryView, RepoInput, RepoLint};
 
     /// A view over the given rows, each `(namespace::slug, [(field, value)])`.
     pub fn view(rows: &[(&str, &[(&str, &str)])]) -> RegistryView {
@@ -180,32 +181,20 @@ pub mod testkit {
         RegistryView::new(rows, BTreeMap::new())
     }
 
-    /// A repository context over `mock_dir` and `registry`.
-    pub fn ctx<'a>(mock_dir: &'a Path, registry: &'a RegistryView) -> RepoContext<'a> {
-        ctx_with(mock_dir, registry, None)
-    }
-
-    /// [`ctx`] over a store of saved verdicts, for a test of what a lint replays.
-    pub fn ctx_with<'a>(
-        mock_dir: &'a Path,
-        registry: &'a RegistryView,
-        verdicts: Option<&'a dyn mockspace::verdict::VerdictCache>,
-    ) -> RepoContext<'a> {
-        static CRATES: OnceLock<BTreeSet<String>> = OnceLock::new();
-        static DIRS: OnceLock<Vec<PathBuf>> = OnceLock::new();
-        static STRINGS: OnceLock<Vec<String>> = OnceLock::new();
-        RepoContext {
-            mock_dir,
-            repo_root: mock_dir,
-            all_crates: CRATES.get_or_init(BTreeSet::new),
-            src_dirs: DIRS.get_or_init(Vec::new),
+    /// What `lint` finds over the repository at `dir`, which is its own mock directory, with `registry`,
+    /// no crates, no canon paths and no open panels.
+    pub fn check(lint: &dyn RepoLint, dir: &Path, registry: &RegistryView) -> Vec<LintError> {
+        check_repo(lint, RepoInput {
+            mock_dir: dir,
+            repo_root: dir,
+            all_crates: &BTreeSet::new(),
+            src_dirs: &[],
             invocation: None,
-            canon_paths: STRINGS.get_or_init(Vec::new),
-            open_panels: STRINGS.get_or_init(Vec::new),
+            canon_paths: &[],
+            open_panels: &[],
             ref_files: &mockspace::src_layout::NO_REF_FILES,
             registry,
-            verdicts,
-        }
+        })
     }
 
     /// An empty mock directory nothing else is using.
@@ -279,7 +268,7 @@ mod tests {
             "# sky\n\n[[tenet]]\nid = \"a\"\nwhat = \"subject = \\\"no\\\"\"\nsubject = \"sky\"\n\n[[tenet]]\nid = \"b\"\n",
         );
         write(&d, "registry/subject.toml", "[[subject]]\nid = \"sky\"\n");
-        let w = written_tenets(&d.join("registry"));
+        let w = written_tenets(&mockspace::reading::Reading::new(&d).view(), &d.join("registry"));
         let file = d.join("registry/tenet/sky.toml");
         assert_eq!(w, [
             Written {

@@ -137,7 +137,7 @@ impl Tool for ParallelStatements {
         let scope = ctx.args.first().copied();
         let across = scope == Some(ACROSS);
         let only = scope.filter(|s| *s != ACROSS);
-        let project = registry_lints::project::Project::of(ctx.mock_dir).name;
+        let project = registry_lints::project::Project::of(&mockspace::reading::Reading::new(ctx.repo_root).view(), ctx.mock_dir).name;
         let mut out = String::new();
         let mut pairs = 0usize;
         let mut flagged = 0usize;

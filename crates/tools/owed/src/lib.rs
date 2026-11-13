@@ -17,6 +17,7 @@
 
 use std::collections::BTreeSet;
 
+use mockspace::reading::Reading;
 use mockspace::tool::{ArgSpec, Purpose, Tool, ToolContext, ToolReport};
 
 mod apply;
@@ -129,7 +130,9 @@ impl Owed {
         let mut files = Vec::new();
         let mut candidates = Vec::new();
         let mut all_candidates = BTreeSet::new();
-        for s in fixme_markers::sources(ctx.repo_root) {
+        let reading = Reading::new(ctx.repo_root);
+        let view = reading.view();
+        for s in fixme_markers::sources(&view, ctx.repo_root) {
             let name = s.rel.rsplit('/').next().unwrap_or(&s.rel);
             if s.scope == Scope::Record {
                 // FIXME(pack_lints_and_tools_read_the_mock_directory_as_mock): the mock directory is read as `mock`, not as the one `mockspace.toml` declares
@@ -176,7 +179,7 @@ impl Owed {
             all_candidates: &all_candidates,
             store:          &store,
             subjects:       &subjects,
-            prefix:         &registry_lints::project::Project::of(ctx.mock_dir).prefix,
+            prefix:         &registry_lints::project::Project::of(&view, ctx.mock_dir).prefix,
             full:           args.only.is_empty(),
         });
         if plan.is_empty() {

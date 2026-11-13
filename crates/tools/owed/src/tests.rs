@@ -112,7 +112,7 @@ impl Repo {
 
     /// Every file under the repository with its text, to compare a run against.
     fn snapshot(&self) -> BTreeMap<String, String> {
-        tree_walk::walk_files(&self.root, |_, _| false, |_| true)
+        tree_walk::walk_files(&mockspace::reading::Reading::new(&self.root).view(), &self.root, |_, _| false, |_| true)
             .into_iter()
             .map(|p| {
                 let rel = p

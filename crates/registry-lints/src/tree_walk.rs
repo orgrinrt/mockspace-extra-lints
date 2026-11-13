@@ -6,17 +6,20 @@
 //! The one walk of a directory, and the one list of the directories under one.
 //!
 //! The lints and the tools each carried their own recursion for the files of an extension and their
-//! own `read_dir` for the crates under `mock/crates`. This file declares no lint. It uses `std` only
-//! and carries no test that needs the lints' testkit, so a tool including it by path, as `canon`
-//! includes `canon_tree.rs`, needs nothing more.
+//! own `read_dir` for the crates under `mock/crates`. Both read through a [`View`]: a lint the one it
+//! is handed, so every directory walked is in its trace, and a tool one of its own over a
+//! [`Reading`](mockspace::reading::Reading) of the repository. This file declares no lint.
 
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
+
+use mockspace::View;
 
 /// Every file under `dir`, at any depth, whose extension is `ext` (without the dot), sorted. A directory
 /// named in `skip` is not entered. A `dir` that is not there gives nothing, which is how a crate without
 /// a `tests` directory is read.
-pub fn with_extension(dir: &Path, ext: &str, skip: &[&str]) -> Vec<PathBuf> {
+pub fn with_extension(view: &View<'_>, dir: &Path, ext: &str, skip: &[&str]) -> Vec<PathBuf> {
     walk_files(
+        view,
         dir,
         |_, name| skip.contains(&name),
         |path| path.extension().is_some_and(|e| e == ext),
@@ -27,52 +30,53 @@ pub fn with_extension(dir: &Path, ext: &str, skip: &[&str]) -> Vec<PathBuf> {
 /// before it is entered, with its path relative to `dir` and its name. A `dir` that is not there gives
 /// nothing.
 pub fn walk_files(
+    view: &View<'_>,
     dir: &Path,
     skip: impl Fn(&Path, &str) -> bool,
     keep: impl Fn(&Path) -> bool,
 ) -> Vec<PathBuf> {
-    let mut out = Vec::new();
-    walk(dir, Path::new(""), &skip, &keep, &mut out);
+    let given = if dir.is_absolute() { dir.to_path_buf() } else { view.root().join(dir) };
+    // The view answers with `.` and `..` folded away, so what it gives is taken against the folded
+    // name and handed back under the name the caller gave.
+    let base = folded(&given);
+    let mut out: Vec<PathBuf> = view
+        .walk(&base, |abs, entry| {
+            let rel = abs.parent().and_then(|p| p.strip_prefix(&base).ok()).unwrap_or(Path::new(""));
+            mockspace::reading::Entry::is_dir(entry) && skip(rel, entry.name())
+        })
+        .into_iter()
+        .filter_map(|abs| abs.strip_prefix(&base).ok().filter(|rel| keep(rel)).map(|rel| given.join(rel)))
+        .collect();
     out.sort();
     out
 }
 
-fn walk(
-    root: &Path,
-    rel: &Path,
-    skip: &impl Fn(&Path, &str) -> bool,
-    keep: &impl Fn(&Path) -> bool,
-    out: &mut Vec<PathBuf>,
-) {
-    let Ok(entries) = std::fs::read_dir(root.join(rel)) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        let name = entry.file_name().to_string_lossy().into_owned();
-        let child = rel.join(&name);
-        let Ok(kind) = entry.file_type() else {
-            continue;
-        };
-        if kind.is_dir() {
-            if !skip(rel, &name) {
-                walk(root, &child, skip, keep, out);
-            }
-        } else if kind.is_file() && keep(&child) {
-            out.push(root.join(child));
+/// `path` with `.` and `..` folded away by name, as the view names what it walks.
+fn folded(path: &Path) -> PathBuf {
+    let mut out = PathBuf::new();
+    for c in path.components() {
+        match c {
+            Component::CurDir => {},
+            Component::ParentDir => {
+                out.pop();
+            },
+            other => out.push(other),
         }
     }
+    out
 }
 
 /// The directories directly under `dir`, as `(name, path)`, sorted by name. Files beside them are not
-/// listed, and a `dir` that is not there gives nothing. The crates are `subdirs(&mock_dir.join("crates"))`.
-pub fn subdirs(dir: &Path) -> Vec<(String, PathBuf)> {
-    let Ok(entries) = std::fs::read_dir(dir) else {
+/// listed, and a `dir` that is not there gives nothing. The crates are `subdirs(view, &mock_dir.join("crates"))`.
+pub fn subdirs(view: &View<'_>, dir: &Path) -> Vec<(String, PathBuf)> {
+    let Some(listing) = view.list(dir) else {
         return Vec::new();
     };
-    let mut out: Vec<(String, PathBuf)> = entries
-        .flatten()
-        .filter(|e| e.path().is_dir())
-        .map(|e| (e.file_name().to_string_lossy().into_owned(), e.path()))
+    let mut out: Vec<(String, PathBuf)> = listing
+        .entries()
+        .iter()
+        .filter(|e| mockspace::reading::Entry::is_dir(e))
+        .map(|e| (e.name().to_owned(), dir.join(e.name())))
         .collect();
     out.sort();
     out
@@ -83,6 +87,7 @@ mod tests {
     use std::sync::atomic::{AtomicU32, Ordering};
 
     use super::*;
+    use mockspace::reading::Reading;
 
     fn scratch(tag: &str) -> PathBuf {
         static N: AtomicU32 = AtomicU32::new(0);
@@ -121,9 +126,11 @@ mod tests {
         write(&d, "a/deep/c.rs", "");
         write(&d, "a/d.toml", "");
         write(&d, "e.rs.bak", "");
-        let found = with_extension(&d, "rs", &[]);
+        let r = Reading::new(&d);
+        let v = r.view();
+        let found = with_extension(&v, &d, "rs", &[]);
         assert_eq!(names(&found, &d), ["a/deep/c.rs", "b.rs"]);
-        assert_eq!(names(&with_extension(&d, "toml", &[]), &d), ["a/d.toml"]);
+        assert_eq!(names(&with_extension(&v, &d, "toml", &[]), &d), ["a/d.toml"]);
     }
 
     #[test]
@@ -132,17 +139,32 @@ mod tests {
         write(&d, "src/lib.rs", "");
         write(&d, "src/tests/t.rs", "");
         write(&d, "src/fixtures/f.rs", "");
-        let all = with_extension(&d, "rs", &[]);
+        let r = Reading::new(&d);
+        let v = r.view();
+        let all = with_extension(&v, &d, "rs", &[]);
         assert_eq!(all.len(), 3, "{all:?}");
-        let skipped = with_extension(&d, "rs", &["tests", "fixtures"]);
+        let skipped = with_extension(&v, &d, "rs", &["tests", "fixtures"]);
         assert_eq!(names(&skipped, &d), ["src/lib.rs"]);
+    }
+
+    #[test]
+    fn a_directory_named_through_a_parent_step_is_walked_and_answered_under_that_name() {
+        // Mutation: the walk is matched against the name as given, which the view folds, so nothing is found.
+        let d = scratch("parent-step");
+        write(&d, "a/x.rs", "");
+        write(&d, "b/keep", "");
+        let r = Reading::new(&d);
+        let through = d.join("b/../a");
+        assert_eq!(with_extension(&r.view(), &through, "rs", &[]), [through.join("x.rs")]);
     }
 
     #[test]
     fn a_directory_that_is_not_there_gives_nothing() {
         let d = scratch("absent");
-        assert!(with_extension(&d.join("nope"), "rs", &[]).is_empty());
-        assert!(subdirs(&d.join("nope")).is_empty());
+        let r = Reading::new(&d);
+        let v = r.view();
+        assert!(with_extension(&v, &d.join("nope"), "rs", &[]).is_empty());
+        assert!(subdirs(&v, &d.join("nope")).is_empty());
     }
 
     #[test]
@@ -150,7 +172,9 @@ mod tests {
         let d = scratch("root-only");
         write(&d, "target/a.rs", "");
         write(&d, "src/target/b.rs", "");
+        let r = Reading::new(&d);
         let found = walk_files(
+            &r.view(),
             &d,
             |rel, name| rel.as_os_str().is_empty() && name == "target",
             |p| p.extension().is_some_and(|e| e == "rs"),
@@ -164,7 +188,7 @@ mod tests {
         write(&d, "kaski-b/Cargo.toml", "");
         write(&d, "kaski-a/Cargo.toml", "");
         write(&d, "README.md", "");
-        let found: Vec<String> = subdirs(&d).into_iter().map(|(n, _)| n).collect();
+        let found: Vec<String> = subdirs(&Reading::new(&d).view(), &d).into_iter().map(|(n, _)| n).collect();
         assert_eq!(found, ["kaski-a", "kaski-b"]);
     }
 }

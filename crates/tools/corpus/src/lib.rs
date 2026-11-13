@@ -36,6 +36,8 @@ pub mod terms;
 
 use std::path::Path;
 
+use mockspace::reading::Reading;
+
 pub use corpus::Corpus;
 pub use doc::{Doc, Kind};
 pub use index::Index;
@@ -52,7 +54,7 @@ pub fn load(mock_dir: &Path, repo_root: &Path, maintainer: &Maintainer) -> Corpu
     Corpus::load_about(
         mock_dir,
         words.as_deref(),
-        &registry_lints::project::Project::of(mock_dir).name,
+        &registry_lints::project::Project::of(&Reading::new(repo_root).view(), mock_dir).name,
     )
 }
 

@@ -13,7 +13,7 @@
 use std::collections::BTreeSet;
 use std::path::Path;
 
-use mockspace::RegistryView;
+use mockspace::{RegistryView, View};
 
 /// Where the rows stand, under the mock directory.
 pub const FILE: &str = "ratchets.toml";
@@ -82,9 +82,9 @@ pub fn parse(text: &str) -> Vec<Row> {
 }
 
 /// The rows in the mock directory's file, none when the file is missing.
-pub fn read(mock: &Path) -> Vec<Row> {
-    std::fs::read_to_string(mock.join(FILE))
-        .map(|t| parse(&t))
+pub fn read(view: &View<'_>, mock: &Path) -> Vec<Row> {
+    view.text(mock.join(FILE))
+        .map(parse)
         .unwrap_or_default()
 }
 
@@ -120,11 +120,12 @@ pub type Finding = (String, usize, String);
 /// A unit with findings and no row is refused on each finding, and a row for a unit with none is refused on
 /// the row. Every repo lint that reads units by name holds its ratchet here, so the reading is written once.
 pub fn judge(
+    view: &View<'_>,
     mock: &Path,
     lint: &'static str,
     found: &std::collections::BTreeMap<String, Vec<Finding>>,
 ) -> Vec<mockspace::LintError> {
-    let rows = read(mock);
+    let rows = read(view, mock);
     let rows = of(&rows, lint);
     let units: BTreeSet<&str> = found
         .keys()
@@ -446,7 +447,7 @@ mod tests {
             FILE,
             "[[row]]\nlint = \"l\"\nsubject = \"listed\"\nticket = \"t\"\n\n[[row]]\nlint = \"l\"\nsubject = \"gone\"\nticket = \"t\"\n",
         );
-        let said: Vec<String> = judge(&d, "l", &found(&["listed", "new"]))
+        let said: Vec<String> = judge(&mockspace::reading::Reading::new(&d).view(), &d, "l", &found(&["listed", "new"]))
             .into_iter()
             .map(|e| e.message)
             .collect();
@@ -481,7 +482,7 @@ mod tests {
                 .collect::<Vec<_>>(),
         ))
         .collect::<std::collections::BTreeMap<_, _>>();
-        judge(&d, "l", &found)
+        judge(&mockspace::reading::Reading::new(&d).view(), &d, "l", &found)
             .into_iter()
             .map(|e| e.message)
             .collect()

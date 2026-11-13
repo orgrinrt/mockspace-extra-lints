@@ -364,11 +364,12 @@ pub struct Source {
 }
 
 /// The longest file read, in bytes.
-const LARGEST: u64 = 4 << 20;
+const LARGEST: usize = 4 << 20;
 
 /// Every file of the repository at `repo` that can hold a marker, read, sorted by path.
-pub fn sources(repo: &std::path::Path) -> Vec<Source> {
+pub fn sources(view: &mockspace::View<'_>, repo: &std::path::Path) -> Vec<Source> {
     let files = crate::tree_walk::walk_files(
+        view,
         repo,
         |rel, name| {
             matches!(name, ".git" | "target" | "node_modules")
@@ -386,10 +387,13 @@ pub fn sources(repo: &std::path::Path) -> Vec<Source> {
         let Some(scope) = scope_of(&rel) else {
             continue;
         };
-        if std::fs::metadata(&path).is_ok_and(|m| m.len() > LARGEST) {
+        let Some(bytes) = view.bytes(&path) else {
+            continue;
+        };
+        if bytes.len() > LARGEST {
             continue;
         }
-        let Ok(text) = std::fs::read_to_string(&path) else {
+        let Ok(text) = std::str::from_utf8(bytes) else {
             continue;
         };
         let Some(kind) = kind_of(&rel, text.lines().next().unwrap_or("")) else {
@@ -399,7 +403,7 @@ pub fn sources(repo: &std::path::Path) -> Vec<Source> {
             rel,
             scope,
             kind,
-            text,
+            text: text.to_owned(),
         });
     }
     out

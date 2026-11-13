@@ -7,6 +7,8 @@
 
 use std::path::Path;
 
+use mockspace::reading::Reading;
+
 /// The index, under the names the tools that ask it use.
 pub use muisti::Error as IndexError;
 pub use muisti::repo::RepoIndex as Index;
@@ -56,7 +58,7 @@ pub fn roots(mock_dir: &Path, maintainer_words: Option<&Path>) -> Vec<Root> {
             shown:       MAINTAINER_ROOT.to_string(),
             class:       DocClass::Human,
             // The captures may cover several projects; a capture that never names this one is not read.
-            only_naming: Some(registry_lints::project::Project::of(mock_dir).name),
+            only_naming: Some(registry_lints::project::Project::of(&Reading::new(mock_dir).view(), mock_dir).name),
         });
     }
     out

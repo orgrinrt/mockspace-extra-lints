@@ -15,12 +15,13 @@ use std::path::Path;
 
 use mockspace::tool::{ArgSpec, Purpose, Tool, ToolContext, ToolReport};
 
+use mockspace::reading::Reading;
 use registry_lints::fixme_markers;
 
 /// The live files that hold a marker citing `from`, each with the text it has once the marker cites
 /// `to`. Nothing is written; this only reads.
 fn recited(repo: &Path, from: &str, to: &str) -> Vec<(String, String)> {
-    fixme_markers::sources(repo)
+    fixme_markers::sources(&Reading::new(repo).view(), repo)
         .into_iter()
         .filter(|s| s.scope == fixme_markers::Scope::Live)
         .filter_map(|s| fixme_markers::recite(&s.text, s.kind, from, to).map(|text| (s.rel, text)))
@@ -29,7 +30,7 @@ fn recited(repo: &Path, from: &str, to: &str) -> Vec<(String, String)> {
 
 /// The live markers that cite `ticket`, each as its file and line, in the files `recited` reads.
 fn citing(repo: &Path, ticket: &str) -> Vec<(String, usize)> {
-    fixme_markers::sources(repo)
+    fixme_markers::sources(&Reading::new(repo).view(), repo)
         .into_iter()
         .filter(|s| s.scope == fixme_markers::Scope::Live)
         .flat_map(|s| {

@@ -6,14 +6,17 @@
 //! The files of the repository a citation or a word can sit in, and the tier each belongs to.
 //!
 //! This file declares no lint. It is the one owner of which files are read and which tier a path is in,
-//! so the lint `a-retired-word-stays-out` and the `canon` tool, which includes this file by path, cannot
-//! disagree about either. It uses nothing but `std`, for that reason.
+//! so the lint `a-retired-word-stays-out` and the `canon` tool, which reads it too, cannot
+//! disagree about either. It reads through the [`View`] it is handed, a lint's own or one a tool builds over
+//! a reading of the repository.
 //!
 //! The tiers are the ones the workflow names: design, code, research, rounds, content, and the canon
 //! itself. Generated documents, build output and the agent files generated from templates are not read,
 //! since each only repeats what one of the tiers already says.
 
 use std::path::{Path, PathBuf};
+
+use mockspace::View;
 
 /// Which tier a path sits in.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -80,8 +83,9 @@ pub fn tier_of(rel: &Path) -> Tier {
 }
 
 /// Every file read, relative to `repo`, sorted.
-pub fn files(repo: &Path) -> Vec<PathBuf> {
+pub fn files(view: &View<'_>, repo: &Path) -> Vec<PathBuf> {
     let mut out = crate::tree_walk::walk_files(
+        view,
         repo,
         |rel, name| {
             SKIPPED_ANYWHERE.contains(&name)

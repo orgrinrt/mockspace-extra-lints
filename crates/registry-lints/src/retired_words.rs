@@ -7,14 +7,15 @@
 //!
 //! This file declares no lint. It is the one owner of how a word is matched, which files are read and what
 //! lets a line through, so the lint `a-retired-word-stays-out` and the verbs `forbids` and `contradicts`
-//! of the `canon` tool, which includes this file by path, answer from one definition. It uses `std` and
-//! `canon_tree` only, for that reason.
+//! of the `canon` tool answer from one definition, each reading through a view.
 //!
 //! A tenet lists in `rules_out` the words and names it rules out. Every check on ids passes a text that
 //! cites the tenet while describing the thing it rules out, because the citation is an id and the
 //! description is words; this reads the words.
 
 use std::path::{Path, PathBuf};
+
+use mockspace::View;
 
 use crate::canon_tree::{Tier, files, tier_of};
 
@@ -196,15 +197,15 @@ pub fn split_text(rel: &Path, body: &str, rules: &[Retiring]) -> (Vec<Hit>, Vec<
 /// Every hit in the repository, or only under any of `under` (paths relative to the repository root) where
 /// any is given, in path and line order, as `(held, excused)`: the excused are the lines the ruling tenet's
 /// id stands beside, which it lets through.
-pub fn split_under(repo: &Path, rules: &[Retiring], under: &[&Path]) -> (Vec<Hit>, Vec<Hit>) {
+pub fn split_under(view: &View<'_>, repo: &Path, rules: &[Retiring], under: &[&Path]) -> (Vec<Hit>, Vec<Hit>) {
     let mut out = Vec::new();
     let mut excused = Vec::new();
-    for rel in files(repo) {
+    for rel in files(view, repo) {
         if !scanned(&rel) || (!under.is_empty() && !under.iter().any(|u| rel.starts_with(u))) {
             continue;
         }
-        if let Ok(body) = std::fs::read_to_string(repo.join(&rel)) {
-            let (held, let_through) = split_text(&rel, &body, rules);
+        if let Some(body) = view.text(repo.join(&rel)) {
+            let (held, let_through) = split_text(&rel, body, rules);
             out.extend(held);
             excused.extend(let_through);
         }

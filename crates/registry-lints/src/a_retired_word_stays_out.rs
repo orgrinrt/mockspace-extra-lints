@@ -32,10 +32,11 @@
 //! The debt list is applied afterwards, outside what is saved, which is why a unit leaving it costs no
 //! file a second reading.
 
+use std::borrow::Cow;
 use std::collections::BTreeSet;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-use mockspace::{Lint, LintError, RegistryView, RepoContext, RepoLint, Severity};
+use mockspace::{Item, Lint, LintError, RegistryView, RepoContext, RepoLint, Severity, View};
 
 use crate::canon_rows::list;
 use crate::canon_tree::files;
@@ -63,13 +64,14 @@ impl Lint for ARetiredWordStaysOut {
 
 impl RepoLint for ARetiredWordStaysOut {
     fn check_repo(&self, ctx: &RepoContext) -> Vec<LintError> {
-        let config =
-            std::fs::read_to_string(ctx.repo_root.join("mockspace.toml")).unwrap_or_default();
-        let (change, unread) = match change_of(ctx.repo_root) {
+        let view = ctx.view();
+        let repo = ctx.repo_root;
+        let config = view.text(repo.join("mockspace.toml")).unwrap_or_default();
+        let (change, unread) = match change_of(view, repo) {
             Ok(change) => (change, None),
             Err(why) => (Change::default(), Some(why)),
         };
-        let mut out = check(ctx.repo_root, ctx.registry(), &config, Some(ctx), &change);
+        let mut out = check(view, repo, ctx.registry(), config, &change);
         out.extend(unread.map(|why| unreadable(&why)));
         out
     }
@@ -85,9 +87,9 @@ struct Change {
 }
 
 /// The change at `repo` as the lint judges it.
-fn change_of(repo: &Path) -> Result<Change, String> {
-    let read = touched_lines::read(repo)?;
-    let at_base = touched_lines::file_at(repo, &read.base, "mockspace.toml").unwrap_or_default();
+fn change_of(view: &View<'_>, repo: &Path) -> Result<Change, String> {
+    let read = touched_lines::read(view, repo)?;
+    let at_base = touched_lines::file_at(view, repo, &read.base, "mockspace.toml").unwrap_or_default();
     Ok(Change {
         touched:   read.touched,
         base_debt: Some(table(&at_base, NAME).exempt_crates.into_iter().collect()),
@@ -160,35 +162,50 @@ fn judge(rel: &Path, body: &str, rules: &[Retiring]) -> Vec<LintError> {
         .collect()
 }
 
-/// The findings of every scanned file, each file's replayed from the store when its path, its text and the
-/// rules are what they were. `ctx` is `None` where there is no store to ask.
-fn judge_files(repo: &Path, rules: &[Retiring], ctx: Option<&RepoContext>) -> Vec<LintError> {
-    let rules_key = fingerprint(rules);
-    let mut out = Vec::new();
-    for rel in files(repo).into_iter().filter(|rel| scanned(rel)) {
-        let Ok(body) = std::fs::read_to_string(repo.join(&rel)) else {
-            continue;
-        };
-        let path = rel.to_string_lossy().replace('\\', "/");
-        let found = match ctx {
-            Some(ctx) => {
-                let parts: [&[u8]; 3] = [path.as_bytes(), body.as_bytes(), rules_key.as_bytes()];
-                { let _ = (ctx, parts); judge(&rel, &body, rules) }
-            },
-            None => judge(&rel, &body, rules),
-        };
-        out.extend(found);
-    }
-    out
+/// One scanned file, judged through a view of its own. Its key holds what the judgement takes from
+/// outside the file: the path, which the file's text is read by, and the rules it is judged under.
+struct Scanned {
+    rel: PathBuf,
+    key: String,
 }
 
-fn check(
-    repo: &Path,
-    reg: &RegistryView,
-    config: &str,
-    ctx: Option<&RepoContext>,
-    change: &Change,
-) -> Vec<LintError> {
+impl Item for Scanned {
+    fn key(&self) -> Cow<'_, str> {
+        Cow::Borrowed(&self.key)
+    }
+}
+
+/// Every scanned file under `repo`, keyed under `rules`.
+fn scanned_files(view: &View<'_>, repo: &Path, rules: &[Retiring]) -> Vec<Scanned> {
+    let rules_key = fingerprint(rules);
+    files(view, repo)
+        .into_iter()
+        .filter(|rel| scanned(rel))
+        .map(|rel| {
+            let key = format!("{rules_key}\u{2}{}", rel.to_string_lossy().replace('\\', "/"));
+            Scanned {
+                rel,
+                key,
+            }
+        })
+        .collect()
+}
+
+/// The findings of every scanned file, each judged through its own view, so a file whose text is what
+/// it was under the same rules is replayed rather than judged again.
+fn judge_files(view: &View<'_>, repo: &Path, rules: &[Retiring]) -> Vec<LintError> {
+    view.each(&scanned_files(view, repo, rules), |v, file| {
+        let Some(body) = v.text(repo.join(&file.rel)) else {
+            return Vec::new();
+        };
+        judge(&file.rel, body, rules)
+    })
+    .into_iter()
+    .flatten()
+    .collect()
+}
+
+fn check(view: &View<'_>, repo: &Path, reg: &RegistryView, config: &str, change: &Change) -> Vec<LintError> {
     let rules = retiring(reg);
     if rules.is_empty() {
         return Vec::new();
@@ -196,7 +213,7 @@ fn check(
     let debt: BTreeSet<String> = table(config, NAME).exempt_crates.into_iter().collect();
     let mut holding: BTreeSet<String> = BTreeSet::new();
     let mut out = Vec::new();
-    for mut e in judge_files(repo, &rules, ctx) {
+    for mut e in judge_files(view, repo, &rules) {
         holding.insert(e.crate_name.clone());
         if !debt.contains(&e.crate_name) {
             out.push(e);
@@ -246,13 +263,15 @@ fn check(
 
 #[cfg(test)]
 mod tests {
-    use std::cell::{Cell, RefCell};
-    use std::collections::HashMap;
-
-    use mockspace::verdict::VerdictCache;
+    use mockspace::reading::Reading;
 
     use super::*;
-    use crate::canon_rows::testkit::{ctx_with, git, scratch, view, write};
+    use crate::canon_rows::testkit::{check as run_lint, git, scratch, view, write};
+
+    /// What [`check`] finds over `d`, read through a reading of its own.
+    fn checked(d: &Path, reg: &RegistryView, config: &str, change: &Change) -> Vec<LintError> {
+        check(&Reading::new(d).view(), d, reg, config, change)
+    }
 
     fn reg() -> RegistryView {
         view(&[
@@ -294,7 +313,7 @@ mod tests {
     #[test]
     fn a_unit_not_on_the_list_is_held_from_its_first_line() {
         let d = repo();
-        let found = check(&d, &reg(), &config(&[]), None, &Change::default());
+        let found = checked(&d, &reg(), &config(&[]), &Change::default());
         let units: Vec<&str> = found.iter().map(|e| e.crate_name.as_str()).collect();
         assert_eq!(units, ["kaski-a", "kaski-b"], "{found:?}");
         assert!(found[0].message.contains("there_is_no_zorblax"));
@@ -303,7 +322,7 @@ mod tests {
     #[test]
     fn a_unit_on_the_list_is_let_through_and_the_others_still_fail() {
         let d = repo();
-        let found = check(&d, &reg(), &config(&["kaski-a"]), None, &Change::default());
+        let found = checked(&d, &reg(), &config(&["kaski-a"]), &Change::default());
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].crate_name, "kaski-b");
     }
@@ -311,11 +330,10 @@ mod tests {
     #[test]
     fn a_unit_on_the_list_with_nothing_left_is_a_finding_so_the_list_only_shrinks() {
         let d = repo();
-        let found = check(
+        let found = checked(
             &d,
             &reg(),
             &config(&["kaski-a", "kaski-b", "kaski-c"]),
-            None,
             &Change::default(),
         );
         assert_eq!(found.len(), 1, "{found:?}");
@@ -330,156 +348,41 @@ mod tests {
             "mock/crates/kaski-a/DESIGN.md.tmpl",
             "the quillfern stands, and it grows\n",
         );
-        assert!(check(&d, &reg(), &config(&[]), None, &Change::default()).is_empty());
+        assert!(checked(&d, &reg(), &config(&[]), &Change::default()).is_empty());
         let none = view(&[("tenet::the_ground_is_one", &[("what", "One ground.")])]);
-        assert!(check(&repo(), &none, &config(&[]), None, &Change::default()).is_empty());
+        assert!(checked(&repo(), &none, &config(&[]), &Change::default()).is_empty());
     }
 
-    /// A store of saved verdicts that counts how often it answered and how often it was written.
-    #[derive(Default)]
-    struct Saved {
-        kept:   RefCell<HashMap<String, String>>,
-        hits:   Cell<usize>,
-        stores: Cell<usize>,
+
+    #[test]
+    fn a_files_key_moves_with_the_rules_so_a_tenet_ruling_out_another_word_judges_every_file_again() {
+        // Mutation: the key leaves the rules out, so a finding saved under one set of words replays under another.
+        let d = repo();
+        let keys = |reg: &RegistryView| -> Vec<String> {
+            scanned_files(&Reading::new(&d).view(), &d, &retiring(reg))
+                .into_iter()
+                .map(|f| f.key)
+                .collect()
+        };
+        let wider = view(&[("tenet::there_is_no_quillfern", &[("rules_out", "quillfern")])]);
+        let (before, again, after) = (keys(&reg()), keys(&reg()), keys(&wider));
+        assert_eq!(before.len(), 3, "{before:?}");
+        assert_eq!(before, again, "the same rules over the same files keep their keys");
+        assert!(before.iter().all(|k| !after.contains(k)), "{before:?} {after:?}");
     }
 
-    impl VerdictCache for Saved {
-        fn digest(&self, parts: &[&[u8]]) -> String {
-            parts
-                .iter()
-                .map(|p| format!("{}:{}", p.len(), String::from_utf8_lossy(p)))
-                .collect::<Vec<_>>()
-                .join("|")
-        }
-
-        fn replay(&self, key: &str) -> Option<String> {
-            let found = self.kept.borrow().get(key).cloned();
-            if found.is_some() {
-                self.hits.set(self.hits.get() + 1);
-            }
-            found
-        }
-
-        fn remember(&self, key: &str, encoded: &str) {
-            self.stores.set(self.stores.get() + 1);
-            self.kept
-                .borrow_mut()
-                .insert(key.to_owned(), encoded.to_owned());
-        }
-    }
-
-    /// Puts `d` under git with its `mockspace.toml` committed on `dev`, once, so a change can be read.
-    fn versioned(d: &Path) {
-        if d.join(".git").exists() {
-            return;
-        }
-        git(d, &["init", "-q", "-b", "dev"]);
-        git(d, &["add", "mockspace.toml"]);
-        git(d, &["commit", "-q", "-m", "base"]);
-    }
-
-    /// What the lint finds over `d` through a store, as `(unit, line, message)`.
-    fn run(d: &Path, reg: &RegistryView, saved: &Saved) -> Vec<(String, usize, String)> {
-        write(d, "mockspace.toml", &config(&[]));
-        versioned(d);
-        ARetiredWordStaysOut
-            .check_repo(&ctx_with(d, reg, Some(saved)))
+    #[test]
+    fn the_lint_judging_each_file_through_its_own_view_finds_what_the_tree_holds() {
+        let d = repo();
+        write(&d, "mockspace.toml", &config(&[]));
+        let units: Vec<String> = run_lint(&ARetiredWordStaysOut, &d, &reg())
             .into_iter()
-            .map(|e| (e.crate_name, e.line, e.message))
-            .collect()
+            .filter(|e| !e.message.contains("cannot tell which lines"))
+            .map(|e| format!("{}:{}", e.crate_name, e.line))
+            .collect();
+        assert_eq!(units, ["kaski-a:1", "kaski-b:1"]);
     }
 
-    /// What the lint finds over `d` with no store at all.
-    fn fresh(d: &Path, reg: &RegistryView) -> Vec<(String, usize, String)> {
-        check(d, reg, &config(&[]), None, &Change::default())
-            .into_iter()
-            .map(|e| (e.crate_name, e.line, e.message))
-            .collect()
-    }
-
-    #[test]
-    fn an_unchanged_tree_replays_every_file_and_finds_what_a_fresh_run_finds() {
-        let d = repo();
-        let (r, saved) = (reg(), Saved::default());
-        let first = run(&d, &r, &saved);
-        assert_eq!(
-            first,
-            fresh(&d, &r),
-            "a first run through the store changes nothing"
-        );
-        assert_eq!(
-            (saved.hits.get(), saved.stores.get()),
-            (0, 3),
-            "three files are read"
-        );
-        let second = run(&d, &r, &saved);
-        assert_eq!(second, first);
-        assert_eq!(
-            (saved.hits.get(), saved.stores.get()),
-            (3, 3),
-            "every file replays, none is judged"
-        );
-    }
-
-    #[test]
-    fn a_changed_file_is_judged_again_and_the_unchanged_ones_replay() {
-        let d = repo();
-        let (r, saved) = (reg(), Saved::default());
-        run(&d, &r, &saved);
-        write(
-            &d,
-            "mock/crates/kaski-c/src/lib.rs",
-            "pub struct Quillfern;\n",
-        );
-        let added = run(&d, &r, &saved);
-        assert_eq!(added, fresh(&d, &r));
-        assert_eq!(
-            (saved.hits.get(), saved.stores.get()),
-            (3, 4),
-            "only the new file is judged"
-        );
-        write(
-            &d,
-            "mock/crates/kaski-b/src/lib.rs",
-            "pub struct ZorblaxCell;\n// and again\n",
-        );
-        let moved = run(&d, &r, &saved);
-        assert_eq!(moved, fresh(&d, &r));
-        assert_eq!(
-            (saved.hits.get(), saved.stores.get()),
-            (6, 5),
-            "the edited file alone is judged"
-        );
-        write(
-            &d,
-            "mock/crates/kaski-b/src/lib.rs",
-            "pub struct Quillfern;\n",
-        );
-        let cleared = run(&d, &r, &saved);
-        assert_eq!(cleared, fresh(&d, &r));
-        assert!(
-            cleared.iter().all(|(unit, ..)| unit != "kaski-b"),
-            "{cleared:?}"
-        );
-    }
-
-    #[test]
-    fn a_tenet_ruling_out_another_word_judges_every_file_again() {
-        let d = repo();
-        let (r, saved) = (reg(), Saved::default());
-        run(&d, &r, &saved);
-        let wider = view(&[("tenet::there_is_no_quillfern", &[(
-            "rules_out",
-            "quillfern",
-        )])]);
-        let found = run(&d, &wider, &saved);
-        assert_eq!(found, fresh(&d, &wider));
-        assert_eq!(
-            saved.stores.get(),
-            6,
-            "the words moved, so nothing saved before applies"
-        );
-    }
 
     const LIB: &str = "mock/crates/kaski-a/src/lib.rs";
 
@@ -502,9 +405,9 @@ mod tests {
 
     /// What the lint finds over a work tree, the change read from git.
     fn judged(d: &Path) -> Vec<LintError> {
-        let change = change_of(d).expect("a change");
+        let change = change_of(&Reading::new(d).view(), d).expect("a change");
         let config = std::fs::read_to_string(d.join("mockspace.toml")).expect("a config");
-        check(d, &reg(), &config, None, &change)
+        checked(d, &reg(), &config, &change)
     }
 
     #[test]
@@ -624,7 +527,7 @@ mod tests {
         // Mutation: an unreadable change is read as none, which lets every listed unit through unwatched.
         let d = repo();
         write(&d, "mockspace.toml", &config(&[]));
-        let found = ARetiredWordStaysOut.check_repo(&ctx_with(&d, &reg(), None));
+        let found = run_lint(&ARetiredWordStaysOut, &d, &reg());
         assert!(
             found
                 .iter()

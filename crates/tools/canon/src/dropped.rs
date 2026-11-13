@@ -71,12 +71,14 @@ impl Corpus {
 /// For every word of a scanned file, the lines naming it, each line counted once however often it says it.
 pub fn word_counts(repo: &Path) -> Corpus {
     let mut out = Corpus::default();
-    for rel in files(repo) {
+    let reading = mockspace::reading::Reading::new(repo);
+    let view = reading.view();
+    for rel in files(&view, repo) {
         if !scanned(&rel) {
             continue;
         }
         let tier = tier_of(&rel);
-        let Ok(body) = std::fs::read_to_string(repo.join(&rel)) else {
+        let Some(body) = view.text(repo.join(&rel)) else {
             continue;
         };
         let mut in_file: HashSet<String> = HashSet::new();

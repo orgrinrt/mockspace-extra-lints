@@ -125,12 +125,14 @@ pub fn canon_namespaces(repo: &Path) -> Result<BTreeSet<String>, String> {
         return Err(none());
     }
     let mut out = BTreeSet::new();
-    for rel in files(repo) {
+    let reading = mockspace::reading::Reading::new(repo);
+    let view = reading.view();
+    for rel in files(&view, repo) {
         let path = rel.to_string_lossy().replace('\\', "/");
         if !path.ends_with(".toml") || !globs.iter().any(|g| glob_match(g, &path)) {
             continue;
         }
-        let Ok(body) = std::fs::read_to_string(repo.join(&rel)) else {
+        let Some(body) = view.text(repo.join(&rel)) else {
             continue;
         };
         let rows: toml::Table = body

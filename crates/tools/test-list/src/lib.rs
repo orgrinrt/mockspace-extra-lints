@@ -19,6 +19,7 @@ use std::path::Path;
 use mockspace::tool::{ArgSpec, NotALint, Purpose, Tool, ToolContext, ToolReport};
 
 // Public so the items the lints read and this tool does not are not reported unused.
+use mockspace::reading::Reading;
 use registry_lints::tree_walk;
 
 pub mod mask;
@@ -238,13 +239,15 @@ fn token_end(bytes: &[u8], at: usize) -> usize {
 
 /// Every test of the crates under `crates_dir`, narrowed to `only`, in crate, file and line order.
 pub fn list(crates_dir: &Path, only: Option<&str>) -> Vec<Row> {
+    let reading = Reading::new(crates_dir);
+    let view = reading.view();
     let mut rows = Vec::new();
-    for (crate_name, dir) in tree_walk::subdirs(crates_dir) {
+    for (crate_name, dir) in tree_walk::subdirs(&view, crates_dir) {
         if only.is_some_and(|o| o != crate_name) {
             continue;
         }
-        for file in tree_walk::with_extension(&dir, "rs", &["target"]) {
-            let Ok(text) = std::fs::read_to_string(&file) else {
+        for file in tree_walk::with_extension(&view, &dir, "rs", &["target"]) {
+            let Some(text) = view.text(&file) else {
                 continue;
             };
             let rel = file.strip_prefix(&dir).unwrap_or(&file);

@@ -14,6 +14,8 @@
 
 use std::path::Path;
 
+use mockspace::View;
+
 use crate::gate_config::quoted;
 
 /// What a repository is called and where its mock tree sits.
@@ -29,12 +31,12 @@ pub struct Project {
 
 impl Project {
     /// The particulars of the repository whose mock directory this is, from the config the engine
-    /// reads there, found the way the registry finds it.
+    /// reads there, found the way the registry finds it and read through `view`.
     #[must_use]
-    pub fn of(mock_dir: &Path) -> Self {
+    pub fn of(view: &View<'_>, mock_dir: &Path) -> Self {
         let located = mockspace_registry::locate(mock_dir);
-        let text = std::fs::read_to_string(&located.config).unwrap_or_default();
-        Self::from_config(&text, &mock_rel(mock_dir, &located.repo_root))
+        let text = view.text(&located.config).unwrap_or_default();
+        Self::from_config(text, &mock_rel(mock_dir, &located.repo_root))
     }
 
     /// The particulars a `mockspace.toml` text names, the mock directory given.

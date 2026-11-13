@@ -22,6 +22,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use mockspace::reading::Reading;
+use mockspace::View;
 use mockspace::tool::{ArgSpec, NotALint, Purpose, Tool, ToolContext, ToolReport};
 
 use registry_lints::tree_walk;
@@ -183,11 +185,11 @@ fn names_crate(lower: &str, krate: &str) -> bool {
 /// An identifier is a capital and then at least two more letters or digits: a type, a trait, a
 /// variant. A path or a call in backticks is not one, and a statement naming either is caught by
 /// [`SHAPES`] instead.
-fn design_types(src_dirs: &[std::path::PathBuf]) -> (BTreeMap<String, Vec<String>>, usize) {
+fn design_types(view: &View<'_>, src_dirs: &[std::path::PathBuf]) -> (BTreeMap<String, Vec<String>>, usize) {
     let mut out: BTreeMap<String, Vec<String>> = BTreeMap::new();
     let mut read = 0usize;
-    for (krate, dir) in src_dirs.iter().flat_map(|d| crate::tree_walk::subdirs(d)) {
-        let Ok(text) = std::fs::read_to_string(dir.join("DESIGN.md.tmpl")) else {
+    for (krate, dir) in src_dirs.iter().flat_map(|d| crate::tree_walk::subdirs(view, d)) {
+        let Some(text) = view.text(dir.join("DESIGN.md.tmpl")) else {
             continue;
         };
         read += 1;
@@ -304,7 +306,7 @@ impl Tool for IntentOrMechanism {
             );
         }
 
-        let (types, designs) = design_types(ctx.src_dirs);
+        let (types, designs) = design_types(&Reading::new(ctx.repo_root).view(), ctx.src_dirs);
         let roots = path_roots(ctx.repo_root);
         if types.is_empty() {
             return ToolReport::inconclusive(format!(

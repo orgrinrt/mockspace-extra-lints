@@ -30,6 +30,7 @@ mod row;
 pub mod testkit;
 pub mod time;
 mod tree;
+use mockspace::reading::Reading;
 use registry_lints::tree_walk;
 pub mod trunk;
 pub mod view;
@@ -73,7 +74,7 @@ pub fn plan_of(texts: &[(String, String)]) -> Result<Plan, String> {
 
 fn read_texts(registry: &std::path::Path) -> Result<Vec<(String, String)>, String> {
     let mut texts = Vec::new();
-    for file in tree_walk::with_extension(registry, "toml", &[]) {
+    for file in tree_walk::with_extension(&Reading::new(registry).view(), registry, "toml", &[]) {
         let src = std::fs::read_to_string(&file)
             .map_err(|e| format!("cannot read {}: {e}", file.display()))?;
         texts.push((file.display().to_string(), src));
