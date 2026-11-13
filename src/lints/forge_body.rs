@@ -71,11 +71,10 @@ impl Lint for ForgeBody {
         if let Some(v) = params.get("required_sections") {
             self.required_sections = split_list(v);
         }
-        if let Some(v) = params.get("min_length") {
-            if let Ok(n) = v.trim().parse::<usize>() {
+        if let Some(v) = params.get("min_length")
+            && let Ok(n) = v.trim().parse::<usize>() {
                 self.min_length = n;
             }
-        }
         if let Some(v) = params.get("forbidden") {
             self.forbidden = split_list(v)
                 .into_iter()

@@ -88,8 +88,8 @@ fn scan_source(ctx: &LintContext, rel_path: &str, source: &str, out: &mut Vec<Li
 fn walk(node: Node, source: &str, rel_path: &str, out: &mut Vec<LintError>, ctx: &LintContext) {
     match node.kind() {
         "const_item" | "static_item" => {
-            if let Some(ty) = node.child_by_field_name("type") {
-                if type_is_str_ref(ty, source) {
+            if let Some(ty) = node.child_by_field_name("type")
+                && type_is_str_ref(ty, source) {
                     // Check if this item or any enclosing scope has a
                     // `cfg(debug_assertions)` gate.
                     if !is_debug_gated(node, source) {
@@ -114,7 +114,6 @@ fn walk(node: Node, source: &str, rel_path: &str, out: &mut Vec<LintError>, ctx:
                         }
                     }
                 }
-            }
         },
         _ => {},
     }

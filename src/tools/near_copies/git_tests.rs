@@ -6,8 +6,8 @@ use std::collections::BTreeSet;
 use mockspace_lint_rules::tool::{Tool, ToolContext};
 use mockspace_lint_rules::{Outcome, RegistryView};
 
-use super::tests::{both, found, write};
-use super::{NearCopies, render};
+use super::tests::write;
+use super::NearCopies;
 
 /// A repository of two crates on a trunk branch `base`, and a work branch cut from it.
 struct Repo {
