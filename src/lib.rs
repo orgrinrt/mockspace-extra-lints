@@ -32,6 +32,12 @@ mod string_literal;
 #[cfg(test)]
 mod test_support;
 pub mod tools;
+
+/// The registry lints and the readings of the tree they share, so a consumer's own lints, which
+/// reach the pack and none of its members, read the markers, the waivers and a lint's table the
+/// one way the pack does.
+#[cfg(feature = "workflow")]
+pub use mockspace_extra_registry_lints as registry_lints;
 mod util;
 
 pub mod lints {
