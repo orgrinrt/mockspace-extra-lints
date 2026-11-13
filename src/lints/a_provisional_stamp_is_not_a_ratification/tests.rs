@@ -207,6 +207,76 @@ fn control_a_row_superseding_another_may_carry_a_stamp() {
 }
 
 #[test]
+fn a_stamp_on_a_row_naming_its_heir_is_reported() {
+    // The relation as the pack's tenet schema writes it: on the replaced row, naming what replaces it.
+    for by in ROUTES {
+        for heir in ["newer", "tenet::newer", "other, newer"] {
+            let f = run(&[
+                ("proposal::newer", &[("says", "x")]),
+                ("proposal::p", &[
+                    ("superseded_by", heir),
+                    ("stamped_by", by),
+                    ("stamp", whole(by)),
+                ]),
+            ]);
+            let want = heir.split(", ").map(|_| "on-a-superseded-row").collect::<Vec<_>>();
+            assert_eq!(kinds(&f), want, "{by} {heir}: {f:?}");
+            assert!(f.iter().any(|e| e.message.contains("newer")), "{f:?}");
+        }
+    }
+}
+
+#[test]
+fn a_relation_written_at_both_ends_is_one_finding() {
+    let f = run(&[
+        ("proposal::newer", &[("supersedes", "p")]),
+        ("proposal::p", &[
+            ("superseded_by", "newer"),
+            ("stamped_by", "experts"),
+            ("stamp", whole("experts")),
+        ]),
+    ]);
+    assert_eq!(kinds(&f), ["on-a-superseded-row"], "{f:?}");
+}
+
+#[test]
+fn control_the_heir_named_by_a_replaced_row_may_carry_a_stamp() {
+    // The other direction: the row that replaces is read as unreplaced, so its stamp stands.
+    let f = run(&[
+        ("proposal::old", &[("superseded_by", "newer")]),
+        ("proposal::newer", &[("stamped_by", "experts"), ("stamp", whole("experts"))]),
+    ]);
+    assert!(f.is_empty(), "{f:?}");
+}
+
+#[test]
+fn control_a_blank_superseded_by_supersedes_nothing() {
+    for blank in ["", "  ", ","] {
+        let f = run(&[("proposal::p", &[
+            ("superseded_by", blank),
+            ("stamped_by", "experts"),
+            ("stamp", whole("experts")),
+        ])]);
+        assert!(f.is_empty(), "{blank:?}: {f:?}");
+    }
+}
+
+#[test]
+fn a_project_names_its_own_superseded_by_field() {
+    let mut lint = AProvisionalStampIsNotARatification::default();
+    lint.configure(&HashMap::from([(SUPERSEDED_BY_KEY.to_string(), "replaced_by".to_string())]));
+    let stamped = |field| -> Vec<LintError> {
+        run_with(&lint, &[("proposal::p", &[
+            (field, "newer"),
+            ("stamped_by", "experts"),
+            ("stamp", whole("experts")),
+        ])])
+    };
+    assert_eq!(kinds(&stamped("replaced_by")), ["on-a-superseded-row"]);
+    assert!(stamped("superseded_by").is_empty(), "the default field was still read");
+}
+
+#[test]
 fn a_stamped_row_a_ratified_row_promotes_is_reported() {
     for by in ROUTES {
         let f = run(&[

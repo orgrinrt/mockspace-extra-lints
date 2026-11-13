@@ -21,7 +21,8 @@
 //!   is one of them wrong; when he ratifies it the stamp comes off.
 //! - `not-stampable`: where `stampable` names the tiers a stamp may sit on, a stamp on a row at any
 //!   other.
-//! - `on-a-superseded-row`: a stamp on a row another row supersedes, which nothing stands on.
+//! - `on-a-superseded-row`: a stamp on a row another row supersedes, which nothing stands on,
+//!   whether the newer row names it or it names its heir.
 //! - `ratified-still-stamped`: a stamped row that a ratified row names under its ratifying edge,
 //!   for a registry whose blessing is a separate row naming what it promotes.
 //!
@@ -30,8 +31,9 @@
 //! namespaces whose rows may carry a stamp (`ruling, proposal`); `tiered`, the namespace carrying a
 //! tier (`ruling`); `tier_field` and `ratified` (`rung`, `ratified`); `ratifies_field`
 //! (`ratifies`); `stampable`, the tiers a stamp may sit on (every tier but the ratified one when
-//! unset); `supersedes_field` (`supersedes`). A registry with none of those namespaces gets no
-//! finding.
+//! unset); `supersedes_field` (`supersedes`), read on the newer row naming what it replaces;
+//! `superseded_by_field` (`superseded_by`), read on the replaced row naming what replaces it. A
+//! registry with none of those namespaces gets no finding.
 
 use std::collections::HashMap;
 
@@ -53,6 +55,7 @@ const RATIFIED_KEY: &str = "ratified";
 const RATIFIES_KEY: &str = "ratifies_field";
 const STAMPABLE_KEY: &str = "stampable";
 const SUPERSEDES_KEY: &str = "supersedes_field";
+const SUPERSEDED_BY_KEY: &str = "superseded_by_field";
 
 /// The separator the engine joins a list field with, and a configured list is written with.
 const JOIN: &str = ",";
@@ -66,6 +69,7 @@ pub struct AProvisionalStampIsNotARatification {
     ratifies_field: String,
     stampable:      Vec<String>,
     supersedes:     String,
+    superseded_by:  String,
 }
 
 impl Default for AProvisionalStampIsNotARatification {
@@ -78,6 +82,7 @@ impl Default for AProvisionalStampIsNotARatification {
             ratifies_field: "ratifies".to_string(),
             stampable:      Vec::new(),
             supersedes:     "supersedes".to_string(),
+            superseded_by:  "superseded_by".to_string(),
         }
     }
 }
@@ -100,6 +105,7 @@ impl Lint for AProvisionalStampIsNotARatification {
             RATIFIES_KEY,
             STAMPABLE_KEY,
             SUPERSEDES_KEY,
+            SUPERSEDED_BY_KEY,
         ]
     }
 
@@ -115,6 +121,7 @@ impl Lint for AProvisionalStampIsNotARatification {
             self.stampable = split(v).map(str::to_string).collect();
         }
         set(&mut self.supersedes, params.get(SUPERSEDES_KEY));
+        set(&mut self.superseded_by, params.get(SUPERSEDED_BY_KEY));
     }
 }
 
@@ -252,7 +259,16 @@ impl RepoLint for AProvisionalStampIsNotARatification {
                     ));
                 }
                 let slug = q.rsplit("::").next().unwrap_or(q);
-                for by_row in superseding.iter().filter(|(t, _)| t == slug).map(|(_, r)| r) {
+                // The rows replacing this one, from either end of the relation, each named once.
+                let mut heirs: Vec<&str> =
+                    superseding.iter().filter(|(t, _)| t == slug).map(|(_, r)| *r).collect();
+                for heir in present(reg, q, &self.superseded_by).into_iter().flat_map(split) {
+                    let tail = heir.rsplit("::").next().unwrap_or(heir);
+                    if !heirs.iter().any(|h| h.rsplit("::").next().unwrap_or(h) == tail) {
+                        heirs.push(heir);
+                    }
+                }
+                for by_row in heirs {
                     out.push(finding(
                         "on-a-superseded-row",
                         format!(
