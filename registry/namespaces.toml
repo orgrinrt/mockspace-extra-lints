@@ -80,8 +80,8 @@ values = ["provisional", "ratified", "held", "demoted"]
 name = "stamped_by"
 type = "string"
 required = false
-values = ["coordinators", "experts"]
-description = "Who stamped the row provisionally while the maintainer was away: `coordinators` where the coordinators converged on it, `experts` where two domain experts agreed. Written with `stamp` and never without it. A stamp is as good as the maintainer's word for now and never a ratification: the row keeps its standing, binds as that standing does, and is never cited as settled."
+values = ["coordinators", "experts", "maintainer"]
+description = "Who stamped the row provisionally while the maintainer was away: `coordinators` where the coordinators converged on it, `experts` where two domain experts agreed after a panel stretch, `maintainer` where the maintainer himself directed the row onto a stamp, with his passage cited in `stamp`. Written with `stamp` and never without it. A stamp is as good as the maintainer's word for now and never a ratification, whichever route made it: the row keeps its standing, binds as that standing does, and is never cited as settled."
 
 [[registry.namespace.field]]
 name = "stamp"

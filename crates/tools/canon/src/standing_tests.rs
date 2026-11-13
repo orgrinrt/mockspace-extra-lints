@@ -305,3 +305,23 @@ fn a_listing_marks_a_stamped_row_and_the_subjects_count_it_binding() {
     let subs = answered(&run(&waiting_as("held"), &scratch(), &["subjects"])).to_string();
     assert!(subs.contains("2 tenets, 1 binding, 0 ratified"), "{subs}");
 }
+
+#[test]
+fn a_row_the_maintainer_put_on_a_stamp_is_noted_as_stamped_and_never_as_ratified() {
+    let reg = view(&[("tenet::asked", &[
+        ("standing", "provisional"),
+        ("stamped_by", "maintainer"),
+        ("stamp", "on the maintainer's own word, OP-ANSWERS-18.md:5, ticket `0123456789ab`"),
+        ("what", "Waits on the maintainer."),
+    ])]);
+    let r = run(&reg, &scratch(), &["check", "asked"]);
+    assert!(matches!(r.outcome, Outcome::Clean { .. }), "{:?}", r.outcome);
+    assert!(
+        r.output.contains("`asked` is provisional, stamped by maintainer, not ratified"),
+        "{}",
+        r.output
+    );
+    // THE CONTROL: the maintainer's route counts as no ratification, so the row is not read as ratified.
+    let subs = answered(&run(&reg, &scratch(), &["subjects"])).to_string();
+    assert!(subs.contains("1 binding, 0 ratified"), "{subs}");
+}
