@@ -5,7 +5,7 @@
 
 //! Finding the tenets a text names.
 //!
-//! kaski cites a tenet by its bare id, in prose, in a comment, in backticks or behind `tenet::`, so a
+//! A tenet is cited by its bare id, in prose, in a comment, in backticks or behind `tenet::`, so a
 //! name is a whole id bounded by anything that cannot sit inside one. A tenet whose id is the start of
 //! another's is not named by the longer one.
 

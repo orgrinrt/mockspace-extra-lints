@@ -94,7 +94,7 @@ pub(crate) fn gist(what: &str) -> String {
     format!("{}...", &cut[.. at])
 }
 
-/// One tenet as a listing line, marked with its standing where op has not ratified it and with what
+/// One tenet as a listing line, marked with its standing where the maintainer has not ratified it and with what
 /// replaced it where it is superseded.
 pub(crate) fn line(out: &mut String, t: &Tenet<'_>, width: usize) {
     let mut note = gist(t.what);
@@ -244,9 +244,9 @@ fn uncited_answer(repo: &Path, all: &[Tenet<'_>]) -> (String, usize) {
     (out, shown)
 }
 
-/// The tenets `ids` name that still bind and op has not ratified, one line each naming its standing.
-/// Not a finding: a tenet that matters now is provisional until op's walk, so a check that blocked on
-/// one would pass nothing.
+/// The tenets `ids` name that still bind and the maintainer has not ratified, one line each naming its
+/// standing. Not a finding: a tenet that matters now is provisional until the maintainer goes through
+/// it, so a check that blocked on one would pass nothing.
 pub fn unratified(all: &[Tenet<'_>], ids: &[&str]) -> Vec<String> {
     ids.iter()
         .filter_map(|raw| {

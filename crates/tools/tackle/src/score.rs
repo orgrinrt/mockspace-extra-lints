@@ -1,11 +1,10 @@
 //! What makes a subject the next one, scored rather than filtered.
 //!
-//! The first version of this ranked topics by one number, row count, against one
-//! threshold, and switched to a second question only when the first was
-//! exhausted. Op's objection, and it is right: it should be a weighed complex
-//! scoring instead of one or the other, with all things playing into it. A
-//! single count cannot tell a topic nobody has started from one that is argued
-//! out and untranscribed, and those want opposite work.
+//! Ranking topics by one number, row count, against one threshold, and switching
+//! to a second question only when the first is exhausted, sends work to the wrong
+//! place, so every signal is weighed together. A single count cannot tell a topic
+//! nobody has started from one that is argued out and untranscribed, and those
+//! want opposite work.
 //!
 //! Five signals, each normalised across the topics so they are comparable, then
 //! weighted and summed. Every one is printed per topic, so the ranking is

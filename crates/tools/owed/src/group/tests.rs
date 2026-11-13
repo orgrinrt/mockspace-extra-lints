@@ -19,19 +19,19 @@ fn shapes(items: &[Item]) -> Vec<(How, Vec<usize>)> {
 }
 
 #[test]
-fn a_tag_is_a_class_and_the_questions_are_the_canon_silence_and_op() {
+fn a_tag_is_a_class_and_the_questions_are_the_canon_silence_and_the_maintainer() {
     assert_eq!(Class::of(None), Class::Unmarked);
     assert_eq!(Class::of(Some("  ")), Class::Unmarked);
     assert_eq!(Class::of(Some("stand-in")), Class::StandIn);
     assert_eq!(Class::of(Some("Stand In")), Class::StandIn);
     assert_eq!(Class::of(Some("canon silent")), Class::CanonSilent);
     assert_eq!(Class::of(Some("canon-silent")), Class::CanonSilent);
-    assert_eq!(Class::of(Some("op")), Class::Op);
+    assert_eq!(Class::of(Some("maintainer")), Class::Maintainer);
     assert_eq!(
         Class::of(Some("gpu-pass")),
         Class::Seam("gpu-pass".to_string())
     );
-    let owing: Vec<bool> = ["canon silent", "op", "stand-in", "gpu-pass"]
+    let owing: Vec<bool> = ["canon silent", "maintainer", "stand-in", "gpu-pass"]
         .iter()
         .map(|t| Class::of(Some(t)).owes_a_decision())
         .collect();

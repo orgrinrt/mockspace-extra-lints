@@ -7,15 +7,14 @@
 //!
 //! The canon is intent. A row saying what the game is for survives a total rewrite of everything
 //! under it; a row naming the component that does the work does not, and the day that component is
-//! replaced the row is quietly false. Ported from kamu.
+//! replaced the row is quietly false.
 //!
 //! A tool because it ranks candidates for a judgement. Naming a mechanism is not wrong on its own,
 //! and whether a sentence has crossed from intent into mechanism is a reading.
 //!
 //! Two signals, reported separately because they mean different things.
 //!
-//!   - A named piece of the implementation. kamu enumerates its mechanisms as rows; kaski does not
-//!     and has no use for such a namespace. What moves when kaski's implementation moves is its
+//!   - A named piece of the implementation. What moves when a project's implementation moves is its
 //!     crates and the types its designs declare, so those are what a statement is matched against:
 //!     every crate, and every identifier a `DESIGN.md.tmpl` under `mock/crates/` writes in backticks.
 //!   - Implementation-shaped text: a path, a Rust path, a flag, a file extension, a call. These name
@@ -29,12 +28,10 @@ use registry_lints::tree_walk;
 
 /// The fields carrying the canon's own statements, read out of the schema.
 ///
-/// **This was a hand-written list of seven names**, and it had already fallen
-/// out of step in the way both sibling tools document their own tables falling
-/// out of step. It could not see `does`, which is the field op ordered added for
-/// what a thing does; it could not see `note` or `gap`, which are 341 rows
-/// between them; and it named nothing on `term` at all. Twenty-six fields are
-/// declared and it read seven.
+/// Read from the schema rather than written down here, because a hand-written
+/// list of field names falls out of step with the schema as soon as a field
+/// such as `does`, `note` or `gap` is added, and then misses every row that
+/// states its content there.
 ///
 /// Three properties in the declaration decide it, and each is there for its own
 /// reason rather than for this tool:
@@ -43,8 +40,8 @@ use registry_lints::tree_walk;
 ///     citation lint; a `string[]` is a list of search words.
 ///   - **no `values`.** A closed enumeration is a label, so `kind` picks from
 ///     three words and none of them is a statement.
-///   - **not `visibility = "internal"`.** A quotation is op's exact words and is
-///     the one thing here nobody may edit, which is the opposite of what this
+///   - **not `visibility = "internal"`.** A quotation is the maintainer's exact words
+///     and is the one thing here nobody may edit, which is the opposite of what this
 ///     tool is looking for. `key` addresses a document the reader cannot open
 ///     and `source` records a derivation. All three are marked in the schema,
 ///     so none has to be named here.
@@ -170,8 +167,8 @@ fn opens_a_sentence(before: &str) -> bool {
 
 /// Whether the text names a crate: the whole name, not the start of a longer one.
 ///
-/// Its own boundary because a crate's name carries hyphens, so `kaski-fire` must not be found in
-/// `kaski-fire-lints`, which the alphanumeric boundary of [`names`] would allow.
+/// Its own boundary because a crate's name carries hyphens, so `app-fire` must not be found in
+/// `app-fire-lints`, which the alphanumeric boundary of [`names`] would allow.
 fn names_crate(lower: &str, krate: &str) -> bool {
     let part = |c: char| c.is_alphanumeric() || c == '-' || c == '_';
     lower.match_indices(krate).any(|(at, _)| {
@@ -233,9 +230,8 @@ fn path_roots(repo_root: &std::path::Path) -> Vec<String> {
 /// sit on word boundaries. Every member was chosen because it cannot occur in a sentence about intent
 /// without naming something concrete.
 ///
-/// kamu matched a bare `/` as a path separator. kaski writes alternatives with one, `Being/Genome`,
-/// `realm/culture/region`, and every slash in its statements when this was ported was one of those,
-/// so a path is matched by the roots the repository's paths start at instead, which [`path_roots()`]
+/// A bare `/` is no path separator here: a statement writes alternatives with one, `Being/Genome` or
+/// `realm/culture/region`. So a path is matched by the roots the repository's paths start at instead, which [`path_roots()`]
 /// reads from the tree, and by `src/`, which every crate's paths pass through.
 const SHAPES: &[(&str, &str)] = &[
     ("::", "a Rust path"),
