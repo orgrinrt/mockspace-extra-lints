@@ -47,6 +47,7 @@ pub mod lints {
     //! with its sources, the workspace as a whole, or one commit message or
     //! forge body.
 
+    pub mod a_provisional_stamp_is_not_a_ratification;
     pub(crate) mod agent_identity;
     pub mod arvo_types_only;
     pub(crate) mod authored_message;
@@ -102,6 +103,7 @@ use lints::no_runtime_spawn::NoRuntimeSpawn;
 use lints::no_source_include_in_test::NoSourceIncludeInTest;
 use lints::no_std::NoStd;
 use lints::no_superseded_citation::NoSupersededCitation;
+use lints::a_provisional_stamp_is_not_a_ratification::AProvisionalStampIsNotARatification;
 use lints::no_vec_in_trait_sig::NoVecInTraitSig;
 use lints::one_relation_field::OneRelationField;
 use lints::re_export_foreign_names::ReExportForeignNames;
@@ -185,6 +187,7 @@ mod own {
             AGitDependencyIsNotPinned::default(),
             NoSourceIncludeInTest::default(),
             NoSupersededCitation::default(),
+            AProvisionalStampIsNotARatification::default(),
             OneRelationField::default(),
             SlangFileSize::default(),
             SlangNoDuplicateFn::default(),
