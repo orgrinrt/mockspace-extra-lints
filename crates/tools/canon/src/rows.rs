@@ -22,7 +22,7 @@ pub struct Tenet<'a> {
     pub id:            &'a str,
     /// Whether the maintainer has ratified it or demoted it. Apart from `superseded_by` and a stamp: a
     /// superseded or a stamped row does not bind whatever its standing.
-    pub standing:      Standing,
+    pub standing:      Standing<'a>,
     /// Who stamped it provisionally, `coordinators` or `experts`, empty where nobody did. A stamp is never
     /// a ratification, so a stamped row binds nothing.
     pub stamped_by:    &'a str,

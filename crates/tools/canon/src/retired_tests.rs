@@ -437,7 +437,7 @@ fn split_under_with_no_path_reads_the_whole_repository_and_with_paths_only_those
 }
 
 #[test]
-fn contradicts_reads_no_word_a_stamped_or_demoted_tenet_rules_out() {
+fn contradicts_reads_no_word_a_stamped_demoted_or_held_tenet_rules_out() {
     let d = tree();
     let held = |standing: &str, stamped: bool| {
         let mut fields = vec![
@@ -455,6 +455,7 @@ fn contradicts_reads_no_word_a_stamped_or_demoted_tenet_rules_out() {
     for (unbound, reg) in [
         ("stamped", held("ratified", true)),
         ("demoted", held("demoted", false)),
+        ("held", held("held", false)),
     ] {
         let r = run(&reg, &d, &["contradicts"]);
         let text = answered(&r);

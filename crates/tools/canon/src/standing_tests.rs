@@ -12,23 +12,29 @@ use registry_lints::standing::Standing;
 use super::tests::{answered, fixture, run, scratch, view};
 use crate::rows::tenets;
 
-/// The tenets of `reg` whose `standing` is missing or outside the set `mockspace.toml` declares.
-fn unstated(reg: &RegistryView) -> Vec<String> {
-    tenets(reg)
-        .into_iter()
-        .filter(|t| t.standing == Standing::Unstated)
-        .map(|t| t.id.to_string())
-        .collect()
+/// The tenets of `reg` whose `standing` is missing, and those whose word is outside the pack's set.
+fn unstated_and_declared(reg: &RegistryView) -> (Vec<String>, Vec<String>) {
+    let all = tenets(reg);
+    let ids = |keep: fn(Standing<'_>) -> bool| {
+        all.iter()
+            .filter(|t| keep(t.standing))
+            .map(|t| t.id.to_string())
+            .collect::<Vec<_>>()
+    };
+    (
+        ids(|s| s == Standing::Unstated),
+        ids(|s| matches!(s, Standing::Declared(_))),
+    )
 }
 
 #[test]
-fn a_tenet_with_no_standing_or_a_misspelt_one_is_caught() {
-    // THE CONTROL: the law above, shown failing on rows that break it, and passing the words of the set.
+fn a_tenet_with_no_standing_binds_and_a_word_outside_the_set_binds_nothing() {
+    // THE CONTROL: the law above, shown on rows that break it, and passing the words of the set.
     let reg = view(&[
         ("tenet::bare", &[("what", "No standing at all.")]),
-        ("tenet::misspelt", &[
-            ("standing", "Provisional"),
-            ("what", "Capitalised."),
+        ("tenet::held", &[
+            ("standing", "held"),
+            ("what", "A word the project's schema declares."),
         ]),
         ("tenet::guessed", &[
             ("standing", "settled"),
@@ -47,7 +53,39 @@ fn a_tenet_with_no_standing_or_a_misspelt_one_is_caught() {
             ("what", "In the set."),
         ]),
     ]);
-    assert_eq!(unstated(&reg), ["bare", "guessed", "misspelt"]);
+    let (unstated, declared) = unstated_and_declared(&reg);
+    assert_eq!(unstated, ["bare"]);
+    assert_eq!(declared, ["guessed", "held"]);
+    let all = tenets(&reg);
+    let row = |id: &str| all.iter().find(|t| t.id == id).expect(id);
+    assert!(row("bare").binds(), "a row missing its standing never slips out of the checks");
+    assert!(!row("held").binds());
+    assert_eq!(row("held").standing.word(), "held");
+    assert!(row("fine").binds() && row("done").binds() && !row("shelved").binds());
+}
+
+#[test]
+fn check_blocks_on_a_row_whose_standing_only_the_project_declares() {
+    let reg = view(&[
+        ("tenet::kept", &[("standing", "provisional"), ("what", "Matters now.")]),
+        ("tenet::held", &[("standing", "held"), ("what", "Nobody backs it.")]),
+    ]);
+    let r = run(&reg, &scratch(), &["check", "kept", "held"]);
+    match &r.outcome {
+        Outcome::Findings(f) => {
+            assert_eq!(f.len(), 1, "{f:?}");
+            assert!(
+                f[0].message.contains("`held` is held")
+                    && f[0].message.contains("binds nothing"),
+                "{}",
+                f[0].message
+            );
+        },
+        other => panic!("{other:?}"),
+    }
+    // THE CONTROL: the provisional row alone is clean.
+    let r = run(&reg, &scratch(), &["check", "kept"]);
+    assert!(matches!(r.outcome, Outcome::Clean { .. }), "{:?}", r.outcome);
 }
 
 #[test]

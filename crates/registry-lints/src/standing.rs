@@ -21,10 +21,11 @@ pub const STAMP_FIELDS: [&str; 2] = ["stamped_by", "stamp"];
 pub const STAMPED: &str =
     "it carries a stamp, which is never a ratification: it binds nothing until the maintainer ratifies it";
 
-/// Whether the maintainer has ratified a tenet or demoted it, read from its `standing`. The set is the one
-/// `mockspace.toml` declares for the field, closed there, and named here once.
+/// Whether the maintainer has ratified a tenet or demoted it, read from its `standing`. The pack's set is
+/// named here once; a project's schema may declare more words for the field, and each of those binds
+/// nothing, so a project can hold a row below provisional without the pack knowing the word.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Standing {
+pub enum Standing<'a> {
     /// It matters now and the maintainer has not ratified it yet: the best current statement, never
     /// cited as settled.
     Provisional,
@@ -33,46 +34,56 @@ pub enum Standing {
     /// The maintainer does not go through it now: kept as reference for a later canon of its domain, binding
     /// nothing.
     Demoted,
-    /// The field is absent or holds a word outside the set, which the schema refuses; read so a test
-    /// over the committed rows can say which.
+    /// A word outside the pack's set, which only the project's own schema can have let through: its
+    /// `values` for the field declare it, and it says why the row binds nothing, as a word for a claim
+    /// nobody backs. The schema refuses a word it does not declare, so a misspelling never reaches here
+    /// in a committed tree.
+    Declared(&'a str),
+    /// The field is absent or empty, which the schema refuses; read as binding so a row missing its
+    /// standing never slips out of the checks, and so a test over the committed rows can say which.
     Unstated,
 }
 
-impl Standing {
-    /// The words of the set, as a row writes them.
+impl<'a> Standing<'a> {
+    /// The words of the pack's set, as a row writes them.
     pub const WORDS: [&'static str; 3] = ["provisional", "ratified", "demoted"];
 
     /// The standing a row's `standing` field spells.
-    pub const fn of(word: &str) -> Self {
+    pub const fn of(word: &'a str) -> Self {
         match word.as_bytes() {
             b"provisional" => Self::Provisional,
             b"ratified" => Self::Ratified,
             b"demoted" => Self::Demoted,
-            _ => Self::Unstated,
+            b"" => Self::Unstated,
+            _ => Self::Declared(word),
         }
     }
 
     /// The word a listing shows for it.
-    pub const fn word(self) -> &'static str {
+    pub const fn word(self) -> &'a str {
         match self {
             Self::Provisional => "provisional",
             Self::Ratified => "ratified",
             Self::Demoted => "demoted",
+            Self::Declared(word) => word,
             Self::Unstated => "unstated",
         }
     }
 
     /// Whether a row of this standing binds, where nothing supersedes it and nothing stamps it. A demoted
-    /// row binds nothing; a row whose standing is unstated is read as binding, so a misspelt word never
-    /// lets a row slip out of the checks.
+    /// row binds nothing and neither does one whose word only the project declares; a row whose standing
+    /// is unstated is read as binding, so a row missing the field never slips out of the checks.
     pub const fn binds(self) -> bool {
-        !matches!(self, Self::Demoted)
+        !matches!(self, Self::Demoted | Self::Declared(_))
     }
 
     /// Why a row of this standing binds nothing, as `check` says it; empty for a standing that binds.
     pub const fn unbound(self) -> &'static str {
         match self {
             Self::Demoted => "kept as reference for a later canon of its domain, it binds nothing",
+            Self::Declared(_) => {
+                "a standing the project's schema declares below provisional, it binds nothing until the maintainer backs it"
+            },
             Self::Provisional | Self::Ratified | Self::Unstated => "",
         }
     }

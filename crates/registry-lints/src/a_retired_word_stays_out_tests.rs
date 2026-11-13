@@ -292,7 +292,7 @@ fn lint() -> ARetiredWordStaysOut {
 }
 
 #[test]
-fn a_stamped_or_demoted_tenet_rules_nothing_out_and_the_same_row_ratified_does() {
+fn a_stamped_demoted_or_held_tenet_rules_nothing_out_and_the_same_row_ratified_does() {
     let d = scratch("retired-word-stamped");
     write(&d, "mock/crates/kaski-a/DESIGN.md.tmpl", "the quillfern stands\n");
     let held = |standing: &str, stamped: bool| {
@@ -306,6 +306,7 @@ fn a_stamped_or_demoted_tenet_rules_nothing_out_and_the_same_row_ratified_does()
     for (unbound, reg) in [
         ("stamped", held("ratified", true)),
         ("demoted", held("demoted", false)),
+        ("held", held("held", false)),
     ] {
         let found = checked(&d, &reg, &config(&[]), &Change::default());
         assert!(found.is_empty(), "a {unbound} tenet binds nothing: {found:?}");
