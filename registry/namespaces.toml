@@ -73,8 +73,8 @@ description = "The tenets that replace this one. A superseded tenet is kept rath
 name = "standing"
 type = "string"
 required = true
-description = "`provisional` where it matters now and the maintainer has not ratified it: read as the best current statement and never cited as settled. `ratified` where the maintainer went through it on a named date, with their answer in the row's `answers`. `demoted` where it is kept as reference for a later canon of its domain and binds nothing. Apart from `superseded_by`: a superseded row does not bind whatever its standing."
-values = ["provisional", "ratified", "demoted"]
+description = "`provisional` where it matters now and the maintainer has not ratified it: read as the best current statement and never cited as settled. `ratified` where the maintainer went through it on a named date, with their answer in the row's `answers`. `pending` where it is written down and waits on the maintainer, who has neither ratified it nor let it stand as the current statement: shown and searched, and binding nothing until it is ratified or made provisional. `demoted` where it is kept as reference for a later canon of its domain and binds nothing. Apart from `superseded_by`: a superseded row does not bind whatever its standing."
+values = ["provisional", "ratified", "pending", "demoted"]
 
 [[registry.namespace.field]]
 name = "subject"

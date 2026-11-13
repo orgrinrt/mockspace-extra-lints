@@ -261,7 +261,7 @@ pub fn unratified(all: &[Tenet<'_>], ids: &[&str]) -> Vec<String> {
 }
 
 /// What is wrong with the tenets `ids` name, one line each: an id that is no tenet, an id whose tenet
-/// something supersedes, and an id whose tenet is demoted and binds nothing. A `tenet::` prefix is the
+/// something supersedes, and an id whose tenet is pending or demoted and binds nothing. A `tenet::` prefix is the
 /// namespace and is read off, as a citation spells it. Empty when every id names a tenet that still
 /// binds, provisional or ratified.
 pub fn check(all: &[Tenet<'_>], ids: &[&str]) -> Vec<String> {
@@ -282,8 +282,9 @@ pub fn check(all: &[Tenet<'_>], ids: &[&str]) -> Vec<String> {
                 },
                 Some(t) if !t.binds() => {
                     Some(format!(
-                        "`{id}` is {}: kept as reference for a later canon of its domain, it binds nothing",
-                        t.standing.word()
+                        "`{id}` is {}: {}",
+                        t.standing.word(),
+                        t.standing.unbound()
                     ))
                 },
                 Some(_) => None,

@@ -45,6 +45,10 @@ fn a_tenet_with_no_standing_or_a_misspelt_one_is_caught() {
             ("standing", "demoted"),
             ("what", "In the set."),
         ]),
+        ("tenet::asked", &[
+            ("standing", "pending"),
+            ("what", "In the set."),
+        ]),
     ]);
     assert_eq!(unstated(&reg), ["bare", "guessed", "misspelt"]);
 }
@@ -184,4 +188,72 @@ fn a_demoted_row_binds_nothing_and_has_no_heir() {
     // THE CONTROL: the provisional row binds.
     assert!(row("kept").binds());
     assert!(crate::rows::heirs(&all).is_empty());
+}
+
+/// A provisional row beside a pending one: the pending row waits on the maintainer and binds nothing.
+fn waiting() -> RegistryView {
+    view(&[
+        ("subject::time", &[("what", "The clock.")]),
+        ("tenet::kept", &[
+            ("standing", "provisional"),
+            ("subject", "time"),
+            ("what", "Matters now."),
+        ]),
+        ("tenet::asked", &[
+            ("standing", "pending"),
+            ("subject", "time"),
+            ("what", "Waits on the maintainer."),
+        ]),
+    ])
+}
+
+#[test]
+fn a_pending_row_binds_nothing_and_has_no_heir() {
+    let reg = waiting();
+    let all = tenets(&reg);
+    let row = |id: &str| all.iter().find(|t| t.id == id).expect(id);
+    assert_eq!(row("asked").standing, Standing::Pending);
+    assert!(!row("asked").binds());
+    assert!(!row("asked").replaced());
+    // THE CONTROL: the provisional row beside it binds.
+    assert!(row("kept").binds());
+    assert!(crate::rows::heirs(&all).is_empty());
+}
+
+#[test]
+fn check_blocks_on_a_pending_row_and_says_it_waits_on_the_maintainer() {
+    let r = run(&waiting(), &scratch(), &["check", "kept", "asked"]);
+    match &r.outcome {
+        Outcome::Findings(f) => {
+            assert_eq!(f.len(), 1, "{f:?}");
+            assert!(
+                f[0].message.contains("`asked` is pending")
+                    && f[0].message.contains("waiting on the maintainer")
+                    && f[0].message.contains("binds nothing"),
+                "{}",
+                f[0].message
+            );
+            // THE CONTROL: a pending row is not read as a demoted or a superseded one.
+            assert!(!f[0].message.contains("later canon"), "{}", f[0].message);
+            assert!(!f[0].message.contains("superseded"), "{}", f[0].message);
+        },
+        other => panic!("{other:?}"),
+    }
+    assert!(r.outcome.blocks(mockspace::LintMode::Push));
+}
+
+#[test]
+fn a_listing_marks_a_pending_row_and_the_subjects_do_not_count_it_binding() {
+    let reg = waiting();
+    let time = answered(&run(&reg, &scratch(), &["subject", "time"])).to_string();
+    let asked = time
+        .lines()
+        .find(|l| l.trim_start().starts_with("asked"))
+        .unwrap_or_default();
+    assert!(asked.contains("(pending)"), "{time}");
+    let found = answered(&run(&reg, &scratch(), &["find", "maintainer"])).to_string();
+    assert!(found.contains("(pending)"), "{found}");
+    let subs = answered(&run(&reg, &scratch(), &["subjects"])).to_string();
+    // THE CONTROL: two tenets, of which only the provisional one binds.
+    assert!(subs.contains("2 tenets, 1 binding, 0 ratified"), "{subs}");
 }
