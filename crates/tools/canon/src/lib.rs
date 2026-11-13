@@ -43,7 +43,7 @@ mod tree;
 mod verbs;
 
 pub use names::named;
-pub use rows::{Standing, Tenet, carries, heirs, joined_to, subjects, tenets};
+pub use rows::{Tenet, carries, heirs, joined_to, subjects, tenets};
 pub use tree::{Line, Tier, mentions, tier_of};
 
 /// The check, holding the content directories `[tools.canon]` names, which are read as the content tier.

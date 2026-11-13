@@ -7,9 +7,10 @@
 
 use mockspace::RegistryView;
 use mockspace::tool::Outcome;
+use registry_lints::standing::Standing;
 
 use super::tests::{answered, fixture, run, scratch, view};
-use crate::rows::{Standing, tenets};
+use crate::rows::tenets;
 
 /// The tenets of `reg` whose `standing` is missing or outside the set `mockspace.toml` declares.
 fn unstated(reg: &RegistryView) -> Vec<String> {

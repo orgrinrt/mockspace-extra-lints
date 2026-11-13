@@ -25,7 +25,7 @@ const SHOWN: usize = 110;
 /// The tenets that still bind and rule out at least one word, as the scan reads them.
 pub fn retiring(all: &[Tenet<'_>]) -> Vec<Retiring> {
     all.iter()
-        .filter(|t| !t.replaced() && !t.rules_out.is_empty())
+        .filter(|t| t.binds() && !t.rules_out.is_empty())
         .map(|t| {
             Retiring {
                 id:    t.id.to_owned(),

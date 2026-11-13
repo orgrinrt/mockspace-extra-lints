@@ -10,9 +10,10 @@
 //! `<mock>/lints/` file has, and [`collect`] hands every one to the pack. The files that declare no
 //! lint are the one reading of their concern, public so the tools and a consumer's own lints read by
 //! them rather than by a copy: what a marker is (`fixme_markers`), which files are walked
-//! (`tree_walk`, `canon_tree`), the tenets (`canon_rows`), the words a tenet retires
-//! (`retired_words`), the waivers (`ratchets`), what a merge carries (`merge_carried`), the lines a
-//! change touched (`touched_lines`) and a lint's table in `mockspace.toml` (`gate_config`).
+//! (`tree_walk`, `canon_tree`), the tenets (`canon_rows`), whether one binds (`standing`), the words
+//! a tenet retires (`retired_words`), the waivers (`ratchets`), what a merge carries
+//! (`merge_carried`), the lines a change touched (`touched_lines`) and a lint's table in
+//! `mockspace.toml` (`gate_config`).
 
 use mockspace::LintPack;
 
@@ -32,6 +33,7 @@ pub mod merge_carried;
 pub mod project;
 pub mod ratchets;
 pub mod retired_words;
+pub mod standing;
 pub mod touched_lines;
 pub mod tree_walk;
 

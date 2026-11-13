@@ -13,9 +13,10 @@ use std::fmt::Write as _;
 use std::path::Path;
 
 use mockspace::RegistryView;
+use registry_lints::standing::Standing;
 
 use crate::layout::Layout;
-use crate::rows::{Standing, Tenet, carries, subjects, tenets};
+use crate::rows::{Tenet, carries, subjects, tenets};
 use crate::scope::Scope;
 use crate::tree::mentions;
 use crate::{VERBS, reference};

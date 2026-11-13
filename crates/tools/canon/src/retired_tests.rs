@@ -435,3 +435,26 @@ fn split_under_with_no_path_reads_the_whole_repository_and_with_paths_only_those
     .0;
     assert_eq!(two.len(), 2, "{two:?}");
 }
+
+#[test]
+fn contradicts_reads_no_word_a_pending_or_demoted_tenet_rules_out() {
+    let d = tree();
+    let held = |standing: &str| {
+        view(&[("tenet::there_is_no_zorblax", &[
+            ("subject", "planet"),
+            ("what", "There is no zorblax."),
+            ("rules_out", "zorblax"),
+            ("standing", standing),
+        ])])
+    };
+    for unbound in ["pending", "demoted"] {
+        let reg = held(unbound);
+        let r = run(&reg, &d, &["contradicts"]);
+        let text = answered(&r);
+        assert!(!text.contains("kaski-a/DESIGN.md.tmpl"), "a {unbound} tenet binds nothing: {text}");
+    }
+    let reg = held("ratified");
+    let r = run(&reg, &d, &["contradicts"]);
+    let text = answered(&r);
+    assert!(text.contains("design  mock/crates/kaski-a/DESIGN.md.tmpl:1"), "{text}");
+}

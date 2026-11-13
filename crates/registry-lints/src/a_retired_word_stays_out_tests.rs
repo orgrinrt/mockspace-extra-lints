@@ -290,3 +290,22 @@ fn lint() -> ARetiredWordStaysOut {
         content: crate::layout::ContentDirs::new(&["content"]),
     }
 }
+
+#[test]
+fn a_pending_or_demoted_tenet_rules_nothing_out_and_the_same_row_ratified_does() {
+    let d = scratch("retired-word-pending");
+    write(&d, "mock/crates/kaski-a/DESIGN.md.tmpl", "the quillfern stands\n");
+    let held = |standing: &str| {
+        view(&[("tenet::there_is_no_quillfern", &[
+            ("rules_out", "quillfern"),
+            ("standing", standing),
+        ])])
+    };
+    for unbound in ["pending", "demoted"] {
+        let found = checked(&d, &held(unbound), &config(&[]), &Change::default());
+        assert!(found.is_empty(), "a {unbound} tenet binds nothing: {found:?}");
+    }
+    let found = checked(&d, &held("ratified"), &config(&[]), &Change::default());
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert!(found[0].message.contains("there_is_no_quillfern"));
+}
