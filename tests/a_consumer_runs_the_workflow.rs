@@ -6,9 +6,8 @@
 //! Every step goes the way a run goes: the engine's own config reader reads the scratch's
 //! `mockspace.toml`, the registry is loaded and viewed as the tool runner loads it, and the tool is
 //! the one the pack's `collect` registered under that name, so a tool the feature does not register
-//! or a declaration the shipped file lacks fails here.
-
-#![cfg(feature = "workflow")]
+//! or a declaration the shipped file lacks fails here. The test build turns the
+//! feature on through the pack's own dev-dependency on itself, so a plain `cargo test` runs this.
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -30,10 +29,11 @@ fn write(root: &Path, rel: &str, text: &str) {
     fs::write(p, text).unwrap();
 }
 
-/// A consumer on `dev`: its config is its own root keys, then the shipped declarations as they
-/// are; its registry holds the shipped ticket vocabulary and planning roles and no row of its own.
-fn consumer() -> PathBuf {
-    let root = std::env::temp_dir().join(format!("extra-lints-consumer-{}", std::process::id()));
+/// A consumer on `dev`, in a directory of its own for `tag`: its config is its own root keys, the
+/// shipped declarations as they are and then `tools`, its `[tools]` tables; its registry holds the shipped ticket vocabulary and planning roles and no row of its own.
+fn consumer(tag: &str, tools: &str) -> PathBuf {
+    let root =
+        std::env::temp_dir().join(format!("extra-lints-consumer-{tag}-{}", std::process::id()));
     let _ = fs::remove_dir_all(&root);
     let shipped = pack_root().join("registry");
     let declarations = fs::read_to_string(shipped.join("namespaces.toml")).unwrap();
@@ -41,7 +41,7 @@ fn consumer() -> PathBuf {
         &root,
         "mockspace.toml",
         &format!(
-            "project_name = \"scratch\"\ncrate_prefix = \"scratch\"\nmock_dir = \"mock\"\nsrc_dirs = [\"crates\"]\n\n{declarations}"
+            "project_name = \"scratch\"\ncrate_prefix = \"scratch\"\nmock_dir = \"mock\"\nsrc_dirs = [\"crates\"]\n\n{declarations}\n{tools}"
         ),
     );
     for f in ["ticket/states.toml", "ticket/kinds.toml", "plan/roles.toml"] {
@@ -80,11 +80,19 @@ fn consumer() -> PathBuf {
     root
 }
 
-/// The pack's tools as the engine gets them.
-fn pack() -> LintPack {
+/// The pack's tools as the engine gets them, configured from `root`'s `[tools]` the way the engine
+/// configures a loaded pack, or unconfigured with no `root`.
+fn pack_for(root: Option<&Path>) -> LintPack {
     let mut pack = LintPack::default();
     mockspace_extra_lints::collect(&mut pack);
+    if let Some(root) = root {
+        pack.configure_tools(&Config::from_dir(&root.join("mock")).tool_params);
+    }
     pack
+}
+
+fn pack() -> LintPack {
+    pack_for(None)
 }
 
 /// Runs the tool registered as `name` over the consumer as it stands now.
@@ -120,14 +128,28 @@ fn every_tool_name_is_registered_once() {
     for t in &pack.tools {
         assert!(seen.insert(t.name()), "`{}` is registered twice", t.name());
     }
-    for name in ["ticket-add", "ticket-move", "tickets", "canon", "owed", "corpus", "unearth"] {
-        assert!(seen.contains(name), "`{name}` is not registered");
+    // Every tool of `crates/tools`, by its directory, so a crate the feature or `collect` leaves out
+    // is named here.
+    let dirs = fs::read_dir(pack_root().join("crates/tools")).unwrap();
+    let mut expected: Vec<String> = dirs
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    expected.sort();
+    assert_eq!(expected.len(), 18, "{expected:?}");
+    for name in &expected {
+        assert!(seen.contains(name.as_str()), "`{name}` is not registered");
     }
+    // THE CONTROL: a name no crate carries is not found, so the loop above is not passing on a set
+    // that holds everything.
+    assert!(
+        !seen.contains("bevy-quote-check"),
+        "the bevy arm ships with the pack"
+    );
 }
 
 #[test]
 fn a_consumer_adds_moves_and_lists_a_ticket_and_asks_its_canon() {
-    let root = consumer();
+    let root = consumer("ticket", "");
     let pack = pack();
 
     let added = run(&pack, &root, "ticket-add", &[
@@ -195,6 +217,16 @@ fn a_consumer_adds_moves_and_lists_a_ticket_and_asks_its_canon() {
         found.output
     );
 
+    // THE CONTROL: a word no row carries finds nothing, so the hit above is the tenet's keyword and
+    // not a listing of every row.
+    let missed = run(&pack, &root, "canon", &["find", "glacier"]);
+    assert!(
+        !missed.output.contains("rain_wets_the_ground"),
+        "{:?} {}",
+        missed.outcome,
+        missed.output
+    );
+
     let checked = run(&pack, &root, "canon", &["check", "rain_wets_the_ground"]);
     assert!(clean(&checked), "{:?} {}", checked.outcome, checked.output);
     // THE CONTROL: an id that is no tenet is a finding.
@@ -210,4 +242,51 @@ fn a_consumer_adds_moves_and_lists_a_ticket_and_asks_its_canon() {
     }
 
     let _ = fs::remove_dir_all(&root);
+}
+
+/// Two subjects with a tenet each, so `tackle` has something to rank and every subject is named.
+fn two_subjects(root: &Path) {
+    write(
+        root,
+        "mock/registry/tenet/ground.toml",
+        "[[subject]]\nid = \"ground\"\nwhat = \"The ground and what lies on it.\"\n\n\
+         [[subject]]\nid = \"tooling\"\nwhat = \"How the project is built.\"\n\n\
+         [[tenet]]\nid = \"rain_wets_the_ground\"\nwhat = \"Rain wets the ground it falls on.\"\n\
+         subject = \"ground\"\nstanding = \"ratified\"\n\n\
+         [[tenet]]\nid = \"a_build_is_one_command\"\nwhat = \"A build is one command.\"\n\
+         subject = \"tooling\"\nstanding = \"ratified\"\n",
+    );
+}
+
+#[test]
+fn a_consumer_names_the_subjects_about_the_work_in_its_tools_table() {
+    let root = consumer(
+        "tackle",
+        "[tools.tackle]\nabout_the_work = [\"ground\", \"tooling\"]\n",
+    );
+    two_subjects(&root);
+    let out = run(&pack_for(Some(&root)), &root, "tackle", &["next"]);
+    match &out.outcome {
+        Outcome::Inconclusive {
+            reason,
+        } => {
+            assert!(reason.contains("about the work"), "{reason}")
+        },
+        other => panic!("both subjects are named about the work, so none is picked: {other:?}"),
+    }
+
+    // THE CONTROL: the same consumer with no table has a subject picked, so the refusal above is the
+    // table's doing.
+    let bare = consumer("tackle-bare", "");
+    two_subjects(&bare);
+    let picked = run(&pack_for(Some(&bare)), &bare, "tackle", &["next"]);
+    assert!(
+        picked.output.contains("TACKLE NEXT:"),
+        "{:?} {}",
+        picked.outcome,
+        picked.output
+    );
+
+    let _ = fs::remove_dir_all(&root);
+    let _ = fs::remove_dir_all(&bare);
 }

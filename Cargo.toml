@@ -85,6 +85,10 @@ workflow = [
 
 [dev-dependencies]
 tempfile = "3"
+# The pack itself with the workflow on, so a plain `cargo test` builds and runs the scratch consumer of
+# `tests/a_consumer_runs_the_workflow.rs`. Only a test build takes it; a consumer's `[lint-crates]` entry
+# still gets the feature only by naming it.
+mockspace-extra-lints = { path = ".", features = ["workflow"] }
 # The engine's own config reader, so a test can load a `mockspace.toml` the way a run does.
 # The same URL spelling as above, for the reason given there.
 mockspace = { git = "https://github.com/hiisi-digital/mockspace.git", branch = "work/extension-carriers" }
