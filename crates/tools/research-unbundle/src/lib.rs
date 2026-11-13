@@ -6,13 +6,14 @@
 //! `mock research-unbundle <bundle> <dir>`: a research bundle written out as the files of a research note.
 //!
 //! A helper that has no push of its own posts its research as one attachment: every file in turn, each
-//! under a line `=== FILE: <name> ===`. This writes the files under `dir`, `mock/research/<stamp>_<slug>/`,
+//! under a line `=== FILE: <name> ===`. This writes the files under `dir`, `<mock>/research/<stamp>_<slug>/` in the mock directory,
 //! and splits any markdown file over [`LIMIT`] lines along its `## ` headings, so a note lands in the
 //! shape the research directory keeps without being cut by hand.
 
 use std::path::{Path, PathBuf};
 
 use mockspace::tool::{ArgRoot, ArgSpec, Purpose, Tool, ToolContext, ToolReport};
+use registry_lints::layout::{ContentDirs, Layout, mock_rel};
 
 mod bundle;
 mod split;
@@ -38,6 +39,7 @@ impl Tool for ResearchUnbundle {
     fn purpose(&self) -> Purpose {
         Purpose::Make {
             writes: &["{dir}/**"],
+            // FIXME(a_maker_tool_s_writes_cannot_name_the_mock_directory): `under` names `mock`, since a pattern cannot name the mock directory the config declares
             roots:  &[ArgRoot {
                 arg:   "dir",
                 under: "mock/research/*",
@@ -55,7 +57,7 @@ impl Tool for ResearchUnbundle {
             ArgSpec {
                 name:        "dir",
                 required:    true,
-                description: "the note's directory, `mock/research/<YYYYMMDDHHMM>_<slug>`, which must not hold any of the files yet",
+                description: "the note's directory, `<mock>/research/<YYYYMMDDHHMM>_<slug>` under the mock directory, which must not hold any of the files yet",
             },
         ]
     }
@@ -70,7 +72,7 @@ impl Tool for ResearchUnbundle {
                 "research-unbundle wants a bundle file and the note's directory",
             );
         };
-        match unbundle(ctx.repo_root, bundle, dir) {
+        match unbundle(ctx.repo_root, &mock_rel(ctx.mock_dir, ctx.repo_root), bundle, dir) {
             Ok(out) => ToolReport::reported(out.report, out.files),
             Err(e) => ToolReport::inconclusive(e),
         }
@@ -99,17 +101,20 @@ fn note_name(dir: &str) -> bool {
             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
 }
 
-/// The bundle at `bundle` written under `dir`, both relative to the repository unless absolute.
+/// The bundle at `bundle` written under `dir`, both relative to the repository unless absolute, in the
+/// repository whose mock directory is `mock`, relative to its root.
 ///
 /// # Errors
 ///
-/// When the directory is not `mock/research/<stamp>_<slug>`, the bundle cannot be read or holds
+/// When the directory is not `<mock>/research/<stamp>_<slug>`, the bundle cannot be read or holds
 /// no file, a name is unsafe or given twice, or a file to write is already there.
-pub fn unbundle(repo: &Path, bundle: &str, dir: &str) -> Result<Written, String> {
+pub fn unbundle(repo: &Path, mock: &str, bundle: &str, dir: &str) -> Result<Written, String> {
     let rel = dir.trim_end_matches('/');
-    if !rel.starts_with("mock/research/") || rel.matches('/').count() != 2 || !note_name(rel) {
+    let research = Layout::new(mock, ContentDirs::default()).in_mock("research/");
+    let note = rel.strip_prefix(research.as_str());
+    if !note.is_some_and(|n| !n.contains('/') && note_name(n)) {
         return Err(format!(
-            "`{dir}` is not a note's directory: `mock/research/<12 digits>_<slug>`, the slug lowercase letters, digits and `-`"
+            "`{dir}` is not a note's directory: `{research}<12 digits>_<slug>`, the slug lowercase letters, digits and `-`"
         ));
     }
     let path = if Path::new(bundle).is_absolute() || Path::new(bundle).exists() {

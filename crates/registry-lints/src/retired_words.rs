@@ -18,6 +18,7 @@ use std::path::{Path, PathBuf};
 use mockspace::View;
 
 use crate::canon_tree::{Tier, files, tier_of};
+use crate::layout::Layout;
 
 /// How many lines either side of a line may carry the ruling tenet's id and let the line through: a
 /// sentence about the retirement says which tenet retired the word, and a design wraps its lines.
@@ -117,36 +118,39 @@ fn without_id(text: &str, id: &str) -> String {
     out
 }
 
-/// Whether a file is read for retired words: a design, code or content, and the shaders under `mock/`
-/// that the tiers leave in `Other`, and the root `README.md`, which is written by hand and has no template to
-/// be read through; the generated `docs/` are read through their templates. Research, rounds and the canon
-/// record what was once said.
-pub fn scanned(rel: &Path) -> bool {
-    match tier_of(rel) {
+/// Whether a file is read for retired words: a design, code or content, and the shaders under the mock
+/// directory that the tiers leave in `Other`, and the root `README.md`, which is written by hand and has no
+/// template to be read through; the generated `docs/` are read through their templates. Research, rounds and
+/// the canon record what was once said.
+pub fn scanned(rel: &Path, layout: &Layout) -> bool {
+    match tier_of(rel, layout) {
         Tier::Design | Tier::Code | Tier::Content => true,
         Tier::Other => {
             let s = rel.to_string_lossy().replace('\\', "/");
             if s == "README.md" {
                 return true;
             }
-            // FIXME(pack_lints_and_tools_read_the_mock_directory_as_mock): the mock directory is read as `mock`, not as the one `mockspace.toml` declares
-            s.starts_with("mock/") && (s.ends_with(".slang") || s.ends_with(".wgsl"))
+            layout
+                .under_mock(&s)
+                .is_some_and(|m| m.ends_with(".slang") || m.ends_with(".wgsl"))
         },
         _ => false,
     }
 }
 
 /// The unit of the repository a file belongs to, which the lint's debt list names: a crate by its
-/// directory name, `lints`, `tools`, `benches` or whichever directory of `mock/` it sits in, `content`,
-/// and `workspace` for what sits at the top of `mock/` or of the repository.
-pub fn unit_of(rel: &Path) -> String {
+/// directory name, `lints`, `tools`, `benches` or whichever directory of the mock directory it sits in,
+/// the content directory it sits in, and `workspace` for what sits at the top of the mock directory or of
+/// the repository.
+pub fn unit_of(rel: &Path, layout: &Layout) -> String {
     let s = rel.to_string_lossy().replace('\\', "/");
-    let parts: Vec<&str> = s.split('/').collect();
+    if let Some((dir, _)) = layout.in_content(&s) {
+        return dir.to_owned();
+    }
+    let parts: Vec<&str> = layout.under_mock(&s).map_or_else(Vec::new, |m| m.split('/').collect());
     match parts.as_slice() {
-        // FIXME(pack_lints_and_tools_read_the_mock_directory_as_mock): the mock directory is read as `mock`, not as the one `mockspace.toml` declares
-        ["mock", "crates", name, _, ..] => (*name).to_owned(),
-        ["mock", dir, _, ..] => (*dir).to_owned(),
-        ["content", _, ..] => "content".to_owned(),
+        ["crates", name, _, ..] => (*name).to_owned(),
+        [dir, _, ..] => (*dir).to_owned(),
         _ => "workspace".to_owned(),
     }
 }
@@ -155,10 +159,10 @@ pub fn unit_of(rel: &Path) -> String {
 /// lines that stand, a line being one hit for a tenet however many of its terms it names, the second the
 /// lines within `EXCUSE_REACH` lines of the ruling tenet's id.
 /// An excuse is a nearness and not a reading, so a verb that reports shows what it let through.
-pub fn split_text(rel: &Path, body: &str, rules: &[Retiring]) -> (Vec<Hit>, Vec<Hit>) {
+pub fn split_text(rel: &Path, body: &str, rules: &[Retiring], layout: &Layout) -> (Vec<Hit>, Vec<Hit>) {
     let lines: Vec<&str> = body.lines().collect();
     let tokens: Vec<Vec<String>> = lines.iter().map(|l| words(l)).collect();
-    let tier = tier_of(rel);
+    let tier = tier_of(rel, layout);
     let mut out = Vec::new();
     let mut excused = Vec::new();
     for rule in rules {
@@ -197,15 +201,21 @@ pub fn split_text(rel: &Path, body: &str, rules: &[Retiring]) -> (Vec<Hit>, Vec<
 /// Every hit in the repository, or only under any of `under` (paths relative to the repository root) where
 /// any is given, in path and line order, as `(held, excused)`: the excused are the lines the ruling tenet's
 /// id stands beside, which it lets through.
-pub fn split_under(view: &View<'_>, repo: &Path, rules: &[Retiring], under: &[&Path]) -> (Vec<Hit>, Vec<Hit>) {
+pub fn split_under(
+    view: &View<'_>,
+    repo: &Path,
+    rules: &[Retiring],
+    under: &[&Path],
+    layout: &Layout,
+) -> (Vec<Hit>, Vec<Hit>) {
     let mut out = Vec::new();
     let mut excused = Vec::new();
     for rel in files(view, repo) {
-        if !scanned(&rel) || (!under.is_empty() && !under.iter().any(|u| rel.starts_with(u))) {
+        if !scanned(&rel, layout) || (!under.is_empty() && !under.iter().any(|u| rel.starts_with(u))) {
             continue;
         }
         if let Some(body) = view.text(repo.join(&rel)) {
-            let (held, let_through) = split_text(&rel, body, rules);
+            let (held, let_through) = split_text(&rel, body, rules, layout);
             out.extend(held);
             excused.extend(let_through);
         }

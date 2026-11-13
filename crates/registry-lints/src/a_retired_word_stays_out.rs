@@ -13,7 +13,7 @@
 //! The mutation order forbids rewriting a design before the code beneath it is gone, so a word a tenet has
 //! only just ruled out is in many places that cannot be cleared in one change. The units still holding it
 //! are named in `exempt_crates` of this lint's table in `mockspace.toml`, a unit being a crate by its
-//! directory name, `lints`, `tools`, `benches`, `content` or `workspace`. The list is the debt, named, and
+//! directory name, `lints`, `tools`, `benches`, a content directory or `workspace`. The list is the debt, named, and
 //! it only shrinks: a unit leaves it in the commit that clears its last line, a unit on it that holds no
 //! line any more is a finding, and a unit that is not on it is held from its first line. Other gates here
 //! ratchet by naming the clean crates they bind; this one names the unclean ones, because a new crate is
@@ -33,7 +33,7 @@
 //! file a second reading.
 
 use std::borrow::Cow;
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 
 use mockspace::{Item, Lint, LintError, RegistryView, RepoContext, RepoLint, Severity, View};
@@ -41,16 +41,21 @@ use mockspace::{Item, Lint, LintError, RegistryView, RepoContext, RepoLint, Seve
 use crate::canon_rows::list;
 use crate::canon_tree::files;
 use crate::gate_config::table;
+use crate::layout::{CONTENT_DIRS, ContentDirs, Layout};
 use crate::retired_words::{Retiring, scanned, split_text, unit_of};
 use crate::touched_lines::{self, Touched};
 
 pub fn repo_lint() -> Box<dyn RepoLint> {
-    Box::new(ARetiredWordStaysOut)
+    Box::new(ARetiredWordStaysOut::default())
 }
 
 const NAME: &str = "a-retired-word-stays-out";
 
-struct ARetiredWordStaysOut;
+/// The lint, holding the content directories its table names, which are read as the content tier.
+#[derive(Default)]
+struct ARetiredWordStaysOut {
+    content: ContentDirs,
+}
 
 impl Lint for ARetiredWordStaysOut {
     fn name(&self) -> &'static str {
@@ -59,6 +64,14 @@ impl Lint for ARetiredWordStaysOut {
 
     fn default_severity(&self) -> Severity {
         Severity::HARD_ERROR
+    }
+
+    fn config_keys(&self) -> &[&str] {
+        &[CONTENT_DIRS]
+    }
+
+    fn configure(&mut self, params: &HashMap<String, String>) {
+        self.content.configure_lint(params);
     }
 }
 
@@ -71,7 +84,8 @@ impl RepoLint for ARetiredWordStaysOut {
             Ok(change) => (change, None),
             Err(why) => (Change::default(), Some(why)),
         };
-        let mut out = check(view, repo, ctx.registry(), config, &change);
+        let layout = Layout::of(ctx.mock_dir, repo, &self.content);
+        let mut out = check(view, repo, ctx.registry(), config, &change, &layout);
         out.extend(unread.map(|why| unreadable(&why)));
         out
     }
@@ -140,14 +154,14 @@ fn fingerprint(rules: &[Retiring]) -> String {
 /// Every line of one file that names a word a tenet rules out, held or not by the debt list, as the
 /// findings the lint would raise for a unit not on it. Depends on the file's path and text and on the
 /// rules, and on nothing else, which is what lets it be saved per file.
-fn judge(rel: &Path, body: &str, rules: &[Retiring]) -> Vec<LintError> {
-    split_text(rel, body, rules)
+fn judge(rel: &Path, body: &str, rules: &[Retiring], layout: &Layout) -> Vec<LintError> {
+    split_text(rel, body, rules, layout)
         .0
         .into_iter()
         .map(|hit| {
             let path = hit.path.to_string_lossy().replace('\\', "/");
             let mut e = LintError::error(
-                unit_of(&hit.path),
+                unit_of(&hit.path, layout),
                 hit.line,
                 NAME,
                 format!(
@@ -175,12 +189,12 @@ impl Item for Scanned {
     }
 }
 
-/// Every scanned file under `repo`, keyed under `rules`.
-fn scanned_files(view: &View<'_>, repo: &Path, rules: &[Retiring]) -> Vec<Scanned> {
-    let rules_key = fingerprint(rules);
+/// Every scanned file under `repo`, keyed under `rules` and the layout it is read by.
+fn scanned_files(view: &View<'_>, repo: &Path, rules: &[Retiring], layout: &Layout) -> Vec<Scanned> {
+    let rules_key = format!("{}\u{3}{layout:?}", fingerprint(rules));
     files(view, repo)
         .into_iter()
-        .filter(|rel| scanned(rel))
+        .filter(|rel| scanned(rel, layout))
         .map(|rel| {
             let key = format!("{rules_key}\u{2}{}", rel.to_string_lossy().replace('\\', "/"));
             Scanned {
@@ -193,19 +207,26 @@ fn scanned_files(view: &View<'_>, repo: &Path, rules: &[Retiring]) -> Vec<Scanne
 
 /// The findings of every scanned file, each judged through its own view, so a file whose text is what
 /// it was under the same rules is replayed rather than judged again.
-fn judge_files(view: &View<'_>, repo: &Path, rules: &[Retiring]) -> Vec<LintError> {
-    view.each(&scanned_files(view, repo, rules), |v, file| {
+fn judge_files(view: &View<'_>, repo: &Path, rules: &[Retiring], layout: &Layout) -> Vec<LintError> {
+    view.each(&scanned_files(view, repo, rules, layout), |v, file| {
         let Some(body) = v.text(repo.join(&file.rel)) else {
             return Vec::new();
         };
-        judge(&file.rel, body, rules)
+        judge(&file.rel, body, rules, layout)
     })
     .into_iter()
     .flatten()
     .collect()
 }
 
-fn check(view: &View<'_>, repo: &Path, reg: &RegistryView, config: &str, change: &Change) -> Vec<LintError> {
+fn check(
+    view: &View<'_>,
+    repo: &Path,
+    reg: &RegistryView,
+    config: &str,
+    change: &Change,
+    layout: &Layout,
+) -> Vec<LintError> {
     let rules = retiring(reg);
     if rules.is_empty() {
         return Vec::new();
@@ -213,7 +234,7 @@ fn check(view: &View<'_>, repo: &Path, reg: &RegistryView, config: &str, change:
     let debt: BTreeSet<String> = table(config, NAME).exempt_crates.into_iter().collect();
     let mut holding: BTreeSet<String> = BTreeSet::new();
     let mut out = Vec::new();
-    for mut e in judge_files(view, repo, &rules) {
+    for mut e in judge_files(view, repo, &rules, layout) {
         holding.insert(e.crate_name.clone());
         if !debt.contains(&e.crate_name) {
             out.push(e);

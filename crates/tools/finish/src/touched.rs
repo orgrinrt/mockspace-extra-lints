@@ -7,27 +7,23 @@
 
 use std::collections::BTreeSet;
 
-/// The crate a repository path belongs to: the directory under `mock/crates/` or `mock/tools/`. A path that is not
-/// inside a crate has none.
-pub fn crate_of(path: &str) -> Option<&str> {
-    let parts: Vec<&str> = path.split('/').collect();
-    // FIXME(pack_lints_and_tools_read_the_mock_directory_as_mock): the mock directory is read as `mock`, not as the one `mockspace.toml` declares
-    if parts.first() != Some(&"mock") || parts.len() < 4 {
+use registry_lints::layout::Layout;
+
+/// The crate a repository path belongs to: the directory under `crates/` or `tools/` of the mock
+/// directory `layout` names. A path that is not inside a crate has none.
+pub fn crate_of<'a>(path: &'a str, layout: &Layout) -> Option<&'a str> {
+    let parts: Vec<&str> = layout.under_mock(path)?.split('/').collect();
+    if parts.len() < 3 || !matches!(parts[0], "crates" | "tools") {
         return None;
     }
-    let at = match parts[1] {
-        "crates" | "tools" => 1,
-        _ => return None,
-    };
-    // a file directly in the crates directory is no crate's
-    (parts.len() > at + 2).then(|| parts[at + 1])
+    Some(parts[1])
 }
 
 /// The crates the paths belong to.
-pub fn touched(paths: &[String]) -> BTreeSet<String> {
+pub fn touched(paths: &[String], layout: &Layout) -> BTreeSet<String> {
     paths
         .iter()
-        .filter_map(|p| crate_of(p))
+        .filter_map(|p| crate_of(p, layout))
         .map(str::to_owned)
         .collect()
 }

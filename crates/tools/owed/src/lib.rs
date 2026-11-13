@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MPL-2.0     https://mozilla.org/MPL/2.0        contact@hiisi.digital
 //--------------------------------------------------------------------------------------------------
 
-//! `mock owed [--dry] [--only <patterns>] [--no-fetch]`: a task held by the coordinator for every
+//! `mock owed [--dry] [--only <patterns>] [--no-fetch]`: a task held by the project's `holder` for every
 //! placeholder marker that cites none, and for every candidate file waiting to be ratified. It files
 //! no question: an agent evaluates the task against the code and the canon, and puts a question to the
 //! maintainer only with a subject and real options.
@@ -12,24 +12,39 @@
 //! research, and a person comes to it by finding it. This files each as a ticket on the registry,
 //! groups the markers that say one thing under one ticket, rewrites each marker to name its ticket,
 //! and closes the tickets it filed whose markers are gone. A second run with nothing changed writes
-//! nothing. The reading of a marker is `mock/lints/fixme_markers.rs`, which the lint that refuses a
-//! marker with no ticket reads by too. The design is `mock/WORKFLOW.md.tmpl`, "Work items".
+//! nothing. The reading of a marker is `fixme_markers` of the registry lints, which the lint that refuses a
+//! marker with no ticket reads by too. Who holds what is filed is `holder` in `[tools.owed]`, and the
+//! content directories a marker's area is named by are its `content_dirs`.
 
 use std::collections::BTreeSet;
 
 use mockspace::reading::Reading;
-use mockspace::tool::{ArgSpec, Purpose, Tool, ToolContext, ToolReport};
+use mockspace::tool::{ArgSpec, ConfigKey, Purpose, Tool, ToolContext, ToolParams, ToolReport};
 
 mod apply;
 use registry_lints::fixme_markers;
+use registry_lints::layout::{CONTENT_DIRS_KEY, ContentDirs, Layout};
 mod group;
 mod plan;
 
 use fixme_markers::Scope;
 use plan::{Candidate, File, Inputs};
 
-/// The maker.
-pub struct Owed;
+/// The maker, holding what `[tools.owed]` names: who holds what it files, and the content directories.
+#[derive(Default)]
+pub struct Owed {
+    holder:  String,
+    content: ContentDirs,
+}
+
+/// The keys of `[tools.owed]`.
+const KEYS: &[ConfigKey] = &[
+    ConfigKey {
+        name:        plan::HOLDER,
+        description: "who holds the tasks `owed` files, such as the channel of the coordinator whose agents evaluate them; nobody when unset",
+    },
+    CONTENT_DIRS_KEY,
+];
 
 /// What the command line said.
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -82,7 +97,7 @@ impl Tool for Owed {
     }
 
     fn description(&self) -> &'static str {
-        "files a task held by the coordinator for every placeholder marker that cites none and every candidate file, rewrites each marker to cite its task, and closes the tickets whose markers are gone"
+        "files a task held by the project's holder for every placeholder marker that cites none and every candidate file, rewrites each marker to cite its task, and closes the tickets whose markers are gone"
     }
 
     fn purpose(&self) -> Purpose {
@@ -96,12 +111,23 @@ impl Tool for Owed {
         &[]
     }
 
+    fn config_keys(&self) -> &[ConfigKey] {
+        KEYS
+    }
+
+    fn configure(&mut self, params: &ToolParams) {
+        if let Some(h) = params.one(plan::HOLDER) {
+            self.holder = h.to_string();
+        }
+        self.content.configure_tool(params);
+    }
+
     fn value_flags(&self) -> &[&'static str] {
         &["--only"]
     }
 
     fn help(&self) -> &'static str {
-        "Reads every authored file for placeholder markers, and the research for candidate files. A marker that cites no ticket is grouped with the markers that say the same, a task is filed for the group on the registry, in the backlog and held by the coordinator, and the marker is rewritten to cite it, keeping its reason. A canon silence, a `maintainer` tag and a candidate file are tasks too, never questions: the task says an agent is to evaluate each marker against the code and the canon, and the list gives each marker with its file and line as it stood then. A marker an earlier run listed on a ticket cites that ticket again and files nothing, whatever line it has moved to. A ticket this filed whose markers are all gone is closed, a task as done and a question filed before this as dropped. Silent when there is nothing to do. `--dry` says what it would do and writes nothing, `--only` takes comma separated patterns, `*` standing for any run of characters, and limits the run to the files they match, so nothing is closed, and `--no-fetch` does not fetch the trunk to say whether the tree is behind it."
+        "Reads every authored file for placeholder markers, and the research for candidate files. A marker that cites no ticket is grouped with the markers that say the same, a task is filed for the group on the registry, in the backlog and held by the `holder` of `[tools.owed]`, nobody where it names none, and the marker is rewritten to cite it, keeping its reason. A canon silence, a `maintainer` tag and a candidate file are tasks too, never questions: the task says an agent is to evaluate each marker against the code and the canon, and the list gives each marker with its file and line as it stood then. A marker an earlier run listed on a ticket cites that ticket again and files nothing, whatever line it has moved to. A ticket this filed whose markers are all gone is closed, a task as done and a question filed before this as dropped. Silent when there is nothing to do. `--dry` says what it would do and writes nothing, `--only` takes comma separated patterns, `*` standing for any run of characters, and limits the run to the files they match, so nothing is closed, and `--no-fetch` does not fetch the trunk to say whether the tree is behind it."
     }
 
     fn run(&self, ctx: &ToolContext<'_>) -> ToolReport {
@@ -132,11 +158,11 @@ impl Owed {
         let mut all_candidates = BTreeSet::new();
         let reading = Reading::new(ctx.repo_root);
         let view = reading.view();
-        for s in fixme_markers::sources(&view, ctx.repo_root) {
+        let layout = Layout::of(ctx.mock_dir, ctx.repo_root, &self.content);
+        for s in fixme_markers::sources(&view, ctx.repo_root, &layout) {
             let name = s.rel.rsplit('/').next().unwrap_or(&s.rel);
             if s.scope == Scope::Record {
-                // FIXME(pack_lints_and_tools_read_the_mock_directory_as_mock): the mock directory is read as `mock`, not as the one `mockspace.toml` declares
-                if s.rel.starts_with("mock/research/")
+                if layout.under_mock(&s.rel).is_some_and(|m| m.starts_with("research/"))
                     && name.starts_with("CANDIDATE")
                     && name.ends_with(".md")
                 {
@@ -180,6 +206,7 @@ impl Owed {
             store:          &store,
             subjects:       &subjects,
             prefix:         &registry_lints::project::Project::of(&view, ctx.mock_dir).prefix,
+            layout:         &layout,
             full:           args.only.is_empty(),
         });
         if plan.is_empty() {
@@ -189,7 +216,7 @@ impl Owed {
             return ToolReport::reported(describe(&plan, &files), examined);
         }
         let at = tickets::time::format_utc(tickets::time::now_secs());
-        match apply::apply(ctx.repo_root, &registry, &store, &files, &plan, &at) {
+        match apply::apply(ctx.repo_root, &registry, &store, &files, &plan, &self.holder, &at) {
             Ok(d) => ToolReport::reported(summary(&d), examined),
             Err(e) => ToolReport::inconclusive(e),
         }
@@ -232,7 +259,7 @@ fn describe(plan: &plan::Plan, files: &[File]) -> String {
 }
 
 mockspace::lint_pack! {
-    tools: [Owed],
+    tools: [Owed::default()],
 }
 
 #[cfg(test)]

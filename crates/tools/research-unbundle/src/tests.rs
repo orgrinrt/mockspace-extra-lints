@@ -66,7 +66,7 @@ fn run_tool(repo: &Path, args: &[&str]) -> ToolReport {
 
 fn err(repo: &Path, text: &str) -> String {
     let b = put(repo, text);
-    match unbundle(repo, &b, DIR) {
+    match unbundle(repo, "mock", &b, DIR) {
         Err(e) => e,
         Ok(_) => panic!("the bundle was accepted: {text:?}"),
     }
@@ -93,7 +93,7 @@ fn every_file_is_written_under_the_directory_with_its_text_and_one_final_newline
         &repo,
         "=== FILE: README.md ===\n# note\n\nbody\n\n\n=== FILE: gaps/sky.md ===\nthe sky\n=== FILE: data.toml ===\nk = 1\n",
     );
-    let w = unbundle(&repo, &b, DIR).expect("written");
+    let w = unbundle(&repo, "mock", &b, DIR).expect("written");
     assert_eq!(w.files, 3);
     assert_eq!(w.report, "");
     assert_eq!(read(&repo, "README.md"), "# note\n\nbody\n");
@@ -111,7 +111,7 @@ fn a_file_over_the_limit_is_cut_before_headings_and_loses_nothing() {
         section("c", 300)
     );
     let b = put(&repo, &format!("=== FILE: long.md ===\n{whole}"));
-    let w = unbundle(&repo, &b, DIR).expect("written");
+    let w = unbundle(&repo, "mock", &b, DIR).expect("written");
     assert_eq!(w.files, 3);
     assert!(
         w.report
@@ -237,7 +237,7 @@ fn nothing_is_overwritten_and_a_refusal_leaves_no_file_of_the_others() {
     );
     std::fs::create_dir_all(repo.join(DIR)).expect("the note");
     std::fs::write(repo.join(DIR).join("b.md"), "old b\n").expect("old");
-    let e = unbundle(&repo, &b, DIR).err().expect("refused");
+    let e = unbundle(&repo, "mock", &b, DIR).err().expect("refused");
     assert!(e.contains("b.md is already there"), "{e}");
     assert_eq!(read(&repo, "b.md"), "old b\n");
     assert!(
@@ -259,13 +259,13 @@ fn only_a_note_directory_in_the_research_directory_is_written() {
         "mock/other/202610230400_a-note",
         "202610230400_a-note",
     ] {
-        let e = unbundle(&repo, &b, dir)
+        let e = unbundle(&repo, "mock", &b, dir)
             .err()
             .unwrap_or_else(|| panic!("{dir} was accepted"));
         assert!(e.contains("is not a note's directory"), "{dir}: {e}");
     }
     assert!(
-        unbundle(&repo, &b, &format!("{DIR}/")).is_ok(),
+        unbundle(&repo, "mock", &b, &format!("{DIR}/")).is_ok(),
         "a trailing slash is the same directory"
     );
 }
@@ -299,4 +299,16 @@ fn the_header_is_the_exact_line_and_nothing_else_opens_a_file() {
     assert_eq!(files.len(), 1);
     assert_eq!(files[0].0, "a.md");
     assert!(files[0].1.contains("=== FILE: c.md === "), "{}", files[0].1);
+}
+
+#[test]
+fn the_note_directory_is_read_under_the_mock_directory_the_project_names() {
+    let repo = scratch();
+    let b = put(&repo, "=== FILE: a.md ===\nx\n");
+    let e = unbundle(&repo, "linux", &b, DIR)
+        .err()
+        .expect("a note under `mock` is refused where the mock directory is `linux`");
+    assert!(e.contains("`linux/research/<12 digits>_<slug>`"), "{e}");
+    unbundle(&repo, "linux", &b, "linux/research/202610230400_a-note").expect("written");
+    assert!(repo.join("linux/research/202610230400_a-note/a.md").exists());
 }

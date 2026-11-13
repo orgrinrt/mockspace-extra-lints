@@ -16,7 +16,7 @@ use ticket_model::Store;
 use tickets::write::{self, AddRequest, MoveRequest};
 
 use crate::fixme_markers;
-use crate::plan::{BY, File, HOLDER, Plan};
+use crate::plan::{BY, File, Plan};
 
 /// What a run did, in counts.
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -27,7 +27,8 @@ pub struct Done {
     pub closed:  usize,
 }
 
-/// Writes the plan under `repo`, with the tickets in `registry`, as of `at`.
+/// Writes the plan under `repo`, with the tickets in `registry` held by `holder`, nobody where it is empty,
+/// as of `at`.
 ///
 /// # Errors
 ///
@@ -38,6 +39,7 @@ pub fn apply(
     store: &Store,
     files: &[File],
     plan: &Plan,
+    holder: &str,
     at: &str,
 ) -> Result<Done, String> {
     let mut done = Done::default();
@@ -55,7 +57,7 @@ pub fn apply(
             id: Some(t.id.clone()),
             kind: "task".to_string(),
             state: None,
-            holder: HOLDER.to_string(),
+            holder: holder.to_string(),
             by: BY.to_string(),
             at: at.to_string(),
             why: format!("filed by mock owed for {} marker(s)", t.covers.len().max(1)),

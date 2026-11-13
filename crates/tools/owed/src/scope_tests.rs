@@ -303,3 +303,25 @@ fn a_marker_citing_a_question_closed_with_no_answer_is_left_alone() {
     r.run(&[]);
     assert_eq!(before, r.snapshot());
 }
+
+#[test]
+fn a_task_is_held_by_the_holder_the_table_names_and_by_nobody_where_it_names_none() {
+    let mut r = Repo::new();
+    r.write(SIM, "// §: the wind is not read\n");
+    r.owed = Owed::default();
+    r.run(&[]);
+    let board = r.board();
+    let (_, (_, state, holder)) = board.iter().next().expect("a task was filed");
+    assert_eq!((state.as_str(), holder.as_str()), ("backlog", ""));
+
+    // THE CONTROL: the same marker with `holder` set is held by it.
+    let mut held = Repo::new();
+    held.write(SIM, "// §: the wind is not read\n");
+    let mut params = mockspace::tool::ToolParams::new();
+    params.set(plan::HOLDER, vec!["helpers".to_string()]);
+    held.owed = Owed::default();
+    held.owed.configure(&params);
+    held.run(&[]);
+    let board = held.board();
+    assert_eq!(board.values().next().expect("a task").2, "helpers");
+}

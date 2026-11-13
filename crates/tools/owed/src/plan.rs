@@ -13,6 +13,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use mockspace_registry::is_valid_slug;
+use registry_lints::layout::Layout;
 use ticket_model::Store;
 use ticket_model::rules::slugify;
 
@@ -27,9 +28,10 @@ use wording::{answered_what, candidate_title, cut, title, unique_id, what_of};
 /// Who `owed` is, in the moves it makes.
 pub const BY: &str = "owed";
 
-/// Who holds what `owed` files: the coordinator, whose agents evaluate it. Never the maintainer, who
-/// is put a question only by an agent that has read the code and the canon.
-pub const HOLDER: &str = "coord";
+/// The key of `[tools.owed]` naming who holds what `owed` files: whoever's agents evaluate it, such as a
+/// coordinator's channel, and never the maintainer, who is put a question only by an agent that has read
+/// the code and the canon. What is filed is held by nobody where the table names no one.
+pub const HOLDER: &str = "holder";
 
 /// The heading of the list of markers in a ticket's `what`.
 pub const COVERS: &str = "Covers:";
@@ -70,6 +72,8 @@ pub struct Inputs<'a> {
     pub subjects:       &'a BTreeSet<String>,
     /// The project's `crate_prefix`, which a crate's subject is named without.
     pub prefix:         &'a str,
+    /// Where the mock tree and the content sit, which a marker's area is named by.
+    pub layout:         &'a Layout,
     /// Nothing was left out by `--only`, so a ticket none of whose markers is found is closed.
     pub full:           bool,
 }
@@ -172,10 +176,9 @@ fn answered<'a>(store: &'a Store, id: &str) -> Option<&'a ticket_model::Move> {
 }
 
 /// Whether a file sits under the phase gate, so that editing it needs a round of its own: the
-// FIXME(pack_lints_and_tools_read_the_mock_directory_as_mock): the mock directory is read as `mock`, not as the one `mockspace.toml` declares
-/// per-crate documents and sources. Its marker is left as it is.
-fn gated(rel: &str) -> bool {
-    rel.starts_with("mock/crates/")
+/// per-crate documents and sources under the mock directory. Its marker is left as it is.
+fn gated(rel: &str, layout: &Layout) -> bool {
+    layout.under_mock(rel).is_some_and(|m| m.starts_with("crates/"))
 }
 
 /// Works out what a run does.
@@ -217,7 +220,7 @@ pub fn plan(inp: &Inputs<'_>) -> Plan {
             if let Some(id) = named {
                 out.cited += 1;
                 cited_ids.insert(id.to_string());
-                if answered(store, id).is_some() && !gated(&file.rel) {
+                if answered(store, id).is_some() && !gated(&file.rel, inp.layout) {
                     answered_markers
                         .entry(id.to_string())
                         .or_default()
@@ -238,7 +241,7 @@ pub fn plan(inp: &Inputs<'_>) -> Plan {
                 rel:    file.rel.clone(),
                 class:  Class::of(marker.tag.as_deref()),
                 reason: marker.reason.clone(),
-                area:   group::area(&file.rel),
+                area:   group::area(&file.rel, inp.layout),
                 line:   marker.line,
             });
             places.push((f, m));
@@ -277,7 +280,7 @@ pub fn plan(inp: &Inputs<'_>) -> Plan {
             .collect();
         let areas: BTreeSet<String> = order.iter().map(|&i| items[i].area.clone()).collect();
         let subjects: Vec<String> = if areas.len() == 1 {
-            group::subject_of(areas.iter().next().map_or("", String::as_str), inp.prefix, inp.subjects)
+            group::subject_of(areas.iter().next().map_or("", String::as_str), inp.prefix, inp.subjects, inp.layout)
                 .into_iter()
                 .collect()
         } else {

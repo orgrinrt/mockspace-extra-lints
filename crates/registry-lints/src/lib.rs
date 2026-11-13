@@ -27,6 +27,7 @@ pub mod canon_tree;
 pub mod every_fixme_names_a_ticket;
 pub mod fixme_markers;
 pub mod gate_config;
+pub mod layout;
 pub mod merge_carried;
 pub mod project;
 pub mod ratchets;

@@ -13,6 +13,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
+use crate::layout::Layout;
 use crate::dropped::{SHOWN_WORDS, show, still_named, word_counts};
 use crate::retired_words::{EXCUSE_REACH, Hit, Retiring, split_under, unit_of};
 use crate::rows::Tenet;
@@ -36,7 +37,7 @@ pub fn retiring(all: &[Tenet<'_>]) -> Vec<Retiring> {
 
 /// `forbids <id>`: whether the tenet binds, the words it rules out, and the tenets it replaces with
 /// theirs, since a replaced tenet's words are the first place a retired concept hides.
-pub fn forbids_answer(repo: &Path, all: &[Tenet<'_>], id: &str) -> Result<(String, usize), String> {
+pub fn forbids_answer(repo: &Path, layout: &Layout, all: &[Tenet<'_>], id: &str) -> Result<(String, usize), String> {
     let Some(t) = all.iter().find(|t| t.id == id) else {
         return Err(format!(
             "there is no tenet `{id}`; `canon find <word>` looks for one"
@@ -69,7 +70,7 @@ pub fn forbids_answer(repo: &Path, all: &[Tenet<'_>], id: &str) -> Result<(Strin
         );
     }
     if t.replaced() && t.rules_out.is_empty() {
-        let named = still_named(all, t, &word_counts(repo));
+        let named = still_named(all, t, &word_counts(repo, layout));
         if named.is_empty() {
             out.push_str("  dropped:    no word it used and its successors do not is named by a design, code or content line\n");
         } else {
@@ -93,8 +94,8 @@ pub fn forbids_answer(repo: &Path, all: &[Tenet<'_>], id: &str) -> Result<(Strin
 /// until the words are written down. This lists the replaced tenets for which neither the tenet nor
 /// any tenet replacing it names a word it rules out, by subject, so a person with the canon in hand
 /// can say for each whether it retires a word and put it in `rules_out`.
-pub fn unretired_answer(repo: &Path, all: &[Tenet<'_>]) -> (String, usize) {
-    let counts = word_counts(repo);
+pub fn unretired_answer(repo: &Path, layout: &Layout, all: &[Tenet<'_>]) -> (String, usize) {
+    let counts = word_counts(repo, layout);
     let replaced: Vec<&Tenet<'_>> = all.iter().filter(|t| t.replaced()).collect();
     let named = |t: &Tenet<'_>| {
         !t.rules_out.is_empty()
@@ -145,7 +146,7 @@ pub fn unretired_answer(repo: &Path, all: &[Tenet<'_>]) -> (String, usize) {
 /// `contradicts [path]...`: every design, code and content line naming a word a binding tenet rules out, in
 /// the whole repository or in the paths named. Several paths are read in one pass, which is what a landing
 /// asks of the files a branch touches.
-pub fn contradicts_answer(repo: &Path, all: &[Tenet<'_>], paths: &[&str]) -> (String, usize) {
+pub fn contradicts_answer(repo: &Path, layout: &Layout, all: &[Tenet<'_>], paths: &[&str]) -> (String, usize) {
     let rules = retiring(all);
     let under: Vec<PathBuf> = paths.iter().map(|p| relative(repo, p)).collect();
     if rules.is_empty() {
@@ -162,7 +163,7 @@ pub fn contradicts_answer(repo: &Path, all: &[Tenet<'_>], paths: &[&str]) -> (St
         );
     }
     let named: Vec<&Path> = under.iter().map(PathBuf::as_path).collect();
-    let (hits, excused) = split_under(&mockspace::reading::Reading::new(repo).view(), repo, &rules, &named);
+    let (hits, excused) = split_under(&mockspace::reading::Reading::new(repo).view(), repo, &rules, &named, layout);
     let mut by_rule: BTreeMap<&str, Vec<&Hit>> = BTreeMap::new();
     for h in &hits {
         by_rule.entry(h.rule.as_str()).or_default().push(h);
@@ -190,7 +191,7 @@ pub fn contradicts_answer(repo: &Path, all: &[Tenet<'_>], paths: &[&str]) -> (St
         } else if !under.is_empty() {
             listing(&mut out, found);
         } else {
-            summary(&mut out, found);
+            summary(&mut out, found, layout);
         }
     }
     if !excused.is_empty() {
@@ -207,7 +208,7 @@ pub fn contradicts_answer(repo: &Path, all: &[Tenet<'_>], paths: &[&str]) -> (St
         }
     }
     if let [one] = under.as_slice() {
-        named_by(&mut out, repo, all, one);
+        named_by(&mut out, repo, layout, all, one);
     }
     (out, hits.len())
 }
@@ -227,7 +228,7 @@ fn listing(out: &mut String, found: &[&Hit]) {
 }
 
 /// The count by tier, every design line by place, and the count by unit for the rest.
-fn summary(out: &mut String, found: &[&Hit]) {
+fn summary(out: &mut String, found: &[&Hit], layout: &Layout) {
     for tier in [Tier::Design, Tier::Code, Tier::Content, Tier::Other] {
         let of: Vec<&&Hit> = found.iter().filter(|h| h.tier == tier).collect();
         if of.is_empty() {
@@ -247,7 +248,7 @@ fn summary(out: &mut String, found: &[&Hit]) {
     }
     let mut units: BTreeMap<String, usize> = BTreeMap::new();
     for h in found {
-        *units.entry(unit_of(&h.path)).or_default() += 1;
+        *units.entry(unit_of(&h.path, layout)).or_default() += 1;
     }
     let mut ranked: Vec<(String, usize)> = units.into_iter().collect();
     ranked.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
@@ -257,9 +258,9 @@ fn summary(out: &mut String, found: &[&Hit]) {
 
 /// The tenets the path names by id, each with what it rules out and how many lines of the path it
 /// stands behind: the first thing to read in a design before building on it.
-fn named_by(out: &mut String, repo: &Path, all: &[Tenet<'_>], under: &Path) {
+fn named_by(out: &mut String, repo: &Path, layout: &Layout, all: &[Tenet<'_>], under: &Path) {
     let known: BTreeSet<&str> = all.iter().map(|t| t.id).collect();
-    let found = mentions(repo, &known);
+    let found = mentions(repo, layout, &known);
     let _ = writeln!(out, "\ntenets {} names:", under.display());
     let mut any = false;
     for t in all {

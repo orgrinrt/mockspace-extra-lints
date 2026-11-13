@@ -213,16 +213,16 @@ fn what_reciting_wrote_is_read_back_as_markers_of_the_successor_alone() {
 
 #[test]
 fn files_are_in_scope_by_where_they_stand() {
-    assert_eq!(scope_of("mock/crates/a/src/lib.rs"), Some(Scope::Live));
-    assert_eq!(scope_of("content/kaski/x.toml"), Some(Scope::Live));
-    assert_eq!(scope_of("mock/research/n/NOTES.md"), Some(Scope::Record));
+    assert_eq!(scope_of("mock/crates/a/src/lib.rs", &layout()), Some(Scope::Live));
+    assert_eq!(scope_of("content/kaski/x.toml", &layout()), Some(Scope::Live));
+    assert_eq!(scope_of("mock/research/n/NOTES.md", &layout()), Some(Scope::Record));
     assert_eq!(
-        scope_of("mock/design_rounds/2026/x.md"),
+        scope_of("mock/design_rounds/2026/x.md", &layout()),
         Some(Scope::Record)
     );
-    assert_eq!(scope_of("docs/X.md"), None);
-    assert_eq!(scope_of("mock/vendor/a/src/lib.rs"), None);
-    assert_eq!(scope_of("mock/crates/a/node_modules/x.js"), None);
+    assert_eq!(scope_of("docs/X.md", &layout()), None);
+    assert_eq!(scope_of("mock/vendor/a/src/lib.rs", &layout()), None);
+    assert_eq!(scope_of("mock/crates/a/node_modules/x.js", &layout()), None);
 }
 
 #[test]
@@ -236,4 +236,9 @@ fn kinds_follow_the_extension_and_a_shebang() {
     );
     assert_eq!(kind_of("a/b.png", ""), None);
     assert_eq!(kind_of("a/build", "text"), None);
+}
+
+/// The layout the fixtures are written in: the mock tree under `mock`, the content under `content`.
+fn layout() -> crate::layout::Layout {
+    crate::layout::Layout::new("mock", crate::layout::ContentDirs::new(&["content"]))
 }

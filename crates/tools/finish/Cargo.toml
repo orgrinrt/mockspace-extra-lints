@@ -14,3 +14,5 @@ mockspace.workspace = true
 canon.workspace = true
 # the tickets and their board, read once by the tool that owns them
 tickets.workspace = true
+# where the mock directory sits, which a path's crate is read under
+registry-lints.workspace = true

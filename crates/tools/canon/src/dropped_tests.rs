@@ -9,7 +9,7 @@
 
 use crate::dropped::{Counts, dropped, still_named, word_counts};
 use crate::rows::tenets;
-use crate::tests::{answered, run, scratch, view, write};
+use crate::tests::{answered, layout, run, scratch, view, write};
 
 fn registry() -> mockspace::RegistryView {
     view(&[
@@ -63,7 +63,7 @@ fn the_dropped_words_are_the_ones_only_the_replaced_tenet_carried() {
 
 #[test]
 fn a_line_is_counted_once_per_word_by_tier_and_notes_are_not_read() {
-    let corpus = word_counts(&tree());
+    let corpus = word_counts(&tree(), &layout());
     assert_eq!(
         corpus.named("snorf"),
         Some(Counts {
@@ -82,7 +82,7 @@ fn the_control_a_dropped_word_no_line_names_is_not_listed() {
     let reg = registry();
     let all = tenets(&reg);
     let ground = all.iter().find(|t| t.id == "the_ground_is_one").unwrap();
-    let corpus = word_counts(&tree());
+    let corpus = word_counts(&tree(), &layout());
     // `ground` was dropped by the second replaced tenet and no line of this tree names it
     assert!(still_named(&all, ground, &corpus).is_empty());
     let old = all
@@ -104,7 +104,7 @@ fn a_word_most_designs_use_is_prose_and_not_a_concept() {
             "the snorf is everywhere in how these are written\n",
         );
     }
-    let corpus = word_counts(&d);
+    let corpus = word_counts(&d, &layout());
     assert!(
         corpus.named("snorf").is_none(),
         "nine design files, nine naming it"
@@ -122,7 +122,7 @@ fn a_word_most_designs_use_is_prose_and_not_a_concept() {
             "a plain design\n",
         );
     }
-    let corpus = word_counts(&d);
+    let corpus = word_counts(&d, &layout());
     assert!(corpus.named("wumble").is_some());
 }
 

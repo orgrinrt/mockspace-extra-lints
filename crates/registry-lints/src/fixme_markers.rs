@@ -17,6 +17,8 @@
 //! read, since a value there is data. A mention that is none of these (`marked with a FIXME`) is prose
 //! about markers and is left alone.
 
+use crate::layout::Layout;
+
 /// One marker in a file.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Marker {
@@ -309,7 +311,7 @@ pub fn recite(text: &str, kind: Kind, from: &str, to: &str) -> Option<String> {
 /// The paths a tool that rewrites markers declares it may write, as a maker declares them: every
 /// authored place a live marker is read in. The registry's own files are under `mock/`.
 pub const WRITES: &[&str] = &[
-    // FIXME(a_maker_tool_s_writes_cannot_name_the_mock_directory): `writes` names `mock`, since a pattern cannot name the mock directory the config declares
+    // FIXME(a_maker_tool_s_writes_cannot_name_the_mock_directory): `writes` names `mock` and `content`, since a pattern cannot name the mock directory the config declares or the content directories a tool table names
     "mock/**",
     "content/**",
     "README.md",
@@ -329,24 +331,24 @@ pub enum Scope {
     Record,
 }
 
-/// Directories under the root that are never read: vendored code, build output, the generated
-/// documents and the generated agent files.
-const NEVER: [&str; 7] = [
-    "mock/vendor/",
-    "mock/target/",
-    "mock/test-history/",
-    "docs/",
-    ".claude/",
-    ".github/",
-    "target/",
-];
+/// Directories under the mock directory that are never read: vendored code, build output and the
+/// recorded test history.
+const NEVER_IN_MOCK: [&str; 3] = ["vendor/", "target/", "test-history/"];
 
-/// The scope of a path relative to the repository root, or nothing where it is not read.
-pub fn scope_of(rel: &str) -> Option<Scope> {
-    if NEVER.iter().any(|p| rel.starts_with(p)) || rel.split('/').any(|s| s == "node_modules") {
+/// Directories under the root that are never read: build output, the generated documents and the
+/// generated agent files.
+const NEVER: [&str; 4] = ["docs/", ".claude/", ".github/", "target/"];
+
+/// The scope of a path relative to the repository root, laid out as `layout` says, or nothing where
+/// it is not read.
+pub fn scope_of(rel: &str, layout: &Layout) -> Option<Scope> {
+    let in_mock = layout.under_mock(rel);
+    let never = NEVER.iter().any(|p| rel.starts_with(p))
+        || in_mock.is_some_and(|m| NEVER_IN_MOCK.iter().any(|p| m.starts_with(p)))
+        || rel.split('/').any(|s| s == "node_modules");
+    if never {
         None
-    // FIXME(pack_lints_and_tools_read_the_mock_directory_as_mock): the mock directory is read as `mock`, not as the one `mockspace.toml` declares
-    } else if rel.starts_with("mock/design_rounds/") || rel.starts_with("mock/research/") {
+    } else if in_mock.is_some_and(|m| m.starts_with("design_rounds/") || m.starts_with("research/")) {
         Some(Scope::Record)
     } else {
         Some(Scope::Live)
@@ -366,8 +368,9 @@ pub struct Source {
 /// The longest file read, in bytes.
 const LARGEST: usize = 4 << 20;
 
-/// Every file of the repository at `repo` that can hold a marker, read, sorted by path.
-pub fn sources(view: &mockspace::View<'_>, repo: &std::path::Path) -> Vec<Source> {
+/// Every file of the repository at `repo`, laid out as `layout` says, that can hold a marker, read, sorted
+/// by path.
+pub fn sources(view: &mockspace::View<'_>, repo: &std::path::Path, layout: &Layout) -> Vec<Source> {
     let files = crate::tree_walk::walk_files(
         view,
         repo,
@@ -384,7 +387,7 @@ pub fn sources(view: &mockspace::View<'_>, repo: &std::path::Path) -> Vec<Source
             .unwrap_or(&path)
             .to_string_lossy()
             .replace('\\', "/");
-        let Some(scope) = scope_of(&rel) else {
+        let Some(scope) = scope_of(&rel, layout) else {
             continue;
         };
         let Some(bytes) = view.bytes(&path) else {

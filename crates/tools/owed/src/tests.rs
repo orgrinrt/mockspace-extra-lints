@@ -25,6 +25,8 @@ pub(crate) fn t(s: &str) -> String {
 /// A repository on disk: `mock/registry/ticket/` holds the shipped states and kinds and no ticket.
 pub(crate) struct Repo {
     pub(crate) root: PathBuf,
+    /// The maker as the fixtures' project configures it: tasks held by `coord`, content under `content`.
+    pub(crate) owed: Owed,
 }
 
 impl Repo {
@@ -55,6 +57,10 @@ impl Repo {
         }
         Repo {
             root,
+            owed: Owed {
+                holder:  "coord".to_string(),
+                content: registry_lints::layout::ContentDirs::new(&["content"]),
+            },
         }
     }
 
@@ -81,7 +87,7 @@ impl Repo {
         let registry = RegistryView::new(rows, BTreeMap::new());
         let mock = self.root.join("mock");
         let parsed = parse(args).unwrap();
-        Owed.work(
+        self.owed.work(
             &ToolContext {
                 mock_dir: &mock,
                 repo_root: &self.root,

@@ -51,7 +51,7 @@ fn found(files: &[(&str, &str)]) -> Vec<LintError> {
     for (rel, body) in files {
         write(&d, rel, &t(body));
     }
-    check(&Reading::new(&d).view(), &d, &reg(), &[])
+    check(&Reading::new(&d).view(), &d, &reg(), &[], &layout())
 }
 
 const SRC: &str = "mock/crates/kaski-a/src/lib.rs";
@@ -132,7 +132,7 @@ fn found_waived(files: &[(&str, &str)], rows: &[ratchets::Row]) -> Vec<LintError
     for (rel, body) in files {
         write(&d, rel, &t(body));
     }
-    check(&Reading::new(&d).view(), &d, &reg(), rows)
+    check(&Reading::new(&d).view(), &d, &reg(), rows, &layout())
 }
 
 #[test]
@@ -265,7 +265,7 @@ fn what_is_not_a_marker_or_is_not_read_is_left_alone() {
 #[test]
 fn the_default_blocks_every_gate() {
     assert_eq!(
-        EveryFixmeNamesATicket.default_severity(),
+        EveryFixmeNamesATicket::default().default_severity(),
         Severity::HARD_ERROR
     );
 }
@@ -297,7 +297,7 @@ fn merging() -> std::path::PathBuf {
 #[test]
 fn a_merge_does_not_judge_the_markers_either_parent_carried() {
     let d = merging();
-    let f = check(&Reading::new(&d).view(), &d, &reg(), &[]);
+    let f = check(&Reading::new(&d).view(), &d, &reg(), &[], &layout());
     assert!(f.is_empty(), "{f:?}");
 }
 
@@ -305,7 +305,7 @@ fn a_merge_does_not_judge_the_markers_either_parent_carried() {
 fn a_merge_still_judges_the_marker_it_adds() {
     let d = merging();
     write(&d, ADDED, &t("// §: the merge's own\n"));
-    let f = check(&Reading::new(&d).view(), &d, &reg(), &[]);
+    let f = check(&Reading::new(&d).view(), &d, &reg(), &[], &layout());
     assert_eq!(f.len(), 1, "{f:?}");
     assert_eq!(f[0].path.as_deref(), Some(ADDED));
 }
@@ -314,7 +314,7 @@ fn a_merge_still_judges_the_marker_it_adds() {
 fn a_carried_marker_whose_words_the_merge_changed_is_the_merges_own() {
     let d = merging();
     write(&d, SIDE, &t("// §: reworded in the resolution\n"));
-    let f = check(&Reading::new(&d).view(), &d, &reg(), &[]);
+    let f = check(&Reading::new(&d).view(), &d, &reg(), &[], &layout());
     assert_eq!(f.len(), 1, "{f:?}");
     assert_eq!(f[0].path.as_deref(), Some(SIDE));
 }
@@ -328,7 +328,7 @@ fn a_second_marker_beside_a_carried_one_is_still_judged() {
         MAIN,
         &t("// §: from main\n// §: a second, added by the merge\n"),
     );
-    let f = check(&Reading::new(&d).view(), &d, &reg(), &[]);
+    let f = check(&Reading::new(&d).view(), &d, &reg(), &[], &layout());
     assert_eq!(f.len(), 1, "{f:?}");
     assert_eq!(f[0].line, 2);
 }
@@ -338,6 +338,11 @@ fn the_same_markers_are_refused_once_the_merge_is_committed() {
     // the control for the three above: it is the merge in progress that excuses them
     let d = merging();
     git(&d, &["commit", "-q", "-m", "merge"]);
-    let f = check(&Reading::new(&d).view(), &d, &reg(), &[]);
+    let f = check(&Reading::new(&d).view(), &d, &reg(), &[], &layout());
     assert_eq!(f.len(), 2, "{f:?}");
+}
+
+/// The layout the fixtures are written in: the mock tree under `mock`, the content under `content`.
+fn layout() -> crate::layout::Layout {
+    crate::layout::Layout::new("mock", crate::layout::ContentDirs::new(&["content"]))
 }

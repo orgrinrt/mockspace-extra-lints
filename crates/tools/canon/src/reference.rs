@@ -16,6 +16,7 @@ use std::path::Path;
 
 use mockspace::RegistryView;
 
+use crate::layout::Layout;
 use crate::rows::Tenet;
 use crate::scope::Scope;
 use crate::tree::mentions;
@@ -282,6 +283,7 @@ pub fn related(
 pub fn citers(
     reg: &RegistryView,
     repo: &Path,
+    layout: &Layout,
     term: &str,
     scope: &Scope,
 ) -> Result<(String, usize), String> {
@@ -289,7 +291,7 @@ pub fn citers(
     let (ns, slug) = parts(&q);
     let name = if ns == "tenet" { slug } else { q.as_str() };
     let known: BTreeSet<&str> = [slug].into_iter().collect();
-    let found = mentions(repo, &known);
+    let found = mentions(repo, layout, &known);
     let lines = found.get(slug).map(Vec::as_slice).unwrap_or_default();
     let mut out = format!("{name} is named {} times\n", lines.len());
     let tiers: BTreeSet<_> = lines.iter().map(|l| l.tier).collect();

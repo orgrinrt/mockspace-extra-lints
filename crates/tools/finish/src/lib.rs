@@ -7,11 +7,8 @@
 //!
 //! A helper finishes its ticket and leaves undone the canon rows beside it and the open tickets in the
 //! crates it touched. This lists them for a branch, and reports; it never gates. The tickets are read
-//! through `tickets` and the tenets through `canon`, so the registry has no second reader here. The
-//! gate is `land-own`, which refuses while `--unanswered` prints a key.
-//!
-//! The same tool would serve every mockspace repository, and that move to `mockspace-extra-lints` is a
-//! ticket, not a second copy.
+//! through `tickets` and the tenets through `canon`, so the registry has no second reader here. A
+//! project that gates its landings on it refuses a branch while `--unanswered` prints a key.
 
 pub mod items;
 pub mod touched;
@@ -21,6 +18,7 @@ use std::path::Path;
 use std::process::Command;
 
 use mockspace::tool::{ArgSpec, NotALint, Purpose, Tool, ToolContext, ToolReport, positional_args};
+use registry_lints::layout::{ContentDirs, Layout};
 use tickets::trunk::{self, Opts};
 use tickets::view::{self, Filter};
 
@@ -109,7 +107,7 @@ impl Tool for Finish {
     }
 
     fn help(&self) -> &'static str {
-        "Lists three things for a branch against `--base` (default `origin/dev`): the crates its diff touches, the open tickets other than its own whose title or text names one of them, and the tenets joined to the rows of its own ticket (the `tenet::` entries of its `related`, or `--rows a,b`) that its diff and commit messages do not name. Each ticket and row is an item with a key, `ticket:<id>` or `row:<id>`. A report answers an item on a line of its own: `- <key> done <sha>`, `- <key> parted <ticket id>` or `- <key> left: <reason>`. `--report <file>` marks each item answered or not, and `--unanswered` prints only the keys with no answer, one a line, which is what `land-own` refuses on. It reports and never fails on what it finds."
+        "Lists three things for a branch against `--base` (default `origin/dev`): the crates its diff touches, the open tickets other than its own whose title or text names one of them, and the tenets joined to the rows of its own ticket (the `tenet::` entries of its `related`, or `--rows a,b`) that its diff and commit messages do not name. Each ticket and row is an item with a key, `ticket:<id>` or `row:<id>`. A report answers an item on a line of its own: `- <key> done <sha>`, `- <key> parted <ticket id>` or `- <key> left: <reason>`. `--report <file>` marks each item answered or not, and `--unanswered` prints only the keys with no answer, one a line, which is what a landing gate refuses on. It reports and never fails on what it finds."
     }
 
     fn run(&self, ctx: &ToolContext<'_>) -> ToolReport {
@@ -142,7 +140,8 @@ fn build(ctx: &ToolContext<'_>, req: &Request<'_>) -> Result<(String, usize), St
         .lines()
         .map(str::to_owned)
         .collect();
-    let touched = touched::touched(&paths);
+    let layout = Layout::of(ctx.mock_dir, root, &ContentDirs::default());
+    let touched = touched::touched(&paths, &layout);
 
     let reading = trunk::read(root, ctx.mock_dir, Opts {
         tree:  false,

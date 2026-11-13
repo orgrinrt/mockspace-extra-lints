@@ -95,7 +95,7 @@ pub(crate) fn run(reg: &RegistryView, repo: &Path, args: &[&str]) -> ToolReport 
         stdin: None,
         registry: reg,
     };
-    Canon.run_with(&ctx, &|_| Vec::new())
+    canon().run_with(&ctx, &|_| Vec::new())
 }
 
 pub(crate) fn answered(r: &ToolReport) -> &str {
@@ -118,15 +118,15 @@ fn listed(text: &str) -> Vec<&str> {
 #[test]
 fn the_declaration_is_a_check_the_engine_accepts() {
     assert!(
-        contract_faults(&Canon, None).is_empty(),
+        contract_faults(&Canon::default(), None).is_empty(),
         "{:?}",
-        contract_faults(&Canon, None)
+        contract_faults(&Canon::default(), None)
     );
 }
 
 #[test]
 fn a_missing_or_unknown_verb_is_refused_naming_the_verbs() {
-    let missing: Vec<&str> = missing_required(&Canon, &[])
+    let missing: Vec<&str> = missing_required(&Canon::default(), &[])
         .iter()
         .map(|a| a.name)
         .collect();
@@ -274,7 +274,7 @@ fn a_file_s_tier_follows_where_it_sits() {
         ("mock/registry/tenet/sky.toml", Tier::Canon),
         ("mockspace.toml", Tier::Other),
     ] {
-        assert_eq!(tier_of(Path::new(p)), t, "{p}");
+        assert_eq!(tier_of(Path::new(p), &layout()), t, "{p}");
     }
 }
 
@@ -320,7 +320,7 @@ fn citers_finds_every_tier_and_skips_what_is_generated_or_built() {
     let known: BTreeSet<&str> = ["the_sun_rises", "the_sun_rose", "nobody_names_this"]
         .into_iter()
         .collect();
-    let found = mentions(&repo, &known);
+    let found = mentions(&repo, &layout(), &known);
     let tiers: Vec<Tier> = found["the_sun_rises"].iter().map(|l| l.tier).collect();
     assert_eq!(
         tiers.iter().copied().collect::<BTreeSet<_>>(),
@@ -372,3 +372,15 @@ fn uncited_lists_the_binding_tenets_nothing_names() {
 }
 
 // --- the committed canon -------------------------------------------------------------------------
+
+/// The layout the fixtures are written in: the mock tree under `mock`, the content under `content`.
+pub(crate) fn layout() -> registry_lints::layout::Layout {
+    registry_lints::layout::Layout::new("mock", registry_lints::layout::ContentDirs::new(&["content"]))
+}
+
+/// The tool as a project with its content under `content` configures it.
+pub(crate) fn canon() -> Canon {
+    Canon {
+        content: registry_lints::layout::ContentDirs::new(&["content"]),
+    }
+}

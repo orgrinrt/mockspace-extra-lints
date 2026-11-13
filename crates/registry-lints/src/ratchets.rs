@@ -3,7 +3,8 @@
 // SPDX-License-Identifier: MPL-2.0     https://mozilla.org/MPL/2.0        contact@hiisi.digital
 //--------------------------------------------------------------------------------------------------
 
-//! The one reading of `mock/ratchets.toml`, which the four ratchet lints share. This file declares no lint.
+//! The one reading of `ratchets.toml` in the mock directory, which `every-fixme-names-a-ticket` and a
+//! consumer's own ratchet lints share. This file declares no lint.
 //!
 //! A ratchet is a check that reads every unit and a closed list of the units that do not yet pass it, each with
 //! the ticket for getting it off the list. The list is `[[row]]` tables of `lint`, `subject`, `ticket` and, for
@@ -14,6 +15,8 @@ use std::collections::BTreeSet;
 use std::path::Path;
 
 use mockspace::{RegistryView, View};
+
+use crate::layout::{ContentDirs, Layout, mock_rel};
 
 /// Where the rows stand, under the mock directory.
 pub const FILE: &str = "ratchets.toml";
@@ -39,7 +42,7 @@ pub struct Row {
     pub findings: usize,
 }
 
-/// The rows of a `ratchets.toml` text. Only the four keys are read, and a line that is none of a table header,
+/// The rows of a `ratchets.toml` text. Only the keys a row has are read, and a line that is none of a table header,
 /// a key or a comment is left alone.
 pub fn parse(text: &str) -> Vec<Row> {
     let mut rows: Vec<Row> = Vec::new();
@@ -125,6 +128,7 @@ pub fn judge(
     lint: &'static str,
     found: &std::collections::BTreeMap<String, Vec<Finding>>,
 ) -> Vec<mockspace::LintError> {
+    let file = Layout::new(&mock_rel(mock, view.root()), ContentDirs::default()).in_mock(FILE);
     let rows = read(view, mock);
     let rows = of(&rows, lint);
     let units: BTreeSet<&str> = found
@@ -135,15 +139,17 @@ pub fn judge(
     let mut out = Vec::new();
     for unit in units {
         let row = rows.iter().find(|r| r.subject == unit).copied();
-        out.extend(judge_unit(lint, unit, row, found.get(unit)));
+        out.extend(judge_unit(lint, &file, unit, row, found.get(unit)));
     }
     out
 }
 
-/// The verdict of lint `lint` over one unit, given its row if it has one and its findings if it has any. A lint that
-/// reads one unit at a time calls this for its own unit, so the verdict is the same as the whole-register one.
+/// The verdict of lint `lint` over one unit, given the rows' file as the repository names it, its row if it has
+/// one and its findings if it has any. A lint that reads one unit at a time calls this for its own unit, so the
+/// verdict is the same as the whole-register one.
 pub fn judge_unit(
     lint: &'static str,
+    file: &str,
     unit: &str,
     row: Option<&Row>,
     findings: Option<&Vec<Finding>>,
@@ -165,7 +171,7 @@ pub fn judge_unit(
                         *line,
                         lint,
                         format!(
-                            "{msg}; `mock/{FILE}` allows `{unit}` {cap} findings of `{lint}` for the ticket `{}` \
+                            "{msg}; `{file}` allows `{unit}` {cap} findings of `{lint}` for the ticket `{}` \
                                  and it has {has}: a unit is never allowed more than its row counts",
                             row.ticket
                         ),
@@ -179,13 +185,12 @@ pub fn judge_unit(
                     row.line,
                     lint,
                     format!(
-                        "`mock/{FILE}` allows `{unit}` {cap} findings of `{lint}` for the ticket `{}` and it has \
+                        "`{file}` allows `{unit}` {cap} findings of `{lint}` for the ticket `{}` and it has \
                              {has} left: lower `findings` to {has}",
                         row.ticket
                     ),
                 );
-                // FIXME(pack_lints_and_tools_read_the_mock_directory_as_mock): the mock directory is read as `mock`, not as the one `mockspace.toml` declares
-                e.path = Some(format!("mock/{FILE}"));
+                e.path = Some(file.to_owned());
                 out.push(e);
             }
         },
@@ -196,7 +201,7 @@ pub fn judge_unit(
                     *line,
                     lint,
                     format!(
-                        "{msg}; `{unit}` has no row in `mock/{FILE}`, which names an open ticket for a unit that \
+                        "{msg}; `{unit}` has no row in `{file}`, which names an open ticket for a unit that \
                              holds this today, and a new offender is not allowed one"
                     ),
                 );
@@ -211,13 +216,12 @@ pub fn judge_unit(
                 row.line,
                 lint,
                 format!(
-                    "`mock/{FILE}` allows `{unit}` findings of `{lint}` for the ticket `{}` and it has none left: \
+                    "`{file}` allows `{unit}` findings of `{lint}` for the ticket `{}` and it has none left: \
                          remove the row",
                     row.ticket
                 ),
             );
-            // FIXME(pack_lints_and_tools_read_the_mock_directory_as_mock): the mock directory is read as `mock`, not as the one `mockspace.toml` declares
-            e.path = Some(format!("mock/{FILE}"));
+            e.path = Some(file.to_owned());
             out.push(e);
         },
     }

@@ -19,11 +19,11 @@ use crate::retired_words::{
     unit_of,
     words,
 };
-use crate::tests::{answered, run, scratch, view, write};
+use crate::tests::{answered, layout, run, scratch, view, write};
 
 /// The lines of a text that stand, which is what the lint holds a unit to.
 fn scan_text(rel: &Path, body: &str, rules: &[Retiring]) -> Vec<crate::retired_words::Hit> {
-    split_text(rel, body, rules).0
+    split_text(rel, body, rules, &layout()).0
 }
 
 fn w(text: &str) -> Vec<String> {
@@ -112,7 +112,7 @@ fn only_designs_code_content_shaders_and_the_root_readme_are_read() {
         "mock/crates/kaski-render/shaders/a.wgsl",
         "README.md",
     ] {
-        assert!(scanned(Path::new(p)), "{p}");
+        assert!(scanned(Path::new(p), &layout()), "{p}");
     }
     for p in [
         "mock/research/202610241000_x/NOTES.md",
@@ -122,7 +122,7 @@ fn only_designs_code_content_shaders_and_the_root_readme_are_read() {
         "docs/PLANET.md",
         "crates/README.md",
     ] {
-        assert!(!scanned(Path::new(p)), "{p}");
+        assert!(!scanned(Path::new(p), &layout()), "{p}");
     }
 }
 
@@ -136,7 +136,7 @@ fn a_file_belongs_to_the_unit_the_debt_list_names() {
         ("mock/DESIGN.md.tmpl", "workspace"),
         ("content/kaski/items.toml", "content"),
     ] {
-        assert_eq!(unit_of(Path::new(p)), unit, "{p}");
+        assert_eq!(unit_of(Path::new(p), &layout()), unit, "{p}");
     }
 }
 
@@ -342,17 +342,17 @@ fn a_line_let_through_by_the_ruling_tenet_is_counted_and_listed_for_a_path() {
 fn a_line_that_only_cites_the_ruling_tenet_names_nothing_held_or_let_through() {
     let rules = [rule()];
     let path = Path::new("mock/DESIGN.md.tmpl");
-    let (held, excused) = split_text(path, "it stands on `there_is_no_zorblax`\n", &rules);
+    let (held, excused) = split_text(path, "it stands on `there_is_no_zorblax`\n", &rules, &layout());
     assert!(
         held.is_empty() && excused.is_empty(),
         "{held:?} {excused:?}"
     );
     // the control: the same words outside the id are a hit, and the id beside them lets it through
-    let (held, excused) = split_text(path, "a zorblax stands on `there_is_no_zorblax`\n", &rules);
+    let (held, excused) = split_text(path, "a zorblax stands on `there_is_no_zorblax`\n", &rules, &layout());
     assert!(held.is_empty());
     assert_eq!(excused.len(), 1);
     // a longer id is another tenet's, and neither blanked nor an excuse
-    let (held, excused) = split_text(path, "stands on `there_is_no_zorblax_at_all`\n", &rules);
+    let (held, excused) = split_text(path, "stands on `there_is_no_zorblax_at_all`\n", &rules, &layout());
     assert_eq!((held.len(), excused.len()), (1, 0));
 }
 
@@ -424,14 +424,14 @@ fn contradicts_with_a_path_among_several_that_is_not_there_names_it() {
 fn split_under_with_no_path_reads_the_whole_repository_and_with_paths_only_those() {
     let d = tree();
     let rules = [rule()];
-    let whole = split_under(&mockspace::reading::Reading::new(&d).view(), &d, &rules, &[]).0;
+    let whole = split_under(&mockspace::reading::Reading::new(&d).view(), &d, &rules, &[], &layout()).0;
     assert_eq!(whole.len(), 2, "{whole:?}");
-    let one = split_under(&mockspace::reading::Reading::new(&d).view(), &d, &rules, &[Path::new("mock/crates/kaski-a/src")]).0;
+    let one = split_under(&mockspace::reading::Reading::new(&d).view(), &d, &rules, &[Path::new("mock/crates/kaski-a/src")], &layout()).0;
     assert_eq!(one.len(), 1, "{one:?}");
     let two = split_under(&mockspace::reading::Reading::new(&d).view(), &d, &rules, &[
         Path::new("mock/crates/kaski-a/src"),
         Path::new("mock/crates/kaski-a/DESIGN.md.tmpl"),
-    ])
+    ], &layout())
     .0;
     assert_eq!(two.len(), 2, "{two:?}");
 }

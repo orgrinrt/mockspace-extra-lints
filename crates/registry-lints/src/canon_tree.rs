@@ -18,18 +18,20 @@ use std::path::{Path, PathBuf};
 
 use mockspace::View;
 
+use crate::layout::Layout;
+
 /// Which tier a path sits in.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Tier {
-    /// A design template under `mock/`.
+    /// A design template under the mock directory.
     Design,
-    /// Rust under `mock/`.
+    /// Rust under the mock directory.
     Code,
     /// A research note.
     Research,
     /// A design round, open or archived.
     Rounds,
-    /// A content pack.
+    /// A file under one of the content directories the project names.
     Content,
     /// Another registry row.
     Canon,
@@ -61,21 +63,25 @@ const SKIPPED_AT_ROOT: [&str; 3] = ["docs", ".claude", ".github"];
 /// The extensions of text a citation can sit in.
 const READ: [&str; 6] = ["md", "tmpl", "rs", "toml", "slang", "wgsl"];
 
-/// The tier of a file, by its path relative to the repository root.
-pub fn tier_of(rel: &Path) -> Tier {
+/// The tier of a file, by its path relative to the repository root, in the repository laid out as
+/// `layout` says.
+pub fn tier_of(rel: &Path, layout: &Layout) -> Tier {
     let s = rel.to_string_lossy().replace('\\', "/");
-    // FIXME(pack_lints_and_tools_read_the_mock_directory_as_mock): the mock directory is read as `mock`, not as the one `mockspace.toml` declares
-    if s.starts_with("mock/registry/") {
+    if layout.in_content(&s).is_some() {
+        return Tier::Content;
+    }
+    let Some(m) = layout.under_mock(&s) else {
+        return Tier::Other;
+    };
+    if m.starts_with("registry/") {
         Tier::Canon
-    } else if s.starts_with("mock/design_rounds/") {
+    } else if m.starts_with("design_rounds/") {
         Tier::Rounds
-    } else if s.starts_with("mock/research/") {
+    } else if m.starts_with("research/") {
         Tier::Research
-    } else if s.starts_with("content/") {
-        Tier::Content
-    } else if s.starts_with("mock/") && s.ends_with(".md.tmpl") {
+    } else if m.ends_with(".md.tmpl") {
         Tier::Design
-    } else if s.starts_with("mock/") && s.ends_with(".rs") {
+    } else if m.ends_with(".rs") {
         Tier::Code
     } else {
         Tier::Other

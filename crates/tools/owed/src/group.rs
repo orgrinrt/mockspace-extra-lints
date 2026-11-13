@@ -13,6 +13,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use registry_lints::layout::Layout;
+
 /// The share of content words two markers have in common for them to be one gap: the size of what
 /// they share over the size of what either has.
 pub const SIMILAR: f64 = 0.45;
@@ -121,36 +123,50 @@ pub fn key(reason: &str) -> String {
     gist(reason).to_lowercase()
 }
 
-/// The part of the repository a path is in, as a ticket names it: a crate by its directory, the
-/// content, or the kind of tooling.
-pub fn area(rel: &str) -> String {
+/// The part of the repository a path is in, as a ticket names it: a crate by its directory, a content
+/// directory and the pack in it, or the kind of tooling under the mock directory.
+pub fn area(rel: &str, layout: &Layout) -> String {
     let segs: Vec<&str> = rel.split('/').collect();
     if let Some(i) = segs.iter().position(|s| *s == "crates")
         && let Some(name) = segs.get(i + 1).filter(|_| i + 2 < segs.len())
     {
         return (*name).to_string();
     }
+    if let Some((dir, rest)) = layout.in_content(rel) {
+        return match rest.split_once('/') {
+            Some((pack, _)) => format!("{dir}/{pack}"),
+            None => dir.to_string(),
+        };
+    }
+    if let Some(m) = layout.under_mock(rel).filter(|_| !layout.mock().is_empty()) {
+        let segs: Vec<&str> = m.split('/').collect();
+        match segs.as_slice() {
+            ["tools", name, _, ..] => return format!("tool {name}"),
+            ["lints", ..] => return "lints".to_string(),
+            ["agent", ..] => return "agent text".to_string(),
+            ["benches", ..] => return "benches".to_string(),
+            [_] => return "mock design".to_string(),
+            _ => {},
+        }
+    }
     match segs.as_slice() {
-        ["content", pack, ..] if segs.len() > 2 => format!("content/{pack}"),
-        ["content", ..] => "content".to_string(),
-        // FIXME(pack_lints_and_tools_read_the_mock_directory_as_mock): the mock directory is read as `mock`, not as the one `mockspace.toml` declares
-        ["mock", "tools", name, ..] if segs.len() > 3 => format!("tool {name}"),
-        ["mock", "lints", ..] => "lints".to_string(),
-        ["mock", "agent", ..] => "agent text".to_string(),
-        ["mock", "benches", ..] => "benches".to_string(),
-        ["mock", _] => "mock design".to_string(),
         [first, ..] if segs.len() > 1 => (*first).to_string(),
         _ => "root".to_string(),
     }
 }
 
 /// The canon subject a path is about, where one of the registry's `subject` rows is named for it:
-/// the crate without the project's `crate_prefix` and its dash, the content, or the workflow for the tooling.
-pub fn subject_of(area: &str, prefix: &str, subjects: &BTreeSet<String>) -> Option<String> {
+/// the crate without the project's `crate_prefix` and its dash, the content directory, or the workflow
+/// for the tooling.
+pub fn subject_of(area: &str, prefix: &str, subjects: &BTreeSet<String>, layout: &Layout) -> Option<String> {
+    let content = layout
+        .content()
+        .iter()
+        .find(|d| area == d.as_str() || area.strip_prefix(d.as_str()).is_some_and(|r| r.starts_with('/')));
     let guess = if let Some(rest) = area.strip_prefix(prefix).and_then(|r| r.strip_prefix('-')) {
         rest.replace('-', "_")
-    } else if area.starts_with("content") {
-        "content".to_string()
+    } else if let Some(dir) = content {
+        dir.replace('-', "_")
     } else if area.starts_with("tool ")
         || matches!(area, "lints" | "agent text" | "mock design" | "benches")
     {

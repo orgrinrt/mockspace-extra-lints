@@ -12,11 +12,13 @@
 use corpus::repo::Near;
 use mockspace::tool::{
     ArgSpec,
+    ConfigKey,
     NotALint,
     Outcome,
     Purpose,
     Tool,
     ToolContext,
+    ToolParams,
     ToolReport,
     positional_args,
 };
@@ -27,6 +29,7 @@ use crate::scope::Scope;
 // which files are read, the tiers and how a retired word is matched are owned by the lints directory,
 // where `a-retired-word-stays-out` reads the same files, so the verb and the gate cannot disagree
 use registry_lints::canon_tree;
+use registry_lints::layout::{self, CONTENT_DIRS_KEY, ContentDirs, Layout};
 mod dropped;
 mod names;
 mod near;
@@ -43,8 +46,11 @@ pub use names::named;
 pub use rows::{Standing, Tenet, carries, heirs, joined_to, subjects, tenets};
 pub use tree::{Line, Tier, mentions, tier_of};
 
-/// The check.
-pub struct Canon;
+/// The check, holding the content directories `[tools.canon]` names, which are read as the content tier.
+#[derive(Default)]
+pub struct Canon {
+    content: ContentDirs,
+}
 
 /// The verbs, in the order the help lists them.
 pub const VERBS: [&str; 11] = [
@@ -87,6 +93,14 @@ impl Tool for Canon {
                 description: "the subject, the word, the row (a bare id, or `namespace::id`) or the tenet the verb asks about; `check` takes one or more tenets, names each provisional one as provisional and still exits 0, and exits 1 on one that is no tenet, is superseded or is demoted; `contradicts` takes any number of paths, read in one pass, and with none reads the whole repository; `forbids` with none lists the replaced tenets that name no word they rule out; `show`, `find`, `related` and `citers` read every namespace of the registry, and `--in <namespace>[,<namespace>]` narrows them, `canon` standing for the namespaces `canon_paths` reaches",
             },
         ]
+    }
+
+    fn config_keys(&self) -> &[ConfigKey] {
+        &[CONTENT_DIRS_KEY]
+    }
+
+    fn configure(&mut self, params: &ToolParams) {
+        self.content.configure_tool(params);
     }
 
     fn value_flags(&self) -> &[&'static str] {
@@ -135,7 +149,8 @@ impl Canon {
         }
         let term = words.get(1).copied();
         let more = words.get(2 ..).unwrap_or_default();
-        match verbs::answer(ctx.registry, ctx.repo_root, verb, term, more, &scope) {
+        let layout = Layout::of(ctx.mock_dir, ctx.repo_root, &self.content);
+        match verbs::answer(ctx.registry, ctx.repo_root, &layout, verb, term, more, &scope) {
             Ok((mut text, examined)) => {
                 if *verb == "find"
                     && let Some(question) = term
@@ -193,7 +208,7 @@ fn check_report(ids: &[&str], registry: &RegistryView) -> ToolReport {
 }
 
 mockspace::lint_pack! {
-    tools: [Canon],
+    tools: [Canon::default()],
 }
 
 #[cfg(test)]

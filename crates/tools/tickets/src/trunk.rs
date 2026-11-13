@@ -17,6 +17,7 @@ use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
 use planning::Plan;
+use registry_lints::layout::{ContentDirs, Layout, mock_rel};
 use ticket_model::Store;
 
 /// The trunk branch the tickets are real on.
@@ -241,11 +242,10 @@ fn trunk_store(root: &Path, registry_rel: &str) -> Result<(Store, Plan), String>
     Ok((store, crate::plan_of(&files)?))
 }
 
-/// The registry's path from the repository root, with `/`.
+/// The registry's path from the repository root, with `/`, under the mock directory the engine hands
+/// the tool, the root itself where the mock directory is the root.
 fn registry_rel(root: &Path, mock_dir: &Path) -> String {
-    let rel = mock_dir.strip_prefix(root).unwrap_or(Path::new("mock"));
-    let rel = rel.to_string_lossy().replace('\\', "/");
-    format!("{}/registry", rel.trim_matches('/'))
+    Layout::new(&mock_rel(mock_dir, root), ContentDirs::default()).in_mock("registry")
 }
 
 /// The tickets, from the trunk unless `--tree` says otherwise.

@@ -269,7 +269,7 @@ fn what_the_refusal_does_not_cover_still_goes_through() {
     assert_eq!(state(&s, "new_work"), "done");
     let s = Scratch::new();
     pair(&s);
-    put(&s, "mock/research/n/NOTES.md", "// §(old_work): quoted\n");
+    put(&s, "research/n/NOTES.md", "// §(old_work): quoted\n");
     put(&s, "docs/GEN.md", "// §(old_work): quoted\n");
     assert!(matches!(
         close_alone(&s, "old_work").outcome,
@@ -313,16 +313,17 @@ fn a_question_closed_with_an_answer_leaves_its_markers_as_the_work_owed() {
     ));
 }
 
+/// The scratch's mock directory is its root, so the records sit at `design_rounds/` and `research/`.
 #[test]
 fn the_records_the_generated_documents_and_vendored_code_are_left_alone() {
     let s = Scratch::new();
     pair(&s);
     let quoted = "// §(old_work): quoted\n";
     for rel in [
-        "mock/design_rounds/202610010000/x.md",
-        "mock/research/n/NOTES.md",
+        "design_rounds/202610010000/x.md",
+        "research/n/NOTES.md",
         "docs/GEN.md",
-        "mock/vendor/v/src/lib.rs",
+        "vendor/v/src/lib.rs",
     ] {
         put(&s, rel, quoted);
     }
@@ -333,10 +334,10 @@ fn the_records_the_generated_documents_and_vendored_code_are_left_alone() {
     ));
     assert_eq!(read(&s, "src/a.rs"), t("// §(new_work): quoted\n"));
     for rel in [
-        "mock/design_rounds/202610010000/x.md",
-        "mock/research/n/NOTES.md",
+        "design_rounds/202610010000/x.md",
+        "research/n/NOTES.md",
         "docs/GEN.md",
-        "mock/vendor/v/src/lib.rs",
+        "vendor/v/src/lib.rs",
     ] {
         assert_eq!(read(&s, rel), t(quoted), "{rel}");
     }

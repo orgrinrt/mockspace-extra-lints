@@ -24,33 +24,39 @@
 //! a marker citing it is owed work and is a warning, which never stops a landing. Whoever answers, from the console
 //! or by `ticket-move --answer`, has no way to rewrite the markers in the same commit, and an answer arriving must
 //! not turn the trunk red for every branch that has nothing to do with it.
-//! The markers that cite one today are rows of `mock/ratchets.toml` (file and cited ticket, each with the open
-//! ticket for removing it); a row whose file holds no such marker is refused, so the list only shrinks.
+//! The markers that cite one today are rows of `ratchets.toml` in the mock directory (file and cited
+//! ticket, each with the open ticket for removing it); a row whose file holds no such marker is refused, so the list only shrinks.
 //!
 //! In a merge that is not yet committed the lint judges what the merge adds and not what it carries in:
 //! a marker with the same tag and words in the same file at either parent is that parent's, and is left
 //! to the gate of the branch it came from (`merge_carried.rs`). Outside a merge every marker is judged.
 //!
-//! The home is this repository and not `mockspace-extra-lints`: no other repository has a `ticket`
-//! namespace to look the ids up in, and the scopes above are this repository's layout. The reading is
-//! a file of its own so that it can be lifted into the pack when a second repository has tickets.
+//! The scopes above are read under the mock directory the engine hands the lint, and a finding is named
+//! by the unit its file is in, the content directories counted among them where `content_dirs` in the
+//! lint's table names any. A repository with no `ticket` namespace has no ticket for a marker to cite,
+//! so every marker there is refused.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::path::Path;
 
 use mockspace::{Lint, LintError, RegistryView, RepoContext, RepoLint, Severity, View};
 
 use crate::fixme_markers::{self, Scope};
+use crate::layout::{CONTENT_DIRS, ContentDirs, Layout};
 use crate::retired_words::unit_of;
 use crate::{merge_carried, ratchets};
 
 pub fn repo_lint() -> Box<dyn RepoLint> {
-    Box::new(EveryFixmeNamesATicket)
+    Box::new(EveryFixmeNamesATicket::default())
 }
 
 pub const NAME: &str = "every-fixme-names-a-ticket";
 
-struct EveryFixmeNamesATicket;
+/// The lint, holding the content directories its table names, which a finding's unit is named by.
+#[derive(Default)]
+struct EveryFixmeNamesATicket {
+    content: ContentDirs,
+}
 
 impl Lint for EveryFixmeNamesATicket {
     fn name(&self) -> &'static str {
@@ -60,12 +66,21 @@ impl Lint for EveryFixmeNamesATicket {
     fn default_severity(&self) -> Severity {
         Severity::HARD_ERROR
     }
+
+    fn config_keys(&self) -> &[&str] {
+        &[CONTENT_DIRS]
+    }
+
+    fn configure(&mut self, params: &HashMap<String, String>) {
+        self.content.configure_lint(params);
+    }
 }
 
 impl RepoLint for EveryFixmeNamesATicket {
     fn check_repo(&self, ctx: &RepoContext) -> Vec<LintError> {
         let view = ctx.view();
-        check(view, ctx.repo_root, ctx.registry(), &ratchets::read(view, ctx.mock_dir))
+        let layout = Layout::of(ctx.mock_dir, ctx.repo_root, &self.content);
+        check(view, ctx.repo_root, ctx.registry(), &ratchets::read(view, ctx.mock_dir), &layout)
     }
 }
 
@@ -76,7 +91,13 @@ fn is_slug(s: &str) -> bool {
             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
 }
 
-fn check(view: &View<'_>, repo: &Path, reg: &RegistryView, rows: &[ratchets::Row]) -> Vec<LintError> {
+fn check(
+    view: &View<'_>,
+    repo: &Path,
+    reg: &RegistryView,
+    rows: &[ratchets::Row],
+    layout: &Layout,
+) -> Vec<LintError> {
     let closed = ratchets::closed_tickets(reg);
     let answered = ratchets::answered_tickets(reg);
     let waivers = ratchets::of(rows, NAME);
@@ -89,7 +110,8 @@ fn check(view: &View<'_>, repo: &Path, reg: &RegistryView, rows: &[ratchets::Row
     let fix = "run `cargo mock owed` to file the ticket and rewrite the marker, or write the id of the ticket you opened";
     let merging = merge_carried::in_progress(view, repo);
     let mut out = Vec::new();
-    for source in fixme_markers::sources(view, repo) {
+    let file = layout.in_mock(ratchets::FILE);
+    for source in fixme_markers::sources(view, repo, layout) {
         if source.scope != Scope::Live {
             continue;
         }
@@ -116,17 +138,16 @@ fn check(view: &View<'_>, repo: &Path, reg: &RegistryView, rows: &[ratchets::Row
                         // A question someone answered is closed by the answer, and the work the answer sets
                         // has not been cited yet: owed work, which must not stop an unrelated landing.
                         let mut e = LintError::warning(
-                            unit_of(Path::new(&source.rel)),
+                            unit_of(Path::new(&source.rel), layout),
                             m.line,
                             NAME,
                             format!(
                                 "`{}:{}` is a placeholder marker that cites `{tag}`, a question answered on {}: the work its \
                                  answer sets is owed. Cite the open task that holds it (`cargo mock owed` files one), or hold \
-                                 the marker with a row of `mock/{}` where the file is in a gated crate",
+                                 the marker with a row of `{file}` where the file is in a gated crate",
                                 source.rel,
                                 m.line,
                                 at.split('T').next().unwrap_or(at),
-                                ratchets::FILE
                             ),
                         );
                         e.path = Some(source.rel.clone());
@@ -151,7 +172,7 @@ fn check(view: &View<'_>, repo: &Path, reg: &RegistryView, rows: &[ratchets::Row
                 continue;
             }
             let mut e = LintError::error(
-                unit_of(Path::new(&source.rel)),
+                unit_of(Path::new(&source.rel), layout),
                 m.line,
                 NAME,
                 format!(
@@ -170,20 +191,18 @@ fn check(view: &View<'_>, repo: &Path, reg: &RegistryView, rows: &[ratchets::Row
             .is_some_and(|(file, tag)| used.contains(&(file.to_owned(), tag.to_owned())));
         if !held {
             let mut e = LintError::error(
-                // FIXME(pack_lints_and_tools_read_the_mock_directory_as_mock): the mock directory is read as `mock`, not as the one `mockspace.toml` declares
-                "mock".to_owned(),
+                // the unit of the rows' file is the mock directory it sits in
+                if layout.mock().is_empty() { "workspace" } else { layout.mock() }.to_owned(),
                 r.line,
                 NAME,
                 format!(
-                    "`mock/{}` allows `{}` for the ticket `{}` and no marker in that file cites that closed ticket \
+                    "`{file}` allows `{}` for the ticket `{}` and no marker in that file cites that closed ticket \
                      now: remove the row",
-                    ratchets::FILE,
                     r.subject,
                     r.ticket
                 ),
             );
-            // FIXME(pack_lints_and_tools_read_the_mock_directory_as_mock): the mock directory is read as `mock`, not as the one `mockspace.toml` declares
-            e.path = Some(format!("mock/{}", ratchets::FILE));
+            e.path = Some(file.clone());
             out.push(e);
         }
     }

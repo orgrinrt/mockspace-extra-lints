@@ -17,11 +17,18 @@ use mockspace::tool::{ArgSpec, Purpose, Tool, ToolContext, ToolReport};
 
 use mockspace::reading::Reading;
 use registry_lints::fixme_markers;
+use registry_lints::layout::{ContentDirs, Layout};
+
+/// Where the markers are read: which of them is live depends on the mock directory alone, so no content
+/// directory is named.
+fn live_layout(repo: &Path, mock_dir: &Path) -> Layout {
+    Layout::of(mock_dir, repo, &ContentDirs::default())
+}
 
 /// The live files that hold a marker citing `from`, each with the text it has once the marker cites
-/// `to`. Nothing is written; this only reads.
-fn recited(repo: &Path, from: &str, to: &str) -> Vec<(String, String)> {
-    fixme_markers::sources(&Reading::new(repo).view(), repo)
+/// `to`, in the repository whose mock directory is `mock_dir`. Nothing is written; this only reads.
+fn recited(repo: &Path, mock_dir: &Path, from: &str, to: &str) -> Vec<(String, String)> {
+    fixme_markers::sources(&Reading::new(repo).view(), repo, &live_layout(repo, mock_dir))
         .into_iter()
         .filter(|s| s.scope == fixme_markers::Scope::Live)
         .filter_map(|s| fixme_markers::recite(&s.text, s.kind, from, to).map(|text| (s.rel, text)))
@@ -29,8 +36,8 @@ fn recited(repo: &Path, from: &str, to: &str) -> Vec<(String, String)> {
 }
 
 /// The live markers that cite `ticket`, each as its file and line, in the files `recited` reads.
-fn citing(repo: &Path, ticket: &str) -> Vec<(String, usize)> {
-    fixme_markers::sources(&Reading::new(repo).view(), repo)
+fn citing(repo: &Path, mock_dir: &Path, ticket: &str) -> Vec<(String, usize)> {
+    fixme_markers::sources(&Reading::new(repo).view(), repo, &live_layout(repo, mock_dir))
         .into_iter()
         .filter(|s| s.scope == fixme_markers::Scope::Live)
         .flat_map(|s| {
@@ -61,7 +68,7 @@ fn closing_leaves_markers(
     if !store.states.get(&request.to).is_some_and(|s| s.closed) {
         return None;
     }
-    let found = citing(repo, &request.ticket);
+    let found = citing(repo, mock_dir, &request.ticket);
     if found.is_empty() {
         return None;
     }
@@ -146,7 +153,7 @@ impl Tool for TicketMove {
         let rewrites = request
             .successor
             .as_deref()
-            .map(|to| recited(ctx.repo_root, &request.ticket, to))
+            .map(|to| recited(ctx.repo_root, ctx.mock_dir, &request.ticket, to))
             .unwrap_or_default();
         if let Err(e) = tickets::write::move_ticket(&tickets::registry_dir(ctx.mock_dir), &request)
         {
@@ -205,7 +212,7 @@ fn close_gone(ctx: &ToolContext<'_>) -> ToolReport {
     let by = tickets::args::by(flag("--by"));
     let at = tickets::args::at(flag("--at"));
     let successor = flag("--for").copied();
-    let cited = |id: &str| !citing(ctx.repo_root, id).is_empty();
+    let cited = |id: &str| !citing(ctx.repo_root, ctx.mock_dir, id).is_empty();
     let git = tickets::landing::Git::of(ctx);
     let swept = tickets::close_gone::close_gone(
         &tickets::registry_dir(ctx.mock_dir),
@@ -223,7 +230,7 @@ fn close_gone(ctx: &ToolContext<'_>) -> ToolReport {
     };
     if let Some(to) = successor {
         for id in &done.closed {
-            for (rel, text) in recited(ctx.repo_root, id, to) {
+            for (rel, text) in recited(ctx.repo_root, ctx.mock_dir, id, to) {
                 if let Err(e) = std::fs::write(ctx.repo_root.join(&rel), text) {
                     return ToolReport::inconclusive(format!(
                         "`{id}` is closed and `{rel}` could not be rewritten: {e}"

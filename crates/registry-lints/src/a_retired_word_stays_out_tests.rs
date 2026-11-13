@@ -1,11 +1,11 @@
 use mockspace::reading::Reading;
 
 use super::*;
-use crate::canon_rows::testkit::{check as run_lint, git, scratch, view, write};
+use crate::canon_rows::testkit::{check_in, git, scratch, view, write};
 
 /// What [`check`] finds over `d`, read through a reading of its own.
 fn checked(d: &Path, reg: &RegistryView, config: &str, change: &Change) -> Vec<LintError> {
-    check(&Reading::new(d).view(), d, reg, config, change)
+    check(&Reading::new(d).view(), d, reg, config, change, &layout())
 }
 
 fn reg() -> RegistryView {
@@ -94,7 +94,7 @@ fn a_files_key_moves_with_the_rules_so_a_tenet_ruling_out_another_word_judges_ev
     // Mutation: the key leaves the rules out, so a finding saved under one set of words replays under another.
     let d = repo();
     let keys = |reg: &RegistryView| -> Vec<String> {
-        scanned_files(&Reading::new(&d).view(), &d, &retiring(reg))
+        scanned_files(&Reading::new(&d).view(), &d, &retiring(reg), &layout())
             .into_iter()
             .map(|f| f.key)
             .collect()
@@ -110,7 +110,7 @@ fn a_files_key_moves_with_the_rules_so_a_tenet_ruling_out_another_word_judges_ev
 fn the_lint_judging_each_file_through_its_own_view_finds_what_the_tree_holds() {
     let d = repo();
     write(&d, "mockspace.toml", &config(&[]));
-    let units: Vec<String> = run_lint(&ARetiredWordStaysOut, &d, &reg())
+    let units: Vec<String> = check_in(&lint(), &d, &d.join("mock"), &reg())
         .into_iter()
         .filter(|e| !e.message.contains("cannot tell which lines"))
         .map(|e| format!("{}:{}", e.crate_name, e.line))
@@ -262,7 +262,7 @@ fn a_change_that_cannot_be_read_is_a_finding_and_the_unlisted_units_are_still_he
     // Mutation: an unreadable change is read as none, which lets every listed unit through unwatched.
     let d = repo();
     write(&d, "mockspace.toml", &config(&[]));
-    let found = run_lint(&ARetiredWordStaysOut, &d, &reg());
+    let found = check_in(&lint(), &d, &d.join("mock"), &reg());
     assert!(
         found
             .iter()
@@ -275,7 +275,18 @@ fn a_change_that_cannot_be_read_is_a_finding_and_the_unlisted_units_are_still_he
 #[test]
 fn the_default_blocks_every_gate() {
     assert_eq!(
-        ARetiredWordStaysOut.default_severity(),
+        lint().default_severity(),
         Severity::HARD_ERROR
     );
+}
+
+/// The layout the fixtures are written in: the mock tree under `mock`, the content under `content`.
+fn layout() -> crate::layout::Layout {
+    crate::layout::Layout::new("mock", crate::layout::ContentDirs::new(&["content"]))
+}
+
+fn lint() -> ARetiredWordStaysOut {
+    ARetiredWordStaysOut {
+        content: crate::layout::ContentDirs::new(&["content"]),
+    }
 }

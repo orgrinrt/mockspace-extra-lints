@@ -39,6 +39,7 @@ impl Tool for KnownRedSet {
 
     fn purpose(&self) -> Purpose {
         Purpose::Make {
+            // FIXME(a_maker_tool_s_writes_cannot_name_the_mock_directory): `writes` names `mock`, since a pattern cannot name the mock directory the config declares
             writes: &["mock/registry/known_red/reds.toml"],
             roots:  &[],
         }

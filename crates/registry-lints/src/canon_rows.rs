@@ -184,8 +184,13 @@ pub mod testkit {
     /// What `lint` finds over the repository at `dir`, which is its own mock directory, with `registry`,
     /// no crates, no canon paths and no open panels.
     pub fn check(lint: &dyn RepoLint, dir: &Path, registry: &RegistryView) -> Vec<LintError> {
+        check_in(lint, dir, dir, registry)
+    }
+
+    /// What `lint` finds over the repository at `dir` whose mock directory is `mock`, as [`check`].
+    pub fn check_in(lint: &dyn RepoLint, dir: &Path, mock: &Path, registry: &RegistryView) -> Vec<LintError> {
         check_repo(lint, RepoInput {
-            mock_dir: dir,
+            mock_dir: mock,
             repo_root: dir,
             all_crates: &BTreeSet::new(),
             src_dirs: &[],

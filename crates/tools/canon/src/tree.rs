@@ -12,6 +12,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 pub use crate::canon_tree::{Tier, files, tier_of};
+use crate::layout::Layout;
 use crate::names::named;
 
 /// One line naming a tenet.
@@ -28,7 +29,7 @@ pub struct Line {
 /// Every line in the tree naming a tenet in `known`, by the tenet it names.
 ///
 /// A registry row's own `id = "..."` line declares the tenet rather than naming it, and is not counted.
-pub fn mentions<'a>(repo: &Path, known: &BTreeSet<&'a str>) -> BTreeMap<&'a str, Vec<Line>> {
+pub fn mentions<'a>(repo: &Path, layout: &Layout, known: &BTreeSet<&'a str>) -> BTreeMap<&'a str, Vec<Line>> {
     let mut out: BTreeMap<&'a str, Vec<Line>> = BTreeMap::new();
     let reading = mockspace::reading::Reading::new(repo);
     let view = reading.view();
@@ -36,7 +37,7 @@ pub fn mentions<'a>(repo: &Path, known: &BTreeSet<&'a str>) -> BTreeMap<&'a str,
         let Some(body) = view.text(repo.join(&rel)) else {
             continue;
         };
-        let tier = tier_of(&rel);
+        let tier = tier_of(&rel, layout);
         for (n, text) in body.lines().enumerate() {
             if tier == Tier::Canon && text.trim_start().starts_with("id = ") {
                 continue;

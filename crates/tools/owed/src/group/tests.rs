@@ -9,7 +9,7 @@ fn item(rel: &str, class: Class, reason: &str) -> Item {
         rel: rel.to_string(),
         class,
         reason: reason.to_string(),
-        area: area(rel),
+        area: area(rel, &layout()),
         line: 1,
     }
 }
@@ -201,33 +201,33 @@ fn the_same_items_group_the_same_way_every_time() {
 
 #[test]
 fn the_area_of_a_path_is_its_crate_its_content_pack_or_its_tooling() {
-    assert_eq!(area("mock/crates/kaski-sim/src/lib.rs"), "kaski-sim");
-    assert_eq!(area("mock/crates/kaski-sim/DESIGN.md.tmpl"), "kaski-sim");
-    assert_eq!(area("content/kaski/trees.toml"), "content/kaski");
-    assert_eq!(area("mock/tools/owed/src/lib.rs"), "tool owed");
-    assert_eq!(area("mock/lints/x.rs"), "lints");
-    assert_eq!(area("mock/WORKFLOW.md.tmpl"), "mock design");
-    assert_eq!(area("mock/agent/rules/a.md.tmpl"), "agent text");
-    assert_eq!(area("README.md"), "root");
+    assert_eq!(area("mock/crates/kaski-sim/src/lib.rs", &layout()), "kaski-sim");
+    assert_eq!(area("mock/crates/kaski-sim/DESIGN.md.tmpl", &layout()), "kaski-sim");
+    assert_eq!(area("content/kaski/trees.toml", &layout()), "content/kaski");
+    assert_eq!(area("mock/tools/owed/src/lib.rs", &layout()), "tool owed");
+    assert_eq!(area("mock/lints/x.rs", &layout()), "lints");
+    assert_eq!(area("mock/WORKFLOW.md.tmpl", &layout()), "mock design");
+    assert_eq!(area("mock/agent/rules/a.md.tmpl", &layout()), "agent text");
+    assert_eq!(area("README.md", &layout()), "root");
 }
 
 #[test]
 fn a_subject_is_named_only_where_the_registry_has_a_row_for_it() {
     let subjects: BTreeSet<String> = ["weather", "workflow", "content"].map(String::from).into();
     assert_eq!(
-        subject_of("kaski-weather", "kaski", &subjects).as_deref(),
+        subject_of("kaski-weather", "kaski", &subjects, &layout()).as_deref(),
         Some("weather")
     );
-    assert_eq!(subject_of("kaski-sim", "kaski", &subjects), None);
+    assert_eq!(subject_of("kaski-sim", "kaski", &subjects, &layout()), None);
     assert_eq!(
-        subject_of("content/kaski", "kaski", &subjects).as_deref(),
+        subject_of("content/kaski", "kaski", &subjects, &layout()).as_deref(),
         Some("content")
     );
     assert_eq!(
-        subject_of("tool owed", "kaski", &subjects).as_deref(),
+        subject_of("tool owed", "kaski", &subjects, &layout()).as_deref(),
         Some("workflow")
     );
-    assert_eq!(subject_of("mock design", "kaski", &BTreeSet::new()), None);
+    assert_eq!(subject_of("mock design", "kaski", &BTreeSet::new(), &layout()), None);
 }
 
 #[test]
@@ -243,4 +243,22 @@ fn the_listed_words_of_a_reason_are_the_same_when_cut_again() {
     assert_eq!(gist(&gist(&wide)), gist(&wide));
     assert_eq!(gist(""), "(no reason given)");
     assert_eq!(key("A Flat  ROOF"), "a flat roof");
+}
+
+/// The layout the fixtures are written in: the mock tree under `mock`, the content under `content`.
+fn layout() -> Layout {
+    Layout::new("mock", registry_lints::layout::ContentDirs::new(&["content"]))
+}
+
+#[test]
+fn the_area_follows_the_mock_and_content_directories_the_project_names() {
+    let l = Layout::new("linux", registry_lints::layout::ContentDirs::new(&["packs"]));
+    assert_eq!(area("linux/tools/owed/src/lib.rs", &l), "tool owed");
+    assert_eq!(area("linux/WORKFLOW.md.tmpl", &l), "mock design");
+    assert_eq!(area("packs/base/trees.toml", &l), "packs/base");
+    // THE CONTROL: `mock` and `content` are no more than directories here.
+    assert_eq!(area("mock/tools/owed/src/lib.rs", &l), "mock");
+    assert_eq!(area("content/kaski/trees.toml", &l), "content");
+    let subjects: BTreeSet<String> = ["packs", "content"].map(String::from).into();
+    assert_eq!(subject_of("packs/base", "x", &subjects, &l).as_deref(), Some("packs"));
 }

@@ -7,23 +7,38 @@ use std::collections::BTreeSet;
 
 use crate::items::{Open, answered, names_crate, row_items, ticket_items};
 use crate::touched::{crate_of, touched};
+use registry_lints::layout::{ContentDirs, Layout};
+
+/// The layout the fixtures are written in, the mock tree under `mock`.
+fn layout() -> Layout {
+    Layout::new("mock", ContentDirs::default())
+}
+
+#[test]
+fn a_crate_is_read_under_the_mock_directory_the_project_names() {
+    let linux = Layout::new("linux", ContentDirs::default());
+    assert_eq!(crate_of("linux/crates/a/src/x.rs", &linux), Some("a"));
+    assert_eq!(crate_of("linux/tools/b/Cargo.toml", &linux), Some("b"));
+    // THE CONTROL: a path under `mock` is outside this repository's mock directory.
+    assert_eq!(crate_of("mock/crates/a/src/x.rs", &linux), None);
+}
 
 #[test]
 fn a_crate_directory_names_its_crate() {
     assert_eq!(
-        crate_of("mock/crates/kaski-clock/src/span.rs"),
+        crate_of("mock/crates/kaski-clock/src/span.rs", &layout()),
         Some("kaski-clock")
     );
-    assert_eq!(crate_of("mock/tools/tickets/Cargo.toml"), Some("tickets"));
+    assert_eq!(crate_of("mock/tools/tickets/Cargo.toml", &layout()), Some("tickets"));
 }
 
 #[test]
 fn a_path_outside_a_crate_names_none() {
-    assert_eq!(crate_of("mock/WORKFLOW.md.tmpl"), None);
-    assert_eq!(crate_of("mock/tools/README.md"), None);
-    assert_eq!(crate_of("mock/crates"), None);
-    assert_eq!(crate_of("docs/crates/x/y.md"), None);
-    assert_eq!(crate_of("mock/lints/fixme_markers.rs"), None);
+    assert_eq!(crate_of("mock/WORKFLOW.md.tmpl", &layout()), None);
+    assert_eq!(crate_of("mock/tools/README.md", &layout()), None);
+    assert_eq!(crate_of("mock/crates", &layout()), None);
+    assert_eq!(crate_of("docs/crates/x/y.md", &layout()), None);
+    assert_eq!(crate_of("mock/lints/fixme_markers.rs", &layout()), None);
 }
 
 #[test]
@@ -37,7 +52,7 @@ fn touched_collects_each_crate_once() {
     .iter()
     .map(ToString::to_string)
     .collect();
-    let got: Vec<String> = touched(&paths).into_iter().collect();
+    let got: Vec<String> = touched(&paths, &layout()).into_iter().collect();
     assert_eq!(got, ["a", "b"]);
 }
 

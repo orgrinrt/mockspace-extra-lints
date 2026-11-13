@@ -3,8 +3,7 @@
 
 use corpus::repo::Near;
 
-use crate::Canon;
-use crate::tests::{answered, view};
+use crate::tests::{answered, canon, view};
 
 fn near_of(word: &str, synonym: bool) -> Near {
     Near {
@@ -48,7 +47,7 @@ fn run_near(args: &[&str], near: &[Near]) -> mockspace::tool::ToolReport {
         stdin: None,
         registry: &reg,
     };
-    Canon.run_with(&ctx, &|_| near.to_vec())
+    canon().run_with(&ctx, &|_| near.to_vec())
 }
 
 #[test]

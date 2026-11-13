@@ -14,6 +14,7 @@ use std::path::Path;
 
 use mockspace::RegistryView;
 
+use crate::layout::Layout;
 use crate::rows::{Standing, Tenet, carries, subjects, tenets};
 use crate::scope::Scope;
 use crate::tree::mentions;
@@ -31,6 +32,7 @@ const GIST: usize = 96;
 pub fn answer(
     reg: &RegistryView,
     repo: &Path,
+    layout: &Layout,
     verb: &str,
     term: Option<&str>,
     more: &[&str],
@@ -46,17 +48,17 @@ pub fn answer(
         "show" => reference::show(reg, want("a row")?, scope)?,
         "find" => reference::find(reg, &all, want("a word")?, scope),
         "related" => reference::related(reg, &all, want("a row")?, scope)?,
-        "citers" => reference::citers(reg, repo, want("a row")?, scope)?,
-        "uncited" => uncited_answer(repo, &all),
+        "citers" => reference::citers(reg, repo, layout, want("a row")?, scope)?,
+        "uncited" => uncited_answer(repo, layout, &all),
         "forbids" => {
             match term {
-                Some(id) => crate::retired::forbids_answer(repo, &all, id)?,
-                None => crate::retired::unretired_answer(repo, &all),
+                Some(id) => crate::retired::forbids_answer(repo, layout, &all, id)?,
+                None => crate::retired::unretired_answer(repo, layout, &all),
             }
         },
         "contradicts" => {
             let paths: Vec<&str> = term.into_iter().chain(more.iter().copied()).collect();
-            crate::retired::contradicts_answer(repo, &all, &paths)
+            crate::retired::contradicts_answer(repo, layout, &all, &paths)
         },
         other => {
             return Err(format!(
@@ -225,9 +227,9 @@ pub(crate) fn related_answer(all: &[Tenet<'_>], id: &str) -> Result<(String, usi
     Ok((out, shown.len()))
 }
 
-fn uncited_answer(repo: &Path, all: &[Tenet<'_>]) -> (String, usize) {
+fn uncited_answer(repo: &Path, layout: &Layout, all: &[Tenet<'_>]) -> (String, usize) {
     let known: BTreeSet<&str> = all.iter().map(|t| t.id).collect();
-    let found = mentions(repo, &known);
+    let found = mentions(repo, layout, &known);
     let lonely: Vec<&Tenet<'_>> = all
         .iter()
         .filter(|t| t.binds() && !found.contains_key(t.id))

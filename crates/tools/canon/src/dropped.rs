@@ -18,6 +18,7 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::path::Path;
 
+use crate::layout::Layout;
 use crate::canon_tree::{Tier, files, tier_of};
 use crate::retired_words::{scanned, words};
 use crate::rows::Tenet;
@@ -69,15 +70,15 @@ impl Corpus {
 }
 
 /// For every word of a scanned file, the lines naming it, each line counted once however often it says it.
-pub fn word_counts(repo: &Path) -> Corpus {
+pub fn word_counts(repo: &Path, layout: &Layout) -> Corpus {
     let mut out = Corpus::default();
     let reading = mockspace::reading::Reading::new(repo);
     let view = reading.view();
     for rel in files(&view, repo) {
-        if !scanned(&rel) {
+        if !scanned(&rel, layout) {
             continue;
         }
-        let tier = tier_of(&rel);
+        let tier = tier_of(&rel, layout);
         let Some(body) = view.text(repo.join(&rel)) else {
             continue;
         };
