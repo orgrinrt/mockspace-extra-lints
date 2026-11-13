@@ -28,7 +28,7 @@ impl CrateLint for NoVecInTraitSig {
             return Vec::new();
         }
         let mut out = Vec::new();
-        for_each_trait(ctx.tree.root_node(), |node| {
+        for_each_trait(ctx.tree().root_node(), |node| {
             check_trait(node, ctx, &mut out);
         });
         out
@@ -48,7 +48,7 @@ fn check_trait(node: Node, ctx: &LintContext, out: &mut Vec<LintError>) {
         }
         let line = item.start_position().row + 1;
         let src_line = ctx
-            .source
+            .source()
             .lines()
             .nth(item.start_position().row)
             .unwrap_or("");
@@ -58,16 +58,16 @@ fn check_trait(node: Node, ctx: &LintContext, out: &mut Vec<LintError>) {
 
         let name = item
             .child_by_field_name("name")
-            .map(|n| txt(n, ctx.source))
+            .map(|n| txt(n, ctx.source()))
             .unwrap_or("<unknown>");
 
         let mut sig = String::new();
         if let Some(params) = item.child_by_field_name("parameters") {
-            sig.push_str(txt(params, ctx.source));
+            sig.push_str(txt(params, ctx.source()));
         }
         if let Some(ret) = item.child_by_field_name("return_type") {
             sig.push(' ');
-            sig.push_str(txt(ret, ctx.source));
+            sig.push_str(txt(ret, ctx.source()));
         }
 
         for forbidden in FORBIDDEN_IN_TRAIT {

@@ -26,12 +26,13 @@
 //! while the registry has rows, and a registry with no row carrying a named field declares nothing
 //! superseded.
 
+use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
-use std::fs;
+use std::hash::{DefaultHasher, Hash, Hasher};
 
-use mockspace_lint_rules::{glob_match, Lint, LintError, RegistryView, RepoContext, RepoLint, Severity};
+use mockspace_lint_rules::{glob_match, Item, Lint, LintError, RegistryView, RepoContext, RepoLint, Severity};
 
-use crate::repo_files::{paths, record_dirs};
+use crate::repo_scope::{crate_of, paths, record_dirs};
 
 /// The lint's name, as a project's `[lints.*]` table spells it.
 pub const NAME: &str = "no-superseded-citation";
@@ -92,53 +93,71 @@ impl Lint for NoSupersededCitation {
 impl RepoLint for NoSupersededCitation {
     fn check_repo(&self, ctx: &RepoContext) -> Vec<LintError> {
         if self.field.is_empty() && self.supersedes.is_empty() {
-            return unconfigured(ctx.registry);
+            return unconfigured(ctx.registry());
         }
-        let replaced = replaced(ctx.registry, &self.field, &self.supersedes);
+        let replaced = replaced(ctx.registry(), &self.field, &self.supersedes);
         if replaced.is_empty() {
             return Vec::new();
         }
         let record = record_dirs(ctx.repo_root, ctx.mock_dir);
-        let files = paths(ctx.repo_root, &record, |name, rel| {
-            reads(name) && !ctx.canon_paths.iter().any(|g| glob_match(g, rel))
+        let view = ctx.view();
+        let root = ctx.repo_root;
+        let files = paths(view, root, &record, |name, rel| {
+            reads(name) && !ctx.canon_paths().iter().any(|g| glob_match(g, rel))
         });
-        // The one fact every file's verdict shares: which rows are replaced and by what. A file's
-        // findings follow from its own text and this, so a file unchanged under an unchanged table
-        // is still read, but not judged again: its saved verdict is replayed.
-        let table = format!("{replaced:?}");
-        // Every file's text is held at once on purpose, so the files that moved can be judged
-        // together in one batch.
-        let mut read: Vec<(String, String, String)> = Vec::new();
-        for rel in files {
-            let Ok(text) = fs::read_to_string(ctx.repo_root.join(&rel)) else {
-                continue;
-            };
-            if text.lines().take(HEADER).any(|l| l.contains(GENERATED)) {
-                continue;
-            }
-            let crate_name = rel
-                .split('/')
-                .find(|c| ctx.all_crates.contains(*c))
-                .unwrap_or("workspace")
-                .to_string();
-            read.push((rel, crate_name, text));
-        }
-        // Every file is asked at once, so the ones that moved are judged together on the machine's
-        // threads. The keys are the ones asking per file made, so saved verdicts replay across.
-        let parts: Vec<Vec<&[u8]>> = read
-            .iter()
-            .map(|(rel, crate_name, text)| {
-                vec![rel.as_bytes(), crate_name.as_bytes(), table.as_bytes(), text.as_bytes()]
+        // The one fact every file's findings share: which rows are replaced and by what. It is no
+        // question put to the view, so each file is judged under a key that holds it.
+        let table = digest(&format!("{replaced:?}"));
+        let candidates: Vec<Candidate> = files
+            .into_iter()
+            .map(|rel| {
+                let crate_name = crate_of(&rel, ctx.all_crates());
+                let key = format!("{table}\0{crate_name}\0{rel}");
+                Candidate { rel, crate_name, key }
             })
             .collect();
-        ctx.remembered_batch(NAME, &parts, |n| {
-            let (rel, crate_name, text) = &read[n];
-            file_findings(rel, crate_name, text, &replaced)
+        // Each file is judged on its own, through its own view, on the machine's threads, and one
+        // that did not move under an unchanged table is not judged again.
+        view.each(&candidates, |v, c| {
+            let Some(text) = v.text(root.join(&c.rel)) else {
+                return Vec::new();
+            };
+            if text.lines().take(HEADER).any(|l| l.contains(GENERATED)) {
+                return Vec::new();
+            }
+            file_findings(&c.rel, &c.crate_name, text, &replaced)
         })
         .into_iter()
         .flatten()
         .collect()
     }
+}
+
+/// A file the lint may read, with the key its findings are saved under: the table of replaced rows,
+/// the crate the file is filed under and its path.
+struct Candidate {
+    rel:        String,
+    crate_name: String,
+    key:        String,
+}
+
+impl Item for Candidate {
+    fn key(&self) -> Cow<'_, str> {
+        Cow::Borrowed(&self.key)
+    }
+}
+
+/// A short name for a text, which two different tables do not share in practice: two passes of the
+/// standard hasher with different salts.
+fn digest(text: &str) -> String {
+    let mut out = String::new();
+    for salt in [0u8, 1u8] {
+        let mut h = DefaultHasher::new();
+        salt.hash(&mut h);
+        text.hash(&mut h);
+        out.push_str(&format!("{:016x}", h.finish()));
+    }
+    out
 }
 
 /// The findings in one file's text against the table of replaced rows.
@@ -369,6 +388,6 @@ fn says_superseded(lines: &[&str], line: usize, at: usize, len: usize, per_line:
 }
 
 #[cfg(test)]
-mod replay;
+mod across_files;
 #[cfg(test)]
 mod tests;

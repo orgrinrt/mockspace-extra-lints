@@ -26,48 +26,17 @@
 //! under all six today, which is exactly why running them over it distinguishes
 //! nothing and the shapes have to be planted.
 
-use std::collections::{BTreeMap, BTreeSet};
-
 use mockspace_extra_lints::lints::no_alloc::NoAlloc;
 use mockspace_extra_lints::lints::no_dyn_dispatch::NoDynDispatch;
 use mockspace_extra_lints::lints::no_std::NoStd;
-use mockspace_lint_rules::{CrateLint, CrateSourceFile, LintContext};
+use mockspace_lint_rules::CrateLint;
+use mockspace_lint_rules::testkit::LintFixture;
 
-fn ctx(source: &'static str) -> LintContext<'static> {
-    let mut parser = tree_sitter::Parser::new();
-    parser
-        .set_language(&tree_sitter_rust::LANGUAGE.into())
-        .unwrap();
-    let tree = parser.parse(source, None).unwrap();
-    let tree: &'static tree_sitter::Tree = Box::leak(Box::new(tree));
-
-    // `no-std` decides whether it is looking at the crate root by comparing
-    // this text against the first source file, so the fixture has to be that
-    // file or the root half of the lint never runs on it.
-    let all_sources: &'static [CrateSourceFile] = Box::leak(Box::new(vec![CrateSourceFile {
-        rel_path: std::path::PathBuf::from("src/lib.rs"),
-        text:     source.to_string(),
-    }]));
-
-    LintContext {
-        crate_name: "test-crate",
-        short_name: "test-crate",
-        source,
-        tree,
-        all_sources,
-        deps: &[],
-        all_crates: Box::leak(Box::new(BTreeSet::new())),
-        design_doc: None,
-        all_doc_content: "",
-        shame_doc: None,
-        workspace_root: std::path::Path::new("/tmp"),
-        proc_macro_crates: &[],
-        // These fixtures are ordinary crates. Turning the proc-macro opt-in on
-        // would test a different thing, since all three lints skip that source.
-        lint_proc_macro_source: false,
-        crate_prefix: "test",
-        primitive_introductions: Box::leak(Box::new(BTreeMap::new())),
-    }
+/// A crate of one file. `no-std` decides whether it is looking at the crate root by comparing the
+/// root's text against the first source file, and the fixture holds the one text as both. These
+/// fixtures are ordinary crates, since all three lints skip proc-macro source.
+fn ctx(source: &str) -> LintFixture {
+    LintFixture::new(source).with_workspace_root(std::path::Path::new("/tmp"))
 }
 
 // ---- no-std ---------------------------------------------------------------
@@ -78,7 +47,7 @@ fn ctx(source: &'static str) -> LintContext<'static> {
 #[test]
 fn a_fully_qualified_std_call_with_no_import_fires() {
     let src = "#![no_std]\n\nfn f() {\n    std::process::exit(0);\n}\n";
-    let hits = NoStd.check(&ctx(src));
+    let hits = NoStd.check(&ctx(src).ctx());
     assert_eq!(
         hits.len(),
         1,
@@ -92,7 +61,7 @@ fn a_fully_qualified_std_call_with_no_import_fires() {
 #[test]
 fn a_root_missing_the_attribute_fires_with_no_offending_line() {
     let src = "use core::fmt;\n";
-    let hits = NoStd.check(&ctx(src));
+    let hits = NoStd.check(&ctx(src).ctx());
     assert!(
         hits.iter().any(|h| h.line == 1),
         "a root with no `#![no_std]` must fire: {hits:?}"
@@ -102,7 +71,7 @@ fn a_root_missing_the_attribute_fires_with_no_offending_line() {
 #[test]
 fn core_paths_under_the_attribute_are_silent() {
     let src = "#![no_std]\nuse core::fmt;\n";
-    let hits = NoStd.check(&ctx(src));
+    let hits = NoStd.check(&ctx(src).ctx());
     assert!(
         hits.is_empty(),
         "`core::` is the replacement, not a hit: {hits:?}"
@@ -123,7 +92,7 @@ fn the_map_and_handle_containers_fire() {
         "let a: Arc<T> = todo!();\n",
         "let r: Rc<T> = todo!();\n",
     ] {
-        let hits = NoAlloc.check(&ctx(Box::leak(src.to_string().into_boxed_str())));
+        let hits = NoAlloc.check(&ctx(src).ctx());
         assert!(!hits.is_empty(), "must fire on {src:?}");
     }
 }
@@ -133,14 +102,14 @@ fn the_map_and_handle_containers_fire() {
 #[test]
 fn a_name_merely_containing_a_container_is_silent() {
     let src = "let v: SmallVec<T, N> = todo!();\n";
-    let hits = NoAlloc.check(&ctx(src));
+    let hits = NoAlloc.check(&ctx(src).ctx());
     assert!(hits.is_empty(), "`SmallVec` is not `Vec`: {hits:?}");
 }
 
 #[test]
 fn a_fixed_size_array_is_silent() {
     let src = "let a: [u8; 4] = [0; 4];\n";
-    let hits = NoAlloc.check(&ctx(src));
+    let hits = NoAlloc.check(&ctx(src).ctx());
     assert!(hits.is_empty(), "the array is the replacement: {hits:?}");
 }
 
@@ -157,7 +126,7 @@ fn the_dyn_shapes_fire() {
         "fn f(t: Box<dyn Trait>) {}\n",
         "fn f(t: &mut dyn Trait) {}\n",
     ] {
-        let hits = NoDynDispatch.check(&ctx(Box::leak(src.to_string().into_boxed_str())));
+        let hits = NoDynDispatch.check(&ctx(src).ctx());
         assert!(!hits.is_empty(), "must fire on {src:?}");
     }
 }
@@ -182,7 +151,7 @@ fn a_dyn_reached_by_another_spelling_is_not_caught() {
         "type A = dyn Trait;\n",
         "    type Item = dyn Trait;\n",
     ] {
-        let hits = NoDynDispatch.check(&ctx(Box::leak(src.to_string().into_boxed_str())));
+        let hits = NoDynDispatch.check(&ctx(src).ctx());
         assert!(
             hits.is_empty(),
             "the marker list does not reach {src:?}; if it now does, the pack \
@@ -209,7 +178,7 @@ fn type_erasure_without_the_dyn_keyword_is_not_caught() {
         "use std::any::TypeId;\n",
         "fn f(v: &dyn_free_alias) {}\n",
     ] {
-        let hits = NoDynDispatch.check(&ctx(Box::leak(src.to_string().into_boxed_str())));
+        let hits = NoDynDispatch.check(&ctx(src).ctx());
         assert!(
             hits.is_empty(),
             "this lint does not read {src:?} as dispatch; if it now does, the \
@@ -227,12 +196,12 @@ fn type_erasure_without_the_dyn_keyword_is_not_caught() {
 #[test]
 fn a_std_any_import_is_caught_only_by_the_std_lint() {
     let src = "#![no_std]\nuse std::any::TypeId;\n";
-    let dispatch = NoDynDispatch.check(&ctx(src));
+    let dispatch = NoDynDispatch.check(&ctx(src).ctx());
     assert!(
         dispatch.is_empty(),
         "the dispatch lint has no notion of `any`: {dispatch:?}"
     );
-    let std_hits = NoStd.check(&ctx(src));
+    let std_hits = NoStd.check(&ctx(src).ctx());
     assert!(
         !std_hits.is_empty(),
         "the std lint catches it as a std path, not as erasure: {std_hits:?}"

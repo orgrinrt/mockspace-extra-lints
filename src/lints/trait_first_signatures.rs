@@ -32,8 +32,8 @@ impl CrateLint for TraitFirstSignatures {
             return Vec::new();
         }
         let mut out = Vec::new();
-        for_each_fn(ctx.tree.root_node(), |node| {
-            if !is_public(node, ctx.source) {
+        for_each_fn(ctx.tree().root_node(), |node| {
+            if !is_public(node, ctx.source()) {
                 return;
             }
             check_fn(node, ctx, &mut out);
@@ -45,7 +45,7 @@ impl CrateLint for TraitFirstSignatures {
 fn check_fn(node: Node, ctx: &LintContext, out: &mut Vec<LintError>) {
     let line = node.start_position().row + 1;
     let src_line = ctx
-        .source
+        .source()
         .lines()
         .nth(node.start_position().row)
         .unwrap_or("");
@@ -55,12 +55,12 @@ fn check_fn(node: Node, ctx: &LintContext, out: &mut Vec<LintError>) {
 
     let name = node
         .child_by_field_name("name")
-        .map(|n| txt(n, ctx.source))
+        .map(|n| txt(n, ctx.source()))
         .unwrap_or("<unknown>");
 
     // Return-type containers.
     if let Some(ret) = node.child_by_field_name("return_type") {
-        let text = txt(ret, ctx.source);
+        let text = txt(ret, ctx.source());
         for ty in &["Vec<", "HashMap<", "BTreeMap<", "HashSet<", "VecDeque<"] {
             if names_type(text, ty) {
                 out.push(err(
@@ -76,7 +76,7 @@ fn check_fn(node: Node, ctx: &LintContext, out: &mut Vec<LintError>) {
 
     // Parameter containers by value.
     if let Some(params) = node.child_by_field_name("parameters") {
-        let text = txt(params, ctx.source);
+        let text = txt(params, ctx.source());
         // Heuristic: `: Vec<` as a parameter type → suggest impl IntoIterator.
         for ty in &[": Vec<", ": HashMap<", ": BTreeMap<", ": HashSet<", ": VecDeque<"] {
             if names_type(text, ty) {

@@ -12,11 +12,11 @@
 //! the tier is resolved through `cargo metadata` and a fixture that bypassed
 //! it would test the walk and not the resolution.
 
-use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use mockspace_extra_lints::lints::re_export_foreign_names::ReExportForeignNames;
-use mockspace_lint_rules::{CrateLint, CrateSourceFile, LintContext};
+use mockspace_lint_rules::CrateLint;
+use mockspace_lint_rules::testkit::LintFixture;
 
 /// A workspace of two crates: `kit`, which re-exports, and `face`, which
 /// declares. `kit_root` is `kit/src/lib.rs`.
@@ -45,35 +45,13 @@ fn workspace(kit_root: &str, face_lib: &str) -> tempfile::TempDir {
     dir
 }
 
-fn check(root: &Path, kit_root: &'static str) -> Vec<String> {
-    let mut parser = tree_sitter::Parser::new();
-    parser
-        .set_language(&tree_sitter_rust::LANGUAGE.into())
-        .unwrap();
-    let tree = parser.parse(kit_root, None).unwrap();
-    let tree: &'static tree_sitter::Tree = Box::leak(Box::new(tree));
-    let all_sources: &'static [CrateSourceFile] = Box::leak(Box::new(vec![CrateSourceFile {
-        rel_path: std::path::PathBuf::from("src/lib.rs"),
-        text:     kit_root.to_string(),
-    }]));
-    let deps: &'static [String] = Box::leak(Box::new(vec!["face".to_string()]));
-    let ctx = LintContext {
-        crate_name: "kit",
-        short_name: "kit",
-        source: kit_root,
-        tree,
-        all_sources,
-        deps,
-        all_crates: Box::leak(Box::new(BTreeSet::new())),
-        design_doc: None,
-        all_doc_content: "",
-        shame_doc: None,
-        workspace_root: Box::leak(root.to_path_buf().into_boxed_path()),
-        proc_macro_crates: &[],
-        lint_proc_macro_source: false,
-        crate_prefix: "kit",
-        primitive_introductions: Box::leak(Box::new(BTreeMap::new())),
-    };
+fn check(root: &Path, kit_root: &str) -> Vec<String> {
+    let fixture = LintFixture::new(kit_root)
+        .with_crate_name("kit", "kit")
+        .with_crate_prefix("kit")
+        .with_deps(&["face"])
+        .with_workspace_root(root);
+    let ctx = fixture.ctx();
     ReExportForeignNames
         .check(&ctx)
         .into_iter()
@@ -184,7 +162,7 @@ fn a_public_field_of_a_re_exported_struct_is_part_of_its_surface() {
     let face = "pub struct Units;\npub struct Hidden;\npub struct Metrics { pub ascent: Units, descent: Hidden }\n";
     let kit = "pub use face::Metrics;\n";
     let ws = workspace(kit, face);
-    let hits = check(ws.path(), face_kit(kit));
+    let hits = check(ws.path(), kit);
     assert_eq!(hits.len(), 1, "{hits:?}");
     assert!(
         hits[0].contains("`Units`") && hits[0].contains("field"),
@@ -202,7 +180,7 @@ fn a_re_exported_trait_carries_its_method_signatures() {
     let face = "pub struct Glyph;\npub trait Shapes { fn next(&mut self) -> Glyph; }\n";
     let kit = "pub use face::Shapes;\n";
     let ws = workspace(kit, face);
-    let hits = check(ws.path(), face_kit(kit));
+    let hits = check(ws.path(), kit);
     assert_eq!(hits.len(), 1, "{hits:?}");
     assert!(
         hits[0].contains("`Glyph`") && hits[0].contains("`next`"),
@@ -216,7 +194,7 @@ fn a_re_exported_alias_carries_what_it_stands_for() {
     let face = "pub struct Wide;\npub type Key = Wide;\n";
     let kit = "pub use face::Key;\n";
     let ws = workspace(kit, face);
-    let hits = check(ws.path(), face_kit(kit));
+    let hits = check(ws.path(), kit);
     assert_eq!(hits.len(), 1, "{hits:?}");
     assert!(hits[0].contains("`Wide`"), "{}", hits[0]);
 }
@@ -229,7 +207,7 @@ fn a_name_the_dependency_took_from_its_own_dependency_is_not_reached() {
         "pub struct Face;\nimpl Face { pub fn parse() -> notko::Outcome<Face, ()> { todo!() } }\n";
     let kit = "pub use face::Face;\n";
     let ws = workspace(kit, face);
-    let hits = check(ws.path(), face_kit(kit));
+    let hits = check(ws.path(), kit);
     assert!(hits.is_empty(), "{hits:?}");
 }
 
@@ -241,7 +219,7 @@ fn a_name_two_crates_down_is_reported_against_the_crate_that_declares_it() {
         "pub struct Face;\nimpl Face { pub fn parse() -> notko::Outcome<Face, ()> { todo!() } }\n";
     let kit = "pub use face::Face;\n";
     let ws = workspace(kit, face);
-    let hits = check(ws.path(), face_kit(kit));
+    let hits = check(ws.path(), kit);
     assert_eq!(hits.len(), 1, "{hits:?}");
     assert!(hits[0].contains("`Outcome`") && hits[0].contains("`notko`"));
 }
@@ -253,7 +231,7 @@ fn a_generic_of_the_impl_is_not_part_of_the_surface() {
     let face = "pub struct K;\npub struct Sheet<K>(K);\nimpl<K> Sheet<K> { pub fn key(&self) -> &K { &self.0 } }\n";
     let kit = "pub use face::Sheet;\n";
     let ws = workspace(kit, face);
-    let hits = check(ws.path(), face_kit(kit));
+    let hits = check(ws.path(), kit);
     assert!(hits.is_empty(), "{hits:?}");
 }
 
@@ -262,7 +240,7 @@ fn a_generic_of_the_item_itself_is_not_part_of_its_surface() {
     let face = "pub struct K;\npub struct Sheet<K> { pub key: K }\n";
     let kit = "pub use face::Sheet;\n";
     let ws = workspace(kit, face);
-    let hits = check(ws.path(), face_kit(kit));
+    let hits = check(ws.path(), kit);
     assert!(hits.is_empty(), "{hits:?}");
 }
 
@@ -271,7 +249,7 @@ fn a_generic_of_a_method_is_not_part_of_its_types_surface() {
     let face = "pub struct K;\npub struct Sheet;\nimpl Sheet { pub fn put<K>(&self, k: K) {} }\n";
     let kit = "pub use face::Sheet;\n";
     let ws = workspace(kit, face);
-    let hits = check(ws.path(), face_kit(kit));
+    let hits = check(ws.path(), kit);
     assert!(hits.is_empty(), "{hits:?}");
 }
 
@@ -286,7 +264,7 @@ fn the_same_positions_naming_the_dependencys_own_k_carry_it() {
     ] {
         let kit = "pub use face::Sheet;\n";
         let ws = workspace(kit, face);
-        let hits = check(ws.path(), face_kit(kit));
+        let hits = check(ws.path(), kit);
         assert_eq!(hits.len(), 1, "{face}: {hits:?}");
         assert!(hits[0].contains("`K`"), "{face}: {}", hits[0]);
     }
@@ -300,7 +278,7 @@ fn a_re_exported_function_carries_no_surface() {
     let face = "pub struct Placed;\npub fn shape() -> Placed { Placed }\n";
     let kit = "pub use face::shape;\n";
     let ws = workspace(kit, face);
-    let hits = check(ws.path(), face_kit(kit));
+    let hits = check(ws.path(), kit);
     assert!(hits.is_empty(), "{hits:?}");
 }
 
@@ -308,7 +286,7 @@ fn a_re_exported_function_carries_no_surface() {
 fn an_allow_on_the_re_export_line_silences_its_surface() {
     let kit = "pub use face::Face; // lint:allow(re-export-foreign-names) reason: measured leak\n";
     let ws = workspace(kit, FACE);
-    let hits = check(ws.path(), face_kit(kit));
+    let hits = check(ws.path(), kit);
     assert!(hits.is_empty(), "{hits:?}");
 }
 
@@ -319,7 +297,7 @@ fn a_workspace_that_cannot_be_read_is_reported_rather_than_passed() {
     // reading as verified.
     let kit = "pub use face::Face;\n";
     let dir = tempfile::tempdir().unwrap();
-    let hits = check(dir.path(), face_kit(kit));
+    let hits = check(dir.path(), kit);
     assert_eq!(hits.len(), 1, "{hits:?}");
     assert!(hits[0].contains("could not be read"), "{}", hits[0]);
 }
@@ -335,13 +313,7 @@ fn an_associated_type_in_a_trait_impl_is_part_of_the_surface() {
                 pub struct Held;\nimpl Reads for Held { type Out = Face; fn go(&self) -> Face { Face } }\n";
     let kit = "pub use face::{Held, Reads};\n";
     let ws = workspace(kit, face);
-    let hits = check(ws.path(), face_kit(kit));
+    let hits = check(ws.path(), kit);
     assert_eq!(hits.len(), 1, "{hits:?}");
     assert!(hits[0].contains("`Face`"), "{}", hits[0]);
-}
-
-/// The kit root as a `'static` string, which the context borrows for the life
-/// of the test.
-fn face_kit(kit: &str) -> &'static str {
-    Box::leak(kit.to_string().into_boxed_str())
 }

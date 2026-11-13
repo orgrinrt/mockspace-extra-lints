@@ -2,24 +2,23 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
-use mockspace_lint_rules::{CrateSourceFile, DeclaredType, collect_crate_sources, declared_types};
+use mockspace_lint_rules::{CrateSourceFile, DeclaredType, Reading, View, declared_types};
 
-use crate::repo_files::{WORKSPACE, crate_of};
+use crate::repo_scope::{WORKSPACE, crate_of};
 
 /// The source of every crate, read from the directories the engine holds source packages in and
-/// the way its lints read a crate, as the crate-relative files `declared_types` reads: what sits
-/// under the crate's own `src/`. A crate found under two of the directories is read from the
-/// first.
-pub fn sources(src_dirs: &[PathBuf], all_crates: &BTreeSet<String>) -> Sources {
-    let mut by_crate: BTreeMap<String, Vec<CrateSourceFile>> = BTreeMap::new();
+/// the way its lints read a crate: what sits under the crate's own `src/`, `src/lib.rs` first. A
+/// crate found under two of the directories is read from the first. Every file is held by
+/// `reading`, which the result borrows.
+pub fn sources<'r>(reading: &'r Reading, src_dirs: &[PathBuf], all_crates: &BTreeSet<String>) -> Sources<'r> {
+    let mut by_crate: Sources<'r> = BTreeMap::new();
     for dir in src_dirs {
         for name in all_crates {
             if by_crate.contains_key(name) {
                 continue;
             }
-            let files = collect_crate_sources(&dir.join(name));
+            let files = reading.crate_sources(&dir.join(name));
             if !files.is_empty() {
                 by_crate.insert(name.clone(), files);
             }
@@ -29,19 +28,23 @@ pub fn sources(src_dirs: &[PathBuf], all_crates: &BTreeSet<String>) -> Sources {
 }
 
 /// The source files of each crate by name, each file's path relative to its crate.
-pub type Sources = BTreeMap<String, Vec<CrateSourceFile>>;
+pub type Sources<'r> = BTreeMap<String, &'r [CrateSourceFile<'r>]>;
 
 /// Every type the crates declare outside test code.
-pub fn declarations(sources: &Sources) -> Vec<DeclaredType> {
+pub fn declarations(sources: &Sources<'_>) -> Vec<DeclaredType> {
     sources
         .iter()
-        .flat_map(|(name, files)| declared_types(name, files))
+        .flat_map(|(name, files)| {
+            let pairs: Vec<(&Path, &str)> = files.iter().map(|f| (f.rel_path, f.text)).collect();
+            declared_types(name, &pairs)
+        })
         .collect()
 }
 
 /// The crates a branch touched against `against`: what the branch committed since it left it, and
 /// what is changed in the tree now. `Err` carries what git said when it could not answer.
 pub fn touched(
+    view: &View<'_>,
     root: &Path,
     all_crates: &BTreeSet<String>,
     against: &str,
@@ -55,20 +58,18 @@ pub fn touched(
         vec!["diff", "--name-only", "HEAD"],
         vec!["ls-files", "--others", "--exclude-standard"],
     ] {
-        let out = Command::new("git")
-            .arg("-C")
-            .arg(root)
-            .args(&args)
-            .output()
-            .map_err(|e| format!("could not run git: {e}"))?;
-        if !out.status.success() {
+        let out = view.git_in(root, &args);
+        if !out.started() {
+            return Err("could not run git".to_string());
+        }
+        if !out.ok() {
             return Err(format!(
                 "`git {}` failed: {}",
                 args.join(" "),
-                String::from_utf8_lossy(&out.stderr).trim()
+                String::from_utf8_lossy(out.stderr()).trim()
             ));
         }
-        for path in String::from_utf8_lossy(&out.stdout).lines() {
+        for path in String::from_utf8_lossy(out.stdout()).lines() {
             let name = crate_of(path, all_crates);
             if name != WORKSPACE {
                 crates.insert(name);
@@ -82,7 +83,7 @@ pub fn touched(
 /// source that is also the name of a type declared elsewhere.
 pub fn named_from(
     types: &[DeclaredType],
-    sources: &Sources,
+    sources: &Sources<'_>,
     touched: &BTreeSet<String>,
 ) -> BTreeSet<String> {
     let mut words: BTreeSet<&str> = BTreeSet::new();
