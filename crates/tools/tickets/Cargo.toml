@@ -1,0 +1,29 @@
+[package]
+name = "tickets"
+description = "Lists the tickets of the registry, checks their graph, and holds the model and rules that adding and moving one are refused by."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+# a scratch registry holding the committed vocabularies, for the makers' tests
+testkit = []
+
+[dependencies]
+# the trait crate under the name the generated collector gives it; the engine patches every spelling
+# of it to the one it is built from
+mockspace = { package = "mockspace-lint-rules", git = "ssh://git@github.com/hiisi-digital/mockspace.git", branch = "dev" }
+toml = "1"
+# the model of the tickets and the rules a move is refused by, which the console builds too
+kaski-tickets.workspace = true
+# the planning rows and the rules over them, which the tickets tool reads and writes beside the tickets
+kaski-planning.workspace = true
+# the tenets and what binds in the place of a superseded one, read once by the tool that owns them
+canon = { path = "../canon" }
+# the repository index a question is searched in
+corpus = { path = "../corpus" }
+
+[dev-dependencies]
+# the scratch registry the integration tests build their repositories from
+tickets = { path = ".", features = ["testkit"] }

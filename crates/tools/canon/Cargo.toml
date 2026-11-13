@@ -1,0 +1,19 @@
+[package]
+name = "canon"
+description = "Answers what the canon holds by subject, word and relation, and who names a tenet."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+# the committed registry read into a view, for a tool whose tests ask the real canon
+testkit = []
+
+[dependencies]
+# the trait crate under the name the generated collector gives it; the engine patches every spelling
+# of it to the one it is built from
+mockspace = { package = "mockspace-lint-rules", git = "ssh://git@github.com/hiisi-digital/mockspace.git", branch = "dev" }
+toml = "1"
+corpus = { path = "../corpus" }
+

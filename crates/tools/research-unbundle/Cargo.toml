@@ -1,0 +1,12 @@
+[package]
+name = "research-unbundle"
+description = "Writes a research bundle a helper posted into a research note's directory, long files split along their headings."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+# the trait crate under the name the generated collector gives it; the engine patches every spelling
+# of it to the one it is built from
+mockspace = { package = "mockspace-lint-rules", git = "ssh://git@github.com/hiisi-digital/mockspace.git", branch = "dev" }

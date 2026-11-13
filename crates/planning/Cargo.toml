@@ -1,0 +1,11 @@
+[package]
+name = "kaski-planning"
+description = "The planning rows of the registry and the rules a schema cannot state over them, read from the texts of registry files, for the tickets tool and the console alike."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+kaski-tickets.workspace = true
+toml = "1"

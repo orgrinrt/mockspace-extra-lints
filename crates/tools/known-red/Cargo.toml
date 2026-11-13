@@ -1,0 +1,17 @@
+[package]
+name = "known-red"
+description = "The catalogue of tests red on dev: adds or clears a row, and answers whether a test is one."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+# the trait crate under the name the generated collector gives it; the engine patches every spelling
+# of it to the one it is built from
+mockspace = { package = "mockspace-lint-rules", git = "ssh://git@github.com/hiisi-digital/mockspace.git", branch = "dev" }
+toml = "1"
+# the registry's directory, the id slug and the clock, which the ticket makers use as well
+tickets = { path = "../tickets" }
+# the id slug of a title, which the rules of adding a ticket make
+kaski-tickets.workspace = true
