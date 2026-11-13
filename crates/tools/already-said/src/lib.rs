@@ -20,7 +20,7 @@ use muisti::repo::Query as AskQuery;
 /// **Everything else on a row is searched, whatever it is called.** The first
 /// version carried a hand-written table of namespace-to-field, and it was wrong
 /// in both directions at once: it named `what` on `term` and `mechanism`, which
-/// neither namespace declares, and omitted `gap`, which 19 rows carry. So a
+/// neither namespace declares, and omitted `gap`, which many rows carry. So a
 /// distinctive phrase reachable only through a `gap` reported as absent, and
 /// this tool's output is what licenses interrupting a person with a question.
 ///
@@ -111,7 +111,7 @@ impl AlreadySaid {
         //
         // Trimmed, so a term of nothing but spaces is the empty question it is.
         // Untrimmed it went through as a search for a run of spaces, answered
-        // `0 of 640 rows` and then said the research was not asked, and this
+        // that no row holds it and then said the research was not asked, and this
         // tool's own help says an empty result is what licenses interrupting a
         // person.
         let needle = ctx.args.join(" ").trim().to_lowercase();
@@ -325,9 +325,9 @@ fn hits_in_row(slug: &str, fields: &[(&str, &str)], needle: &str) -> Vec<String>
 ///
 /// **The two halves used different matchers and disagreed in both directions.**
 /// The registry half was a bare substring test, so `already-said conveyed`
-/// returned `0 of 640 rows`, whose help says that licenses interrupting a
+/// returned no row, which its help says licenses interrupting a
 /// person, while `unearth conveyed` named five rows including a ruling whose
-/// `says` is about conveyance. And `already-said key` returned 73 rows, 29 of
+/// `says` is about conveyance. And `already-said key` returned rows, many of
 /// which carry no standalone `key` at all and matched inside `keywords`.
 ///
 /// One matcher now, the corpus's: a stem anchored at a word boundary and run as

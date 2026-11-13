@@ -5,7 +5,7 @@
 
 //! A lint's table in `mockspace.toml`, read as text: the three gate severities and the `crates` and
 //! `exempt_crates` arrays. The engine reads the same keys for the crate and workspace lints, and not for a
-//! repo lint, so a repo lint of this repository and the tests over the gates both come here for them.
+//! repo lint, so a repo lint of this pack and the tests over the gates both come here for them.
 
 use mockspace::PathFilter;
 
