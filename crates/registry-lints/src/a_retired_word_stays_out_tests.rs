@@ -292,20 +292,26 @@ fn lint() -> ARetiredWordStaysOut {
 }
 
 #[test]
-fn a_pending_or_demoted_tenet_rules_nothing_out_and_the_same_row_ratified_does() {
-    let d = scratch("retired-word-pending");
+fn a_stamped_or_demoted_tenet_rules_nothing_out_and_the_same_row_ratified_does() {
+    let d = scratch("retired-word-stamped");
     write(&d, "mock/crates/kaski-a/DESIGN.md.tmpl", "the quillfern stands\n");
-    let held = |standing: &str| {
-        view(&[("tenet::there_is_no_quillfern", &[
-            ("rules_out", "quillfern"),
-            ("standing", standing),
-        ])])
+    let held = |standing: &str, stamped: bool| {
+        let mut fields = vec![("rules_out", "quillfern"), ("standing", standing)];
+        if stamped {
+            fields.push(("stamped_by", "coordinators"));
+            fields.push(("stamp", "held for the maintainer, ticket `0123456789ab`"));
+        }
+        view(&[("tenet::there_is_no_quillfern", fields.as_slice())])
     };
-    for unbound in ["pending", "demoted"] {
-        let found = checked(&d, &held(unbound), &config(&[]), &Change::default());
+    for (unbound, reg) in [
+        ("stamped", held("ratified", true)),
+        ("demoted", held("demoted", false)),
+    ] {
+        let found = checked(&d, &reg, &config(&[]), &Change::default());
         assert!(found.is_empty(), "a {unbound} tenet binds nothing: {found:?}");
     }
-    let found = checked(&d, &held("ratified"), &config(&[]), &Change::default());
+    // THE CONTROL: the same row, ratified and unstamped, rules the word out.
+    let found = checked(&d, &held("ratified", false), &config(&[]), &Change::default());
     assert_eq!(found.len(), 1, "{found:?}");
     assert!(found[0].message.contains("there_is_no_quillfern"));
 }

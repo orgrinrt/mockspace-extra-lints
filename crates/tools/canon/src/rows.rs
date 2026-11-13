@@ -11,7 +11,7 @@
 use std::collections::BTreeMap;
 
 use mockspace::RegistryView;
-use registry_lints::standing::Standing;
+use registry_lints::standing::{STAMPED, Standing};
 
 /// The separator the engine joins a list field with.
 const JOIN: &str = ", ";
@@ -20,9 +20,15 @@ const JOIN: &str = ", ";
 pub struct Tenet<'a> {
     /// Its id, the slug every citation names.
     pub id:            &'a str,
-    /// Whether the maintainer has ratified it, holds it pending or demoted it. Apart from `superseded_by`: a superseded row does not
-    /// bind whatever its standing.
+    /// Whether the maintainer has ratified it or demoted it. Apart from `superseded_by` and a stamp: a
+    /// superseded or a stamped row does not bind whatever its standing.
     pub standing:      Standing,
+    /// Who stamped it provisionally, `coordinators` or `experts`, empty where nobody did. A stamp is never
+    /// a ratification, so a stamped row binds nothing.
+    pub stamped_by:    &'a str,
+    /// The stamp: what was stamped, why, where it is recorded and the question ticket asking the
+    /// maintainer, empty where there is none.
+    pub stamp:         &'a str,
     /// The subject it names, where it names one.
     pub subject:       Option<&'a str>,
     /// The tenets that replace it, empty while it binds.
@@ -42,9 +48,19 @@ pub struct Tenet<'a> {
 }
 
 impl Tenet<'_> {
-    /// Whether it still binds: nothing supersedes it and its standing binds.
+    /// Whether it still binds: nothing supersedes it, nothing stamps it and its standing binds.
     pub fn binds(&self) -> bool {
-        !self.replaced() && self.standing.binds()
+        !self.replaced() && !self.stamped() && self.standing.binds()
+    }
+
+    /// Whether it carries a provisional stamp, which keeps its standing and binds nothing.
+    pub fn stamped(&self) -> bool {
+        !self.stamped_by.is_empty() || !self.stamp.is_empty()
+    }
+
+    /// Why it binds nothing, as `check` says it, where nothing supersedes it; empty where it binds.
+    pub fn unbound(&self) -> &'static str {
+        if self.stamped() { STAMPED } else { self.standing.unbound() }
     }
 
     /// Whether another tenet replaces it, which is what a supersession chain follows. A demoted row is
@@ -127,6 +143,8 @@ pub fn tenets(reg: &RegistryView) -> Vec<Tenet<'_>> {
             Tenet {
                 id:            slug(q),
                 standing:      Standing::of(text(reg, q, "standing")),
+                stamped_by:    text(reg, q, "stamped_by"),
+                stamp:         text(reg, q, "stamp"),
                 subject:       reg
                     .field(q, "subject")
                     .map(str::trim)

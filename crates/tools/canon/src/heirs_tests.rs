@@ -14,6 +14,8 @@ fn row<'a>(id: &'a str, superseded_by: &[&'a str]) -> Tenet<'a> {
     Tenet {
         id,
         standing: Standing::Provisional,
+        stamped_by: "",
+        stamp: "",
         subject: None,
         superseded_by: superseded_by.to_vec(),
         cites: vec![],

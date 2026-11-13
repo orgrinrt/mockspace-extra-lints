@@ -97,11 +97,13 @@ pub(crate) fn gist(what: &str) -> String {
     format!("{}...", &cut[.. at])
 }
 
-/// One tenet as a listing line, marked with its standing where the maintainer has not ratified it and with what
-/// replaced it where it is superseded.
+/// One tenet as a listing line, marked with its standing where the maintainer has not ratified it, with its stamp
+/// where it carries one and with what replaced it where it is superseded.
 pub(crate) fn line(out: &mut String, t: &Tenet<'_>, width: usize) {
     let mut note = gist(t.what);
-    if t.standing != Standing::Ratified {
+    if t.stamped() {
+        note = format!("({}, stamped) {note}", t.standing.word());
+    } else if t.standing != Standing::Ratified {
         note = format!("({}) {note}", t.standing.word());
     }
     if t.replaced() {
@@ -262,7 +264,7 @@ pub fn unratified(all: &[Tenet<'_>], ids: &[&str]) -> Vec<String> {
 }
 
 /// What is wrong with the tenets `ids` name, one line each: an id that is no tenet, an id whose tenet
-/// something supersedes, and an id whose tenet is pending or demoted and binds nothing. A `tenet::` prefix is the
+/// something supersedes, and an id whose tenet is stamped or demoted and binds nothing. A `tenet::` prefix is the
 /// namespace and is read off, as a citation spells it. Empty when every id names a tenet that still
 /// binds, provisional or ratified.
 pub fn check(all: &[Tenet<'_>], ids: &[&str]) -> Vec<String> {
@@ -281,12 +283,16 @@ pub fn check(all: &[Tenet<'_>], ids: &[&str]) -> Vec<String> {
                         t.superseded_by.join(", ")
                     ))
                 },
-                Some(t) if !t.binds() => {
+                Some(t) if t.stamped() => {
+                    let by = if t.stamped_by.is_empty() { "nobody named" } else { t.stamped_by };
                     Some(format!(
-                        "`{id}` is {}: {}",
+                        "`{id}` is {}, stamped by {by}: {}",
                         t.standing.word(),
-                        t.standing.unbound()
+                        t.unbound()
                     ))
+                },
+                Some(t) if !t.binds() => {
+                    Some(format!("`{id}` is {}: {}", t.standing.word(), t.unbound()))
                 },
                 Some(_) => None,
             }

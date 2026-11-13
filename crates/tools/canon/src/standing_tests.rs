@@ -46,10 +46,6 @@ fn a_tenet_with_no_standing_or_a_misspelt_one_is_caught() {
             ("standing", "demoted"),
             ("what", "In the set."),
         ]),
-        ("tenet::asked", &[
-            ("standing", "pending"),
-            ("what", "In the set."),
-        ]),
     ]);
     assert_eq!(unstated(&reg), ["bare", "guessed", "misspelt"]);
 }
@@ -191,7 +187,8 @@ fn a_demoted_row_binds_nothing_and_has_no_heir() {
     assert!(crate::rows::heirs(&all).is_empty());
 }
 
-/// A provisional row beside a pending one: the pending row waits on the maintainer and binds nothing.
+/// A provisional row beside a stamped one: the stamp is never a ratification, so the stamped row keeps its
+/// standing and binds nothing.
 fn waiting() -> RegistryView {
     view(&[
         ("subject::time", &[("what", "The clock.")]),
@@ -201,7 +198,9 @@ fn waiting() -> RegistryView {
             ("what", "Matters now."),
         ]),
         ("tenet::asked", &[
-            ("standing", "pending"),
+            ("standing", "provisional"),
+            ("stamped_by", "experts"),
+            ("stamp", "held for the maintainer, recorded in ROWS.md, ticket `0123456789ab`"),
             ("subject", "time"),
             ("what", "Waits on the maintainer."),
         ]),
@@ -209,11 +208,12 @@ fn waiting() -> RegistryView {
 }
 
 #[test]
-fn a_pending_row_binds_nothing_and_has_no_heir() {
+fn a_stamped_row_keeps_its_standing_binds_nothing_and_has_no_heir() {
     let reg = waiting();
     let all = tenets(&reg);
     let row = |id: &str| all.iter().find(|t| t.id == id).expect(id);
-    assert_eq!(row("asked").standing, Standing::Pending);
+    assert_eq!(row("asked").standing, Standing::Provisional);
+    assert!(row("asked").stamped());
     assert!(!row("asked").binds());
     assert!(!row("asked").replaced());
     // THE CONTROL: the provisional row beside it binds.
@@ -222,19 +222,19 @@ fn a_pending_row_binds_nothing_and_has_no_heir() {
 }
 
 #[test]
-fn check_blocks_on_a_pending_row_and_says_it_waits_on_the_maintainer() {
+fn check_blocks_on_a_stamped_row_and_says_a_stamp_is_no_ratification() {
     let r = run(&waiting(), &scratch(), &["check", "kept", "asked"]);
     match &r.outcome {
         Outcome::Findings(f) => {
             assert_eq!(f.len(), 1, "{f:?}");
             assert!(
-                f[0].message.contains("`asked` is pending")
-                    && f[0].message.contains("waiting on the maintainer")
+                f[0].message.contains("`asked` is provisional, stamped by experts")
+                    && f[0].message.contains("never a ratification")
                     && f[0].message.contains("binds nothing"),
                 "{}",
                 f[0].message
             );
-            // THE CONTROL: a pending row is not read as a demoted or a superseded one.
+            // THE CONTROL: a stamped row is not read as a demoted or a superseded one.
             assert!(!f[0].message.contains("later canon"), "{}", f[0].message);
             assert!(!f[0].message.contains("superseded"), "{}", f[0].message);
         },
@@ -244,17 +244,38 @@ fn check_blocks_on_a_pending_row_and_says_it_waits_on_the_maintainer() {
 }
 
 #[test]
-fn a_listing_marks_a_pending_row_and_the_subjects_do_not_count_it_binding() {
+fn a_listing_marks_a_stamped_row_and_the_subjects_do_not_count_it_binding() {
     let reg = waiting();
     let time = answered(&run(&reg, &scratch(), &["subject", "time"])).to_string();
     let asked = time
         .lines()
         .find(|l| l.trim_start().starts_with("asked"))
         .unwrap_or_default();
-    assert!(asked.contains("(pending)"), "{time}");
+    assert!(asked.contains("(provisional, stamped)"), "{time}");
     let found = answered(&run(&reg, &scratch(), &["find", "maintainer"])).to_string();
-    assert!(found.contains("(pending)"), "{found}");
+    assert!(found.contains("(provisional, stamped)"), "{found}");
     let subs = answered(&run(&reg, &scratch(), &["subjects"])).to_string();
-    // THE CONTROL: two tenets, of which only the provisional one binds.
+    // THE CONTROL: two provisional tenets, of which only the unstamped one binds.
     assert!(subs.contains("2 tenets, 1 binding, 0 ratified"), "{subs}");
+}
+
+#[test]
+fn half_a_stamp_still_binds_nothing() {
+    // Either field written is a stamp: the lint refuses the half, and the canon never reads the row as
+    // binding meanwhile.
+    for field in ["stamped_by", "stamp"] {
+        let reg = view(&[("tenet::half", &[
+            ("standing", "provisional"),
+            (field, "experts"),
+            ("what", "Half a stamp."),
+        ])]);
+        let all = tenets(&reg);
+        assert!(!all[0].binds(), "{field}");
+    }
+    // THE CONTROL: the same row with neither field binds.
+    let reg = view(&[("tenet::half", &[
+        ("standing", "provisional"),
+        ("what", "No stamp."),
+    ])]);
+    assert!(tenets(&reg)[0].binds());
 }

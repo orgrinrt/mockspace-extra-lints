@@ -73,8 +73,21 @@ description = "The tenets that replace this one. A superseded tenet is kept rath
 name = "standing"
 type = "string"
 required = true
-description = "`provisional` where it matters now and the maintainer has not ratified it: read as the best current statement and never cited as settled. `ratified` where the maintainer went through it on a named date, with their answer in the row's `answers`. `pending` where it is written down and waits on the maintainer, who has neither ratified it nor let it stand as the current statement: shown and searched, and binding nothing until it is ratified or made provisional. `demoted` where it is kept as reference for a later canon of its domain and binds nothing. Apart from `superseded_by`: a superseded row does not bind whatever its standing."
-values = ["provisional", "ratified", "pending", "demoted"]
+description = "`provisional` where it matters now and the maintainer has not ratified it: read as the best current statement and never cited as settled. `ratified` where the maintainer went through it on a named date, with their answer in the row's `answers`. `demoted` where it is kept as reference for a later canon of its domain and binds nothing. Apart from `superseded_by`: a superseded row does not bind whatever its standing."
+values = ["provisional", "ratified", "demoted"]
+
+[[registry.namespace.field]]
+name = "stamped_by"
+type = "string"
+required = false
+values = ["coordinators", "experts"]
+description = "Who stamped the row provisionally while the maintainer was away: `coordinators` where the coordinators converged on it, `experts` where two domain experts agreed. Written with `stamp` and never without it. A stamp is never a ratification: the row keeps its standing and binds nothing until the maintainer ratifies it."
+
+[[registry.namespace.field]]
+name = "stamp"
+type = "string"
+required = false
+description = "The provisional stamp: what was stamped, why, where it is recorded, and the id of the question ticket, held by the maintainer, that asks him to make it formal, in backticks after the word `ticket`. Written with `stamped_by` and never without it; the lint `a-provisional-stamp-is-not-a-ratification` holds rows to the shape."
 
 [[registry.namespace.field]]
 name = "subject"
