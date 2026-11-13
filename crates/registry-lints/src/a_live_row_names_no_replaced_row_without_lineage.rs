@@ -45,7 +45,7 @@ impl Lint for ALiveRowNamesNoReplacedRowWithoutLineage {
 
 impl RepoLint for ALiveRowNamesNoReplacedRowWithoutLineage {
     fn check_repo(&self, ctx: &RepoContext) -> Vec<LintError> {
-        check(ctx.registry)
+        check(ctx.registry())
     }
 }
 

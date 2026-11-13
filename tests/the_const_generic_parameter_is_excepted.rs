@@ -11,49 +11,25 @@
 //! mixed cases are the load-bearing ones: a parameter and an ordinary type on
 //! the same line, where exactly one of the two has to report.
 
-use std::collections::{BTreeMap, BTreeSet};
-
 use mockspace_extra_lints::lints::arvo_types_only::ArvoTypesOnly;
 use mockspace_extra_lints::lints::no_bare_numeric::NoBareNumeric;
 use mockspace_extra_lints::lints::no_public_raw_field::NoPublicRawField;
-use mockspace_lint_rules::{CrateLint, CrateSourceFile, LintContext, LintError};
+use mockspace_lint_rules::testkit::LintFixture;
+use mockspace_lint_rules::{CrateLint, LintError};
 
-fn ctx(source: &'static str) -> LintContext<'static> {
-    let mut parser = tree_sitter::Parser::new();
-    parser
-        .set_language(&tree_sitter_rust::LANGUAGE.into())
-        .unwrap();
-    let tree = parser.parse(source, None).unwrap();
-    let tree: &'static tree_sitter::Tree = Box::leak(Box::new(tree));
-
-    let all_sources: &'static [CrateSourceFile] = Box::leak(Box::new(vec![CrateSourceFile {
-        rel_path: std::path::PathBuf::from("src/lib.rs"),
-        text:     source.to_string(),
-    }]));
-
-    LintContext {
-        crate_name: "a-consumer",
-        short_name: "a-consumer",
-        source,
-        tree,
-        all_sources,
-        deps: &[],
-        all_crates: Box::leak(Box::new(BTreeSet::new())),
-        design_doc: None,
-        all_doc_content: "",
-        shame_doc: None,
-        workspace_root: std::path::Path::new("/tmp"),
-        proc_macro_crates: &[],
-        lint_proc_macro_source: false,
-        crate_prefix: "a",
-        primitive_introductions: Box::leak(Box::new(BTreeMap::new())),
-    }
+/// A crate of one file, named and prefixed the way the checks below expect.
+fn fixture(source: &str) -> LintFixture {
+    LintFixture::new(source)
+        .with_crate_name("a-consumer", "a-consumer")
+        .with_workspace_root(std::path::Path::new("/tmp"))
+        .with_crate_prefix("a")
 }
 
 /// Both lints, because the pack's own documentation says they are semantically
 /// equivalent today and a change that moves one and not the other breaks that.
-fn hits(source: &'static str) -> Vec<LintError> {
-    let context = ctx(source);
+fn hits(source: &str) -> Vec<LintError> {
+    let fixture = fixture(source);
+    let context = fixture.ctx();
     let numeric = NoBareNumeric.check(&context);
     let types_only = ArvoTypesOnly.check(&context);
     assert_eq!(
@@ -64,7 +40,7 @@ fn hits(source: &'static str) -> Vec<LintError> {
     types_only
 }
 
-fn lines(source: &'static str) -> Vec<usize> {
+fn lines(source: &str) -> Vec<usize> {
     hits(source).into_iter().map(|e| e.line).collect()
 }
 
@@ -266,10 +242,10 @@ fn the_allow_marker_still_silences_a_refused_position() {
 fn the_raw_field_lint_never_read_a_parameter_as_a_field() {
     // A guard rather than a change: `no-public-raw-field` walks fields, so an
     // excepted parameter was never its business and must stay that way.
-    let quiet = NoPublicRawField.check(&ctx("pub struct A<const N: u32>(Width);\n"));
+    let quiet = NoPublicRawField.check(&fixture("pub struct A<const N: u32>(Width);\n").ctx());
     assert!(quiet.is_empty(), "a parameter is not a field: {quiet:?}");
 
-    let loud = NoPublicRawField.check(&ctx("pub struct A<const N: u32>(u64);\n"));
+    let loud = NoPublicRawField.check(&fixture("pub struct A<const N: u32>(u64);\n").ctx());
     assert!(!loud.is_empty(), "the field beside it is still a field");
 }
 

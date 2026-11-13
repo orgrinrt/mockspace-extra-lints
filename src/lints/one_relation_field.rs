@@ -22,7 +22,6 @@
 //! cannot parse, gets no finding.
 
 use std::collections::{BTreeSet, HashMap};
-use std::fs;
 
 use mockspace_lint_rules::{Lint, LintError, RepoContext, RepoLint, Severity};
 
@@ -86,10 +85,7 @@ impl Lint for OneRelationField {
 
 impl RepoLint for OneRelationField {
     fn check_repo(&self, ctx: &RepoContext) -> Vec<LintError> {
-        let Ok(text) = fs::read_to_string(ctx.repo_root.join("mockspace.toml")) else {
-            return Vec::new();
-        };
-        let Ok(doc) = text.parse::<toml::Table>() else {
+        let Some(Ok(doc)) = ctx.view().toml(ctx.repo_root.join("mockspace.toml")) else {
             return Vec::new();
         };
         let Some(spaces) = doc

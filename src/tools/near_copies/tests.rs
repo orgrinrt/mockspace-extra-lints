@@ -3,20 +3,16 @@
 
 use std::collections::BTreeSet;
 use std::fs;
-use std::path::PathBuf;
+use std::path::Path;
 
 use mockspace_lint_rules::tool::{Tool, ToolContext};
-use mockspace_lint_rules::{CrateSourceFile, DeclaredType, Outcome, RegistryView, declared_types};
+use mockspace_lint_rules::{DeclaredType, Outcome, RegistryView, declared_types};
 
 use super::compare::{Found, Options, close, compare};
 use super::{NearCopies, parse, render};
 
 fn crate_of(name: &str, source: &str) -> Vec<DeclaredType> {
-    let file = CrateSourceFile {
-        rel_path: PathBuf::from("src/lib.rs"),
-        text:     source.to_string(),
-    };
-    declared_types(name, &[file])
+    declared_types(name, &[(Path::new("src/lib.rs"), source)])
 }
 
 pub(super) fn both(a: &str, b: &str) -> Vec<DeclaredType> {

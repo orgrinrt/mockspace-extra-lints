@@ -64,7 +64,7 @@ impl Lint for EveryFixmeNamesATicket {
 
 impl RepoLint for EveryFixmeNamesATicket {
     fn check_repo(&self, ctx: &RepoContext) -> Vec<LintError> {
-        check(ctx.repo_root, ctx.registry, &ratchets::read(ctx.mock_dir))
+        check(ctx.repo_root, ctx.registry(), &ratchets::read(ctx.mock_dir))
     }
 }
 

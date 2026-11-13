@@ -35,7 +35,7 @@ impl Lint for ARelationAddsWhatTheWordsDoNot {
 
 impl RepoLint for ARelationAddsWhatTheWordsDoNot {
     fn check_repo(&self, ctx: &RepoContext) -> Vec<LintError> {
-        check(ctx.registry)
+        check(ctx.registry())
     }
 }
 

@@ -11,42 +11,13 @@
 //! else teaches readers to reach for an allow when it is wrong, and the allows
 //! stay after the lint is fixed.
 
-use std::collections::{BTreeMap, BTreeSet};
-
 use mockspace_extra_lints::lints::no_vec_in_trait_sig::NoVecInTraitSig;
 use mockspace_extra_lints::lints::trait_first_signatures::TraitFirstSignatures;
-use mockspace_lint_rules::{CrateLint, CrateSourceFile, LintContext};
+use mockspace_lint_rules::CrateLint;
+use mockspace_lint_rules::testkit::LintFixture;
 
-fn ctx_with(source: &'static str) -> LintContext<'static> {
-    let mut parser = tree_sitter::Parser::new();
-    parser
-        .set_language(&tree_sitter_rust::LANGUAGE.into())
-        .unwrap();
-    let tree = parser.parse(source, None).unwrap();
-    let tree: &'static tree_sitter::Tree = Box::leak(Box::new(tree));
-
-    let all_sources: &'static [CrateSourceFile] = Box::leak(Box::new(vec![CrateSourceFile {
-        rel_path: std::path::PathBuf::from("src/lib.rs"),
-        text:     source.to_string(),
-    }]));
-
-    LintContext {
-        crate_name: "test-crate",
-        short_name: "test-crate",
-        source,
-        tree,
-        all_sources,
-        deps: &[],
-        all_crates: Box::leak(Box::new(BTreeSet::new())),
-        design_doc: None,
-        all_doc_content: "",
-        shame_doc: None,
-        workspace_root: std::path::Path::new("/tmp"),
-        proc_macro_crates: &[],
-        lint_proc_macro_source: false,
-        crate_prefix: "test",
-        primitive_introductions: Box::leak(Box::new(BTreeMap::new())),
-    }
+fn ctx_with(source: &str) -> LintFixture {
+    LintFixture::new(source).with_workspace_root(std::path::Path::new("/tmp"))
 }
 
 /// The real case. A wrapper around an interner is not a heap string.
@@ -54,7 +25,7 @@ fn ctx_with(source: &'static str) -> LintContext<'static> {
 fn a_type_merely_beginning_with_string_is_not_a_string() {
     let src = "pub trait IntoStr {\n    fn into_str(self, interner: &StringInterner<impl \
                ArenaInterner>) -> Str;\n}\n";
-    let hits = NoVecInTraitSig.check(&ctx_with(src));
+    let hits = NoVecInTraitSig.check(&ctx_with(src).ctx());
     assert!(
         hits.is_empty(),
         "StringInterner is not String; got: {:?}",
@@ -67,7 +38,7 @@ fn a_type_merely_beginning_with_string_is_not_a_string() {
 #[test]
 fn a_returned_type_merely_beginning_with_string_is_not_a_string() {
     let src = "pub trait Build {\n    fn builder(&self) -> StringBuilder;\n}\n";
-    let hits = NoVecInTraitSig.check(&ctx_with(src));
+    let hits = NoVecInTraitSig.check(&ctx_with(src).ctx());
     assert!(hits.is_empty(), "StringBuilder is not String");
 }
 
@@ -75,14 +46,14 @@ fn a_returned_type_merely_beginning_with_string_is_not_a_string() {
 #[test]
 fn a_real_string_parameter_is_still_caught() {
     let src = "pub trait Name {\n    fn set(&mut self, name: String);\n}\n";
-    let hits = NoVecInTraitSig.check(&ctx_with(src));
+    let hits = NoVecInTraitSig.check(&ctx_with(src).ctx());
     assert_eq!(hits.len(), 1, "a bare String parameter must be caught");
 }
 
 #[test]
 fn a_real_string_return_is_still_caught() {
     let src = "pub trait Name {\n    fn get(&self) -> String;\n}\n";
-    let hits = NoVecInTraitSig.check(&ctx_with(src));
+    let hits = NoVecInTraitSig.check(&ctx_with(src).ctx());
     assert_eq!(hits.len(), 1, "a bare String return must be caught");
 }
 
@@ -91,7 +62,7 @@ fn a_real_string_return_is_still_caught() {
 #[test]
 fn a_string_inside_a_generic_argument_is_still_caught() {
     let src = "pub trait Names {\n    fn all(&self) -> Maybe<String>;\n}\n";
-    let hits = NoVecInTraitSig.check(&ctx_with(src));
+    let hits = NoVecInTraitSig.check(&ctx_with(src).ctx());
     assert_eq!(hits.len(), 1, "Maybe<String> still contains a String");
 }
 
@@ -99,7 +70,7 @@ fn a_string_inside_a_generic_argument_is_still_caught() {
 #[test]
 fn the_anchored_entries_still_fire() {
     let src = "pub trait Bag {\n    fn items(&self) -> Vec<u8>;\n}\n";
-    let hits = NoVecInTraitSig.check(&ctx_with(src));
+    let hits = NoVecInTraitSig.check(&ctx_with(src).ctx());
     assert_eq!(hits.len(), 1, "Vec< is anchored and must still fire");
 }
 
@@ -110,7 +81,7 @@ fn the_anchored_entries_still_fire() {
 #[test]
 fn a_type_merely_ending_with_string_is_not_a_string() {
     let src = "pub trait Name {\n    fn set(&mut self, name: MyString);\n}\n";
-    let hits = NoVecInTraitSig.check(&ctx_with(src));
+    let hits = NoVecInTraitSig.check(&ctx_with(src).ctx());
     assert!(
         hits.is_empty(),
         "MyString is not String; got: {:?}",
@@ -122,7 +93,7 @@ fn a_type_merely_ending_with_string_is_not_a_string() {
 #[test]
 fn a_compact_string_wrapper_is_not_a_string() {
     let src = "pub trait Name {\n    fn set(&mut self, name: CompactString);\n}\n";
-    let hits = NoVecInTraitSig.check(&ctx_with(src));
+    let hits = NoVecInTraitSig.check(&ctx_with(src).ctx());
     assert!(hits.is_empty(), "CompactString is not String");
 }
 
@@ -131,7 +102,7 @@ fn a_compact_string_wrapper_is_not_a_string() {
 #[test]
 fn a_type_merely_ending_with_vec_is_not_a_vec() {
     let src = "pub trait Bag {\n    fn items(&self) -> MyVec<u8>;\n}\n";
-    let hits = NoVecInTraitSig.check(&ctx_with(src));
+    let hits = NoVecInTraitSig.check(&ctx_with(src).ctx());
     assert!(hits.is_empty(), "MyVec<u8> is not Vec<u8>");
 }
 
@@ -142,7 +113,7 @@ fn a_type_merely_ending_with_vec_is_not_a_vec() {
 #[test]
 fn the_sibling_lint_does_not_report_a_wrapper_container() {
     let src = "pub fn items() -> MyVec<u8> { todo!() }\n";
-    let hits = TraitFirstSignatures.check(&ctx_with(src));
+    let hits = TraitFirstSignatures.check(&ctx_with(src).ctx());
     assert!(
         hits.is_empty(),
         "MyVec<u8> is not a concrete Vec; got: {:?}",
@@ -153,6 +124,6 @@ fn the_sibling_lint_does_not_report_a_wrapper_container() {
 #[test]
 fn the_sibling_lint_still_reports_a_real_container() {
     let src = "pub fn items() -> Vec<u8> { todo!() }\n";
-    let hits = TraitFirstSignatures.check(&ctx_with(src));
+    let hits = TraitFirstSignatures.check(&ctx_with(src).ctx());
     assert!(!hits.is_empty(), "a real Vec return must still be caught");
 }

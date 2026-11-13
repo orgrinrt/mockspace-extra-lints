@@ -41,12 +41,12 @@ impl CrateLint for NoBareOption {
         }
         let mut out = Vec::new();
 
-        let sources: Vec<(String, &str)> = if ctx.all_sources.is_empty() {
-            vec![("src/lib.rs".to_string(), ctx.source)]
+        let sources: Vec<(String, &str)> = if ctx.all_sources().is_empty() {
+            vec![("src/lib.rs".to_string(), ctx.source())]
         } else {
-            ctx.all_sources
+            ctx.all_sources()
                 .iter()
-                .map(|f| (f.rel_path.display().to_string(), f.text.as_str()))
+                .map(|f| (f.rel_path.display().to_string(), f.text))
                 .collect()
         };
 

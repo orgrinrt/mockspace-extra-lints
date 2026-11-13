@@ -35,7 +35,7 @@ impl Lint for ATenetNamesASubject {
 
 impl RepoLint for ATenetNamesASubject {
     fn check_repo(&self, ctx: &RepoContext) -> Vec<LintError> {
-        check(ctx.mock_dir, ctx.registry)
+        check(ctx.mock_dir, ctx.registry())
     }
 }
 

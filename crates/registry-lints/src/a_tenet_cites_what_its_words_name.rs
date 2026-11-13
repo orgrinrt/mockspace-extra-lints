@@ -35,7 +35,7 @@ impl Lint for ATenetCitesWhatItsWordsName {
 
 impl RepoLint for ATenetCitesWhatItsWordsName {
     fn check_repo(&self, ctx: &RepoContext) -> Vec<LintError> {
-        check(ctx.registry)
+        check(ctx.registry())
     }
 }
 

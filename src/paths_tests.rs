@@ -1,7 +1,7 @@
 use super::*;
 
 fn generics_of(src: &str) -> Vec<String> {
-    let tree = parse(src).unwrap();
+    let tree = mockspace_lint_rules::Reading::new(".").view().parse(src);
     let item = tree.root_node().named_child(0).unwrap();
     let mut out = BTreeSet::new();
     generic_names(item, src, &mut out);

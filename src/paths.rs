@@ -7,7 +7,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use tree_sitter::{Node, Parser, Tree};
+use tree_sitter::Node;
 
 use crate::util::txt;
 
@@ -20,15 +20,6 @@ pub const RESERVED_ROOTS: &[&str] = &["crate", "self", "super", "Self", "core", 
 /// A crate name as a path root spells it: hyphens become underscores.
 pub fn as_root(name: &str) -> String {
     name.replace('-', "_")
-}
-
-/// Parse one file, or nothing where the grammar fails to load.
-pub fn parse(text: &str) -> Option<Tree> {
-    let mut parser = Parser::new();
-    parser
-        .set_language(&tree_sitter_rust::LANGUAGE.into())
-        .ok()?;
-    parser.parse(text, None)
 }
 
 /// One name a `use` brings into scope: the crate it came from and what it was

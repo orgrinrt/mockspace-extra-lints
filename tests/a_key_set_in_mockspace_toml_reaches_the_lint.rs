@@ -11,7 +11,9 @@ use std::path::Path;
 
 use mockspace::config::Config;
 use mockspace_extra_lints::lints::catalogue_ignore::CatalogueIgnore;
-use mockspace_lint_rules::{RegistryView, RepoContext, RepoLint};
+use mockspace_lint_rules::src_layout::NO_REF_FILES;
+use mockspace_lint_rules::testkit::check_repo;
+use mockspace_lint_rules::{RegistryView, RepoInput};
 
 const BARE: &str = "#[test]\n#[ignore]\nfn t() {}\n";
 
@@ -32,20 +34,19 @@ fn found_with(toml: &str) -> (Vec<String>, bool) {
     cfg.lint_overrides.apply_params_to(&mut lint);
     let registry = RegistryView::new(BTreeMap::new(), BTreeMap::new());
     let crates = BTreeSet::from(["alpha".to_string()]);
-    let ctx = RepoContext {
-        mock_dir: &d.path().join("mock"),
-        repo_root: d.path(),
-        all_crates: &crates,
-        src_dirs: &[],
-        invocation: None,
+    let mock_dir = d.path().join("mock");
+    let input = RepoInput {
+        mock_dir:    &mock_dir,
+        repo_root:   d.path(),
+        all_crates:  &crates,
+        src_dirs:    &[],
+        invocation:  None,
         canon_paths: &[],
         open_panels: &[],
-        ref_files: &mockspace_lint_rules::src_layout::NO_REF_FILES,
-        registry: &registry,
-        verdicts: None,
+        ref_files:   &NO_REF_FILES,
+        registry:    &registry,
     };
-    let mut paths: Vec<String> =
-        lint.check_repo(&ctx).into_iter().filter_map(|e| e.path).collect();
+    let mut paths: Vec<String> = check_repo(&lint, input).into_iter().filter_map(|e| e.path).collect();
     paths.sort();
     // That the table survived the read at all: one the engine could not deserialise is gone from
     // the result, severity included, or the read refuses it outright, by engine version.

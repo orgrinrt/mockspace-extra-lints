@@ -12,40 +12,16 @@
 //! is not the framework's, so the silence is the root and not the position
 //! going unread.
 
-use std::collections::{BTreeMap, BTreeSet};
-
 use mockspace_extra_lints::lints::re_export_foreign_names::ReExportForeignNames;
-use mockspace_lint_rules::{CrateLint, CrateSourceFile, LintContext};
+use mockspace_lint_rules::CrateLint;
+use mockspace_lint_rules::testkit::LintFixture;
 
-fn findings(src: &'static str, deps: &'static [&'static str]) -> Vec<String> {
-    let mut parser = tree_sitter::Parser::new();
-    parser
-        .set_language(&tree_sitter_rust::LANGUAGE.into())
-        .unwrap();
-    let tree: &'static tree_sitter::Tree = Box::leak(Box::new(parser.parse(src, None).unwrap()));
-    let all_sources: &'static [CrateSourceFile] = Box::leak(Box::new(vec![CrateSourceFile {
-        rel_path: std::path::PathBuf::from("src/lib.rs"),
-        text:     src.to_string(),
-    }]));
-    let deps: &'static [String] =
-        Box::leak(Box::new(deps.iter().map(|d| d.to_string()).collect::<Vec<_>>()));
-    let ctx = LintContext {
-        crate_name: "console-commands",
-        short_name: "commands",
-        source: src,
-        tree,
-        all_sources,
-        deps,
-        all_crates: Box::leak(Box::new(BTreeSet::new())),
-        design_doc: None,
-        all_doc_content: "",
-        shame_doc: None,
-        workspace_root: std::path::Path::new("/nonexistent"),
-        proc_macro_crates: &[],
-        lint_proc_macro_source: false,
-        crate_prefix: "kaski",
-        primitive_introductions: Box::leak(Box::new(BTreeMap::new())),
-    };
+fn findings(src: &str, deps: &[&str]) -> Vec<String> {
+    let fixture = LintFixture::new(src)
+        .with_crate_name("console-commands", "commands")
+        .with_crate_prefix("kaski")
+        .with_deps(deps);
+    let ctx = fixture.ctx();
     ReExportForeignNames
         .check(&ctx)
         .into_iter()

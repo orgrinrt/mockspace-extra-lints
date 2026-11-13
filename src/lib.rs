@@ -26,7 +26,7 @@ mod const_generic_parameters;
 mod dep_surface;
 mod manifest_toml;
 mod paths;
-mod repo_files;
+mod repo_scope;
 pub mod slang;
 mod string_literal;
 #[cfg(test)]

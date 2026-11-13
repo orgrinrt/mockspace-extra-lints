@@ -1,9 +1,8 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::fs;
 
-use mockspace_lint_rules::RegistryView;
-
 use super::*;
+use crate::test_support::run_repo_lint;
 
 fn check(lint: &SlangFileSize, files: &[(&str, String)]) -> Vec<LintError> {
     let d = tempfile::tempdir().unwrap();
@@ -13,20 +12,7 @@ fn check(lint: &SlangFileSize, files: &[(&str, String)]) -> Vec<LintError> {
         fs::write(p, text).unwrap();
     }
     let crates = BTreeSet::from(["alpha".to_string()]);
-    let reg = RegistryView::new(BTreeMap::new(), BTreeMap::new());
-    let ctx = RepoContext {
-        mock_dir: &d.path().join("mock"),
-        repo_root: d.path(),
-        all_crates: &crates,
-        src_dirs: &[],
-        invocation: None,
-        canon_paths: &[],
-        open_panels: &[],
-        ref_files: &mockspace_lint_rules::src_layout::NO_REF_FILES,
-        registry: &reg,
-        verdicts: None,
-    };
-    lint.check_repo(&ctx)
+    run_repo_lint(lint, d.path(), &crates)
 }
 
 fn body(code_lines: usize) -> String {

@@ -69,7 +69,7 @@ impl RepoLint for ARetiredWordStaysOut {
             Ok(change) => (change, None),
             Err(why) => (Change::default(), Some(why)),
         };
-        let mut out = check(ctx.repo_root, ctx.registry, &config, Some(ctx), &change);
+        let mut out = check(ctx.repo_root, ctx.registry(), &config, Some(ctx), &change);
         out.extend(unread.map(|why| unreadable(&why)));
         out
     }
@@ -173,7 +173,7 @@ fn judge_files(repo: &Path, rules: &[Retiring], ctx: Option<&RepoContext>) -> Ve
         let found = match ctx {
             Some(ctx) => {
                 let parts: [&[u8]; 3] = [path.as_bytes(), body.as_bytes(), rules_key.as_bytes()];
-                ctx.remembered(NAME, &parts, || judge(&rel, &body, rules))
+                { let _ = (ctx, parts); judge(&rel, &body, rules) }
             },
             None => judge(&rel, &body, rules),
         };

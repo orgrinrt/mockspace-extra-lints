@@ -87,21 +87,21 @@ impl CrateLint for ArvoTypesOnly {
 
         // Scan every .rs file under src/. Module files (bits.rs,
         // prim.rs, ufixed_impl.rs, ...) are where drift usually
-        // lives. Fall back to ctx.source only if the context carried
+        // lives. Fall back to ctx.source() only if the context carried
         // no all_sources (older mockspace version).
-        let sources: Vec<(String, &str)> = if ctx.all_sources.is_empty() {
-            vec![("src/lib.rs".to_string(), ctx.source)]
+        let sources: Vec<(String, &str, &tree_sitter::Tree)> = if ctx.all_sources().is_empty() {
+            vec![("src/lib.rs".to_string(), ctx.source(), ctx.tree())]
         } else {
-            ctx.all_sources
+            ctx.all_sources()
                 .iter()
-                .map(|f| (f.rel_path.display().to_string(), f.text.as_str()))
+                .map(|f| (f.rel_path.display().to_string(), f.text, f.tree()))
                 .collect()
         };
 
-        for (rel_path, source) in sources {
+        for (rel_path, source, tree) in sources {
             // The excepted position comes off the parse, blanked in place so the
             // line numbering is still the file's own.
-            let excepted = without_const_generic_parameter_types(source);
+            let excepted = without_const_generic_parameter_types(source, tree);
             for (idx, (raw_line, kept)) in source.lines().zip(excepted.lines()).enumerate() {
                 let trimmed_start = raw_line.trim_start();
                 if trimmed_start.starts_with("//") {

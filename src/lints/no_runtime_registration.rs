@@ -66,7 +66,7 @@ impl CrateLint for NoRuntimeRegistration {
             return Vec::new();
         }
         let mut out = Vec::new();
-        for (idx, line) in ctx.source.lines().enumerate() {
+        for (idx, line) in ctx.source().lines().enumerate() {
             let trimmed = line.trim_start();
             if trimmed.starts_with("//") {
                 continue;

@@ -1,9 +1,8 @@
-use std::collections::BTreeMap;
+use std::fs;
 use std::path::Path;
 
-use mockspace_lint_rules::RegistryView;
-
 use super::*;
+use crate::test_support::run_repo_lint;
 
 fn schema(extra_field: &str) -> String {
     format!(
@@ -35,19 +34,7 @@ type = "tenet"
 
 fn run_with(lint: &OneRelationField, root: &Path) -> Vec<LintError> {
     let crates = BTreeSet::new();
-    let registry = RegistryView::new(BTreeMap::new(), BTreeMap::new());
-    lint.check_repo(&RepoContext {
-        mock_dir: &root.join("mock"),
-        repo_root: root,
-        all_crates: &crates,
-        src_dirs: &[],
-        invocation: None,
-        canon_paths: &[],
-        open_panels: &[],
-        ref_files: &mockspace_lint_rules::src_layout::NO_REF_FILES,
-        registry: &registry,
-        verdicts: None,
-    })
+    run_repo_lint(lint, root, &crates)
 }
 
 fn run(toml_text: &str) -> Vec<LintError> {

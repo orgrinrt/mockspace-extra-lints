@@ -262,7 +262,8 @@ fn the_sources_of_a_repository_are_named_by_crate_and_skip_what_is_never_authore
         fs::write(p, text).unwrap();
     }
     let all: BTreeSet<String> = ["alpha".to_string()].into();
-    let found = sources(d.path(), &d.path().join("mock"), &all);
+    let reading = mockspace_lint_rules::Reading::new(d.path());
+    let found = sources(&reading.view(), d.path(), &d.path().join("mock"), &all);
     let got: Vec<_> = found.iter().map(|s| (s.rel.as_str(), s.crate_name.as_str())).collect();
     assert_eq!(
         got,

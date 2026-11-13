@@ -19,10 +19,7 @@ publish = false
 # with nothing in the error naming the cause. The engine's generated
 # manifest also carries a `[patch]` keyed on the `https://` spelling,
 # which covers this crate only once the two agree.
-# FIXME(point_the_pack_back_at_mockspace_dev_once_the_tool_carrier_l): `work/extension-carriers`
-# carries `Tool::config_keys` and `Tool::configure`, which `tackle` reads; the four mockspace
-# lines go back to `dev` once it lands there.
-mockspace-lint-rules = { git = "https://github.com/hiisi-digital/mockspace.git", branch = "work/extension-carriers" }
+mockspace-lint-rules = { git = "https://github.com/hiisi-digital/mockspace.git", branch = "dev" }
 tree-sitter = "0.24"
 tree-sitter-rust = "0.23.3"
 # `re-export-foreign-names` reads the surface of a re-exported type out of the
@@ -91,7 +88,7 @@ tempfile = "3"
 mockspace-extra-lints = { path = ".", features = ["workflow"] }
 # The engine's own config reader, so a test can load a `mockspace.toml` the way a run does.
 # The same URL spelling as above, for the reason given there.
-mockspace = { git = "https://github.com/hiisi-digital/mockspace.git", branch = "work/extension-carriers" }
+mockspace = { git = "https://github.com/hiisi-digital/mockspace.git", branch = "dev" }
 
 [workspace]
 members = [".", "crates/registry-lints", "crates/ticket-model", "crates/planning", "crates/tools/*"]
@@ -106,9 +103,9 @@ publish = false
 [workspace.dependencies]
 # The trait crate under the name the moved crates use for it, `mockspace`, and the root's spelling of
 # it, for the reason given on the root's own dependency above.
-mockspace = { package = "mockspace-lint-rules", git = "https://github.com/hiisi-digital/mockspace.git", branch = "work/extension-carriers" }
+mockspace = { package = "mockspace-lint-rules", git = "https://github.com/hiisi-digital/mockspace.git", branch = "dev" }
 # The registry's own slug rule, which an id is held to.
-mockspace-registry = { git = "https://github.com/hiisi-digital/mockspace.git", branch = "work/extension-carriers" }
+mockspace-registry = { git = "https://github.com/hiisi-digital/mockspace.git", branch = "dev" }
 # Private, so spelled ssh: over https git waits for a credential nobody supplies.
 muisti = { git = "ssh://git@github.com/orgrinrt/muisti", branch = "dev", default-features = false }
 toml = "1"
