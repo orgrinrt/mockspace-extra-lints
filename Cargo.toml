@@ -19,7 +19,7 @@ publish = false
 # with nothing in the error naming the cause. The engine's generated
 # manifest also carries a `[patch]` keyed on the `https://` spelling,
 # which covers this crate only once the two agree.
-mockspace-lint-rules = { git = "https://github.com/hiisi-digital/mockspace.git", branch = "work/mockspace-lint-one-pass" }
+mockspace-lint-rules = { git = "https://github.com/hiisi-digital/mockspace.git", branch = "dev" }
 tree-sitter = "0.24"
 tree-sitter-rust = "0.23.3"
 # `re-export-foreign-names` reads the surface of a re-exported type out of the
@@ -36,4 +36,4 @@ toml_edit = "0.25"
 tempfile = "3"
 # The engine's own config reader, so a test can load a `mockspace.toml` the way a run does.
 # The same URL spelling as above, for the reason given there.
-mockspace = { git = "https://github.com/hiisi-digital/mockspace.git", branch = "work/mockspace-lint-one-pass" }
+mockspace = { git = "https://github.com/hiisi-digital/mockspace.git", branch = "dev" }
