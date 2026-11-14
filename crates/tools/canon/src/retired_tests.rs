@@ -435,3 +435,36 @@ fn split_under_with_no_path_reads_the_whole_repository_and_with_paths_only_those
     .0;
     assert_eq!(two.len(), 2, "{two:?}");
 }
+
+#[test]
+fn contradicts_reads_no_word_a_demoted_or_held_tenet_rules_out_and_reads_a_stamped_ones() {
+    let d = tree();
+    let held = |standing: &str, stamped: bool| {
+        let mut fields = vec![
+            ("subject", "planet"),
+            ("what", "There is no zorblax."),
+            ("rules_out", "zorblax"),
+            ("standing", standing),
+        ];
+        if stamped {
+            fields.push(("stamped_by", "experts"));
+            fields.push(("stamp", "two experts agreed, ticket `0123456789ab`"));
+        }
+        view(&[("tenet::there_is_no_zorblax", fields.as_slice())])
+    };
+    for (unbound, reg) in [
+        ("demoted", held("demoted", false)),
+        ("held", held("held", false)),
+    ] {
+        let r = run(&reg, &d, &["contradicts"]);
+        let text = answered(&r);
+        assert!(!text.contains("kaski-a/DESIGN.md.tmpl"), "a {unbound} tenet binds nothing: {text}");
+    }
+    // THE CONTROL: the same row ratified, or provisional on a stamp, rules the word out, since a stamp
+    // leaves the row binding as its standing does.
+    for (bound, reg) in [("ratified", held("ratified", false)), ("stamped", held("provisional", true))] {
+        let r = run(&reg, &d, &["contradicts"]);
+        let text = answered(&r);
+        assert!(text.contains("design  mock/crates/kaski-a/DESIGN.md.tmpl:1"), "{bound}: {text}");
+    }
+}

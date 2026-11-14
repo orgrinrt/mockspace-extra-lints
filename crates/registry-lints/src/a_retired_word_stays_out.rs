@@ -43,6 +43,7 @@ use crate::canon_tree::files;
 use crate::gate_config::table;
 use crate::layout::{CONTENT_DIRS, ContentDirs, Layout};
 use crate::retired_words::{Retiring, scanned, split_text, unit_of};
+use crate::standing::binding;
 use crate::touched_lines::{self, Touched};
 
 pub fn repo_lint() -> Box<dyn RepoLint> {
@@ -129,7 +130,7 @@ fn unreadable(why: &str) -> LintError {
 pub fn retiring(reg: &RegistryView) -> Vec<Retiring> {
     reg.rows_in("tenet")
         .iter()
-        .filter(|q| list(reg, q, "superseded_by").is_empty())
+        .filter(|q| binding(reg, q))
         .filter_map(|q| {
             let terms = list(reg, q, "rules_out");
             (!terms.is_empty()).then(|| {

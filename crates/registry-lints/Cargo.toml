@@ -12,3 +12,5 @@ mockspace-registry.workspace = true
 # the ticket and planning rows and the rules over them, which `a-ticket-graph-holds` holds the registry to
 ticket-model.workspace = true
 planning.workspace = true
+# the two fields a provisional stamp is written in, named once for this crate and the stamp lint
+stamp.workspace = true

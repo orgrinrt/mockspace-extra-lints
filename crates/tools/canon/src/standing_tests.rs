@@ -7,31 +7,43 @@
 
 use mockspace::RegistryView;
 use mockspace::tool::Outcome;
+use registry_lints::standing::Standing;
 
 use super::tests::{answered, fixture, run, scratch, view};
-use crate::rows::{Standing, tenets};
+use crate::rows::tenets;
 
-/// The tenets of `reg` whose `standing` is missing or outside the set `mockspace.toml` declares.
-fn unstated(reg: &RegistryView) -> Vec<String> {
-    tenets(reg)
-        .into_iter()
-        .filter(|t| t.standing == Standing::Unstated)
-        .map(|t| t.id.to_string())
-        .collect()
+/// The tenets of `reg` whose word the pack does not know, and those it reads as held.
+fn unstated_and_held(reg: &RegistryView) -> (Vec<String>, Vec<String>) {
+    let all = tenets(reg);
+    let ids = |keep: fn(Standing) -> bool| {
+        all.iter()
+            .filter(|t| keep(t.standing))
+            .map(|t| t.id.to_string())
+            .collect::<Vec<_>>()
+    };
+    (
+        ids(|s| s == Standing::Unstated),
+        ids(|s| s == Standing::Held),
+    )
 }
 
 #[test]
-fn a_tenet_with_no_standing_or_a_misspelt_one_is_caught() {
-    // THE CONTROL: the law above, shown failing on rows that break it, and passing the words of the set.
+fn a_missing_or_misspelt_standing_binds_and_a_held_one_binds_nothing() {
+    // A word the pack does not know fails closed: the row stays in every check, so a typo never takes it
+    // out of them.
     let reg = view(&[
         ("tenet::bare", &[("what", "No standing at all.")]),
-        ("tenet::misspelt", &[
+        ("tenet::cap", &[
             ("standing", "Provisional"),
-            ("what", "Capitalised."),
+            ("what", "A misspelt word of the set."),
         ]),
         ("tenet::guessed", &[
             ("standing", "settled"),
             ("what", "A word outside the set."),
+        ]),
+        ("tenet::held", &[
+            ("standing", "held"),
+            ("what", "Brought to the maintainer."),
         ]),
         ("tenet::fine", &[
             ("standing", "provisional"),
@@ -46,7 +58,42 @@ fn a_tenet_with_no_standing_or_a_misspelt_one_is_caught() {
             ("what", "In the set."),
         ]),
     ]);
-    assert_eq!(unstated(&reg), ["bare", "guessed", "misspelt"]);
+    let (unstated, held) = unstated_and_held(&reg);
+    assert_eq!(unstated, ["bare", "cap", "guessed"]);
+    assert_eq!(held, ["held"]);
+    let all = tenets(&reg);
+    let row = |id: &str| all.iter().find(|t| t.id == id).expect(id);
+    for id in ["bare", "cap", "guessed"] {
+        assert!(row(id).binds(), "{id}: a row whose standing the pack cannot read stays in the checks");
+    }
+    // THE CONTROL: the words of the set read as themselves, held and demoted binding nothing.
+    assert!(!row("held").binds());
+    assert_eq!(row("held").standing.word(), "held");
+    assert!(row("fine").binds() && row("done").binds() && !row("shelved").binds());
+}
+
+#[test]
+fn check_blocks_on_a_held_row() {
+    let reg = view(&[
+        ("tenet::kept", &[("standing", "provisional"), ("what", "Matters now.")]),
+        ("tenet::held", &[("standing", "held"), ("what", "Nobody backs it.")]),
+    ]);
+    let r = run(&reg, &scratch(), &["check", "kept", "held"]);
+    match &r.outcome {
+        Outcome::Findings(f) => {
+            assert_eq!(f.len(), 1, "{f:?}");
+            assert!(
+                f[0].message.contains("`held` is held")
+                    && f[0].message.contains("binds nothing"),
+                "{}",
+                f[0].message
+            );
+        },
+        other => panic!("{other:?}"),
+    }
+    // THE CONTROL: the provisional row alone is clean.
+    let r = run(&reg, &scratch(), &["check", "kept"]);
+    assert!(matches!(r.outcome, Outcome::Clean { .. }), "{:?}", r.outcome);
 }
 
 #[test]
@@ -184,4 +231,175 @@ fn a_demoted_row_binds_nothing_and_has_no_heir() {
     // THE CONTROL: the provisional row binds.
     assert!(row("kept").binds());
     assert!(crate::rows::heirs(&all).is_empty());
+}
+
+/// A provisional row beside a stamped one of `standing`: a stamp is as good as the maintainer's word for
+/// now and never a ratification, so the stamped row keeps its standing and binds as that standing does.
+fn waiting_as(standing: &str) -> RegistryView {
+    view(&[
+        ("subject::time", &[("what", "The clock.")]),
+        ("tenet::kept", &[
+            ("standing", "provisional"),
+            ("subject", "time"),
+            ("what", "Matters now."),
+        ]),
+        ("tenet::asked", &[
+            ("standing", standing),
+            ("stamped_by", "experts"),
+            ("stamp", "two experts agreed, recorded in ROWS.md, ticket `0123456789ab`"),
+            ("subject", "time"),
+            ("what", "Waits on the maintainer."),
+        ]),
+    ])
+}
+
+fn waiting() -> RegistryView {
+    waiting_as("provisional")
+}
+
+#[test]
+fn a_stamped_row_keeps_its_standing_and_binds_as_it_does() {
+    let reg = waiting();
+    let all = tenets(&reg);
+    let row = |id: &str| all.iter().find(|t| t.id == id).expect(id);
+    assert_eq!(row("asked").standing, Standing::Provisional);
+    assert!(row("asked").stamped());
+    assert!(row("asked").binds());
+    assert!(!row("asked").replaced());
+    assert!(crate::rows::heirs(&all).is_empty());
+    // THE CONTROL: the same stamped row held binds nothing, so the standing decides and the stamp does not.
+    let held = waiting_as("held");
+    let all = tenets(&held);
+    assert!(!all.iter().find(|t| t.id == "asked").expect("asked").binds());
+}
+
+#[test]
+fn check_passes_a_stamped_row_and_notes_its_stamp_and_ticket() {
+    let r = run(&waiting(), &scratch(), &["check", "kept", "asked"]);
+    assert!(matches!(r.outcome, Outcome::Clean { .. }), "{:?}", r.outcome);
+    assert!(!r.outcome.blocks(mockspace::LintMode::Push));
+    assert!(
+        r.output.contains(
+            "`asked` is provisional, stamped by experts, not ratified, asked in ticket `0123456789ab`"
+        ) && r.output.contains("never a ratification"),
+        "{}",
+        r.output
+    );
+    // THE CONTROL: the unstamped provisional row is noted with no stamp and no ticket.
+    assert!(r.output.contains("`kept` is provisional, not ratified\n"), "{}", r.output);
+}
+
+#[test]
+fn a_stamp_naming_no_ticket_is_noted_as_naming_none() {
+    let reg = view(&[("tenet::asked", &[
+        ("standing", "provisional"),
+        ("stamped_by", "experts"),
+        ("stamp", "two experts agreed, recorded in ROWS.md"),
+        ("what", "Waits on the maintainer."),
+    ])]);
+    let r = run(&reg, &scratch(), &["check", "asked"]);
+    assert!(
+        r.output.contains("stamped by experts, not ratified, naming no question ticket"),
+        "{}",
+        r.output
+    );
+    // THE CONTROL: the stamp lint is what refuses such a row; the canon tool notes it and passes.
+    assert!(matches!(r.outcome, Outcome::Clean { .. }), "{:?}", r.outcome);
+}
+
+#[test]
+fn a_listing_marks_a_stamped_row_and_the_subjects_count_it_binding() {
+    let reg = waiting();
+    let time = answered(&run(&reg, &scratch(), &["subject", "time"])).to_string();
+    let asked = time
+        .lines()
+        .find(|l| l.trim_start().starts_with("asked"))
+        .unwrap_or_default();
+    assert!(asked.contains("(provisional, stamped)"), "{time}");
+    let found = answered(&run(&reg, &scratch(), &["find", "maintainer"])).to_string();
+    assert!(found.contains("(provisional, stamped)"), "{found}");
+    let subs = answered(&run(&reg, &scratch(), &["subjects"])).to_string();
+    assert!(subs.contains("2 tenets, 2 binding, 0 ratified"), "{subs}");
+    // THE CONTROL: held in its place, the stamped row no longer counts.
+    let subs = answered(&run(&waiting_as("held"), &scratch(), &["subjects"])).to_string();
+    assert!(subs.contains("2 tenets, 1 binding, 0 ratified"), "{subs}");
+}
+
+#[test]
+fn a_row_on_any_route_is_noted_as_stamped_and_never_as_ratified() {
+    for route in stamp::ROUTES {
+        let reg = view(&[("tenet::asked", &[
+            ("standing", "provisional"),
+            ("stamped_by", route),
+            ("stamp", "recorded at `OP-ANSWERS-18.md:5`, ticket `0123456789ab`"),
+            ("what", "Waits on the maintainer."),
+        ])]);
+        let r = run(&reg, &scratch(), &["check", "asked"]);
+        assert!(matches!(r.outcome, Outcome::Clean { .. }), "{route}: {:?}", r.outcome);
+        assert!(
+            r.output.contains(&format!("`asked` is provisional, stamped by {route}, not ratified")),
+            "{route}: {}",
+            r.output
+        );
+    }
+    // THE CONTROL: a ratified row carrying the same stamp is not noted as unratified, so the note above
+    // comes from the standing and the route cannot turn it off.
+    let reg = view(&[("tenet::asked", &[
+        ("standing", "ratified"),
+        ("stamped_by", "maintainer"),
+        ("stamp", "recorded at `OP-ANSWERS-18.md:5`, ticket `0123456789ab`"),
+        ("what", "Ratified."),
+    ])]);
+    let r = run(&reg, &scratch(), &["check", "asked"]);
+    assert!(!r.output.contains("not ratified"), "{}", r.output);
+}
+
+#[test]
+fn check_blocks_on_a_missing_or_misspelt_standing_that_the_word_lints_still_read_as_binding() {
+    let reg = view(&[
+        ("tenet::bare", &[("what", "No standing at all.")]),
+        ("tenet::cap", &[("standing", "Held"), ("what", "A misspelt word of the set.")]),
+        ("tenet::kept", &[("standing", "provisional"), ("what", "Matters now.")]),
+    ]);
+    let r = run(&reg, &scratch(), &["check", "bare", "cap", "kept"]);
+    match &r.outcome {
+        Outcome::Findings(f) => {
+            assert_eq!(f.len(), 2, "{f:?}");
+            for (row, id) in f.iter().zip(["bare", "cap"]) {
+                assert!(
+                    row.message.contains(&format!("`{id}` states no standing the pack reads")),
+                    "{}",
+                    row.message
+                );
+            }
+        },
+        other => panic!("{other:?}"),
+    }
+    let all = tenets(&reg);
+    assert!(all.iter().all(|t| t.binds()), "the word lints keep reading both as binding");
+    // THE CONTROL: the provisional row alone is clean.
+    let r = run(&reg, &scratch(), &["check", "kept"]);
+    assert!(matches!(r.outcome, Outcome::Clean { .. }), "{:?}", r.outcome);
+}
+
+#[test]
+fn the_standing_words_are_the_values_the_pack_schema_declares() {
+    // The schema refuses a word the tool does not read and the tool reads none the schema refuses,
+    // only while the two lists are the same list.
+    let schema: toml::Table = include_str!("../../../../registry/namespaces.toml").parse().unwrap();
+    let field = schema["registry"]["namespace"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|ns| ns["key"].as_str() == Some("tenet"))
+        .flat_map(|ns| ns["field"].as_array().into_iter().flatten())
+        .find(|f| f["name"].as_str() == Some("standing"))
+        .expect("the pack schema declares the tenet's `standing`");
+    let declared: Vec<&str> = field["values"]
+        .as_array()
+        .expect("`standing` declares its values")
+        .iter()
+        .filter_map(|v| v.as_str())
+        .collect();
+    assert_eq!(declared, Standing::WORDS);
 }
