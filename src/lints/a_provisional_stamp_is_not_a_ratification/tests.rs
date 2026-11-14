@@ -24,8 +24,14 @@ fn run_with(
     rows: &[(&str, &[(&str, &str)])],
 ) -> Vec<LintError> {
     let dir = TempDir::new().unwrap();
+    // The passage every maintainer stamp here cites, nine lines long.
+    std::fs::create_dir_all(dir.path().join("research")).unwrap();
+    std::fs::write(dir.path().join(PASSAGE), "line\n".repeat(9)).unwrap();
     run_repo_lint_in(lint, dir.path(), &BTreeSet::new(), &registry(rows), &[])
 }
+
+/// The file the tests' maintainer stamps cite, written by `run_with` with nine lines.
+const PASSAGE: &str = "research/OP-ANSWERS-18.md";
 
 fn run(rows: &[(&str, &[(&str, &str)])]) -> Vec<LintError> {
     run_with(&AProvisionalStampIsNotARatification::default(), rows)
@@ -110,6 +116,45 @@ fn control_a_passage_with_a_line_range_is_a_passage() {
     let s = "He directed it at `research/OP-ANSWERS-18.md:5-9`; ticket `000000000000`.";
     let f = run(&[("proposal::p", &[("stamped_by", "maintainer"), ("stamp", s)])]);
     assert!(f.is_empty(), "{f:?}");
+}
+
+#[test]
+fn a_passage_the_repository_does_not_have_is_reported() {
+    for cited in [
+        "research/NO-SUCH-FILE.md:5",
+        "no-such-dir/OP-ANSWERS-18.md:5",
+        "research/OP-ANSWERS-18.md:10",
+        "research/OP-ANSWERS-18.md:5-12",
+    ] {
+        let s = format!("He directed it at `{cited}`; ticket `000000000000`.");
+        let f = run(&[("proposal::p", &[("stamped_by", "maintainer"), ("stamp", &s)])]);
+        assert_eq!(kinds(&f), ["passage-not-found"], "{cited}: {f:?}");
+    }
+}
+
+#[test]
+fn control_a_passage_up_to_the_files_last_line_is_there() {
+    for cited in ["research/OP-ANSWERS-18.md:9", "research/OP-ANSWERS-18.md:1-9"] {
+        let s = format!("He directed it at `{cited}`; ticket `000000000000`.");
+        let f = run(&[("proposal::p", &[("stamped_by", "maintainer"), ("stamp", &s)])]);
+        assert!(f.is_empty(), "{cited}: {f:?}");
+    }
+}
+
+#[test]
+fn a_route_no_stamp_names_is_reported() {
+    for by in ["Maintainer", "maintainers", "op", "expert", "coordinator"] {
+        let f = run(&[("proposal::p", &[("stamped_by", by), ("stamp", whole("experts"))])]);
+        assert_eq!(kinds(&f), ["unknown-route"], "{by}: {f:?}");
+    }
+}
+
+#[test]
+fn control_every_route_is_known() {
+    for by in ROUTES {
+        let f = run(&[("proposal::p", &[("stamped_by", by), ("stamp", whole(by))])]);
+        assert!(f.is_empty(), "{by}: {f:?}");
+    }
 }
 
 #[test]
@@ -342,12 +387,20 @@ fn a_project_names_its_own_words() {
 #[test]
 fn every_finding_blocks() {
     // One planted row per kind, so a kind that stopped blocking is caught.
-    let plants: [(&str, Vec<(&str, &[(&str, &str)])>); 7] = [
+    let plants: [(&str, Vec<(&str, &[(&str, &str)])>); 9] = [
         ("half", vec![("proposal::p", &[("stamp", "x")])]),
         ("no-ticket", vec![("proposal::p", &[("stamped_by", "experts"), ("stamp", "x")])]),
         ("no-passage", vec![("proposal::p", &[
             ("stamped_by", "maintainer"),
             ("stamp", "ticket `000000000000`"),
+        ])]),
+        ("unknown-route", vec![("proposal::p", &[
+            ("stamped_by", "op"),
+            ("stamp", "ticket `000000000000`"),
+        ])]),
+        ("passage-not-found", vec![("proposal::p", &[
+            ("stamped_by", "maintainer"),
+            ("stamp", "at `research/NO-SUCH-FILE.md:5`, ticket `000000000000`"),
         ])]),
         ("on-a-ratified-row", vec![("ruling::r", &[
             ("rung", "ratified"),

@@ -37,7 +37,8 @@ pub const MAINTAINER: &str = "maintainer";
 pub const TICKET: &str = "ticket";
 
 /// The id of the question ticket `stamp` names, the first where it names several, or nothing where it
-/// names none. An id is one word in backticks after the word `ticket`, so an empty or spaced one is not.
+/// names none. An id is one word in backticks after the word `ticket`, padding trimmed, so an empty
+/// id or one with a space inside it is not.
 pub fn ticket(stamp: &str) -> Option<&str> {
     stamp.match_indices(TICKET).find_map(|(at, _)| {
         let rest = stamp[at + TICKET.len() ..].trim_start();

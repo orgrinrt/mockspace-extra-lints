@@ -381,3 +381,25 @@ fn check_blocks_on_a_missing_or_misspelt_standing_that_the_word_lints_still_read
     let r = run(&reg, &scratch(), &["check", "kept"]);
     assert!(matches!(r.outcome, Outcome::Clean { .. }), "{:?}", r.outcome);
 }
+
+#[test]
+fn the_standing_words_are_the_values_the_pack_schema_declares() {
+    // The schema refuses a word the tool does not read and the tool reads none the schema refuses,
+    // only while the two lists are the same list.
+    let schema: toml::Table = include_str!("../../../../registry/namespaces.toml").parse().unwrap();
+    let field = schema["registry"]["namespace"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|ns| ns["key"].as_str() == Some("tenet"))
+        .flat_map(|ns| ns["field"].as_array().into_iter().flatten())
+        .find(|f| f["name"].as_str() == Some("standing"))
+        .expect("the pack schema declares the tenet's `standing`");
+    let declared: Vec<&str> = field["values"]
+        .as_array()
+        .expect("`standing` declares its values")
+        .iter()
+        .filter_map(|v| v.as_str())
+        .collect();
+    assert_eq!(declared, Standing::WORDS);
+}

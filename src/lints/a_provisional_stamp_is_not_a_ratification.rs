@@ -15,8 +15,12 @@
 //!   record, cannot be checked against what decided it.
 //! - `no-ticket`: a `stamp` naming no ticket, written as the word `ticket` and the id in
 //!   backticks. A stamp he is never asked about stays provisional forever.
+//! - `unknown-route`: a `stamped_by` naming none of the three routes. A misspelt route would
+//!   slip past every check the route it meant is held to.
 //! - `no-passage`: a stamp by the maintainer citing no passage of his as a backticked
 //!   `<path>:<line>`. His direction is the whole of what decided it, so it is cited.
+//! - `passage-not-found`: a cited passage whose file the repository does not have, or whose line
+//!   is past the file's end. A citation nobody can open cites nothing.
 //! - `on-a-ratified-row`: a stamp on a row at the ratified tier. Ratified and provisional at once
 //!   is one of them wrong; when he ratifies it the stamp comes off.
 //! - `not-stampable`: where `stampable` names the tiers a stamp may sit on, a stamp on a row at any
@@ -45,7 +49,7 @@ pub const NAME: &str = "a-provisional-stamp-is-not-a-ratification";
 /// The two fields the stamp is written in, the routes and the ticket word, from the crate the canon
 /// tool reads stamps through too. Fixed rather than configured: they are the shape the projects that
 /// carry a stamp agreed on, and a second spelling would be a second mechanism.
-use mockspace_extra_stamp::{MAINTAINER, STAMP, STAMPED_BY, TICKET};
+use mockspace_extra_stamp::{MAINTAINER, ROUTES, STAMP, STAMPED_BY, TICKET};
 
 /// The configuration keys.
 const NAMESPACES_KEY: &str = "namespaces";
@@ -142,17 +146,24 @@ fn present<'a>(reg: &'a RegistryView, q: &str, field: &str) -> Option<&'a str> {
     reg.field(q, field).filter(|v| !v.trim().is_empty())
 }
 
-/// Whether a stamp cites a passage: a backticked `<path>:<line>`, the path holding a dot.
-fn cites_a_passage(stamp: &str) -> bool {
-    stamp.split('`').skip(1).step_by(2).any(|span| {
-        span.rsplit_once(':').is_some_and(|(path, line)| {
-            path.contains('.')
-                && !path.contains(char::is_whitespace)
-                && !line.is_empty()
-                && line.chars().all(|c| c.is_ascii_digit() || c == '-')
-                && line.starts_with(|c: char| c.is_ascii_digit())
-        })
+/// The passages a stamp cites, each a backticked `<path>:<line>` or `<path>:<first>-<last>`, the
+/// path holding a dot, with the last line the citation reaches.
+fn passages(stamp: &str) -> impl Iterator<Item = (&str, usize)> {
+    stamp.split('`').skip(1).step_by(2).filter_map(|span| {
+        let (path, line) = span.rsplit_once(':')?;
+        if !path.contains('.') || path.contains(char::is_whitespace) {
+            return None;
+        }
+        let (first, last) = line.split_once('-').unwrap_or((line, ""));
+        let first: usize = first.parse().ok()?;
+        let last: usize = if last.is_empty() { first } else { last.parse().ok()? };
+        (first >= 1 && last >= first).then_some((path, last))
     })
+}
+
+/// Whether the repository has the file a passage names and the line it reaches.
+fn passage_is_there(ctx: &RepoContext, path: &str, last: usize) -> bool {
+    ctx.view().text(ctx.repo_root.join(path)).is_some_and(|t| t.lines().count() >= last)
 }
 
 fn finding(kind: &'static str, message: String) -> LintError {
@@ -225,15 +236,38 @@ impl RepoLint for AProvisionalStampIsNotARatification {
                     )),
                     _ => {},
                 }
-                if by == Some(MAINTAINER) && stamp.is_some_and(|s| !cites_a_passage(s)) {
+                if let Some(b) = by.map(str::trim).filter(|b| !ROUTES.contains(b)) {
                     out.push(finding(
-                        "no-passage",
+                        "unknown-route",
                         format!(
-                            "`{q}` is stamped by the {MAINTAINER} and its `{STAMP}` cites no \
-                             passage of his. Name where he directed it, as a backticked \
-                             `<path>:<line>`."
+                            "`{q}`'s `{STAMPED_BY}` is `{b}`, which names no route onto a stamp. \
+                             Write one of {}.",
+                            ROUTES.join(", ")
                         ),
                     ));
+                }
+                if let (Some(MAINTAINER), Some(s)) = (by.map(str::trim), stamp) {
+                    let cited: Vec<_> = passages(s).collect();
+                    if cited.is_empty() {
+                        out.push(finding(
+                            "no-passage",
+                            format!(
+                                "`{q}` is stamped by the {MAINTAINER} and its `{STAMP}` cites no \
+                                 passage of his. Name where he directed it, as a backticked \
+                                 `<path>:<line>`."
+                            ),
+                        ));
+                    }
+                    for (path, last) in cited.into_iter().filter(|(p, l)| !passage_is_there(ctx, p, *l)) {
+                        out.push(finding(
+                            "passage-not-found",
+                            format!(
+                                "`{q}`'s `{STAMP}` cites `{path}` to line {last}, and the \
+                                 repository has no such file or the file ends before it. Cite \
+                                 the passage where it is, from the repository root."
+                            ),
+                        ));
+                    }
                 }
                 let tier = reg.field(q, &self.tier_field).map(str::trim);
                 if tier == Some(self.ratified.as_str()) {
