@@ -43,7 +43,7 @@ mod tree;
 mod verbs;
 
 pub use names::named;
-pub use rows::{Standing, Tenet, carries, heirs, joined_to, subjects, tenets};
+pub use rows::{Tenet, carries, heirs, joined_to, subjects, tenets};
 pub use tree::{Line, Tier, mentions, tier_of};
 
 /// The check, holding the content directories `[tools.canon]` names, which are read as the content tier.
@@ -90,7 +90,7 @@ impl Tool for Canon {
             ArgSpec {
                 name:        "term",
                 required:    false,
-                description: "the subject, the word, the row (a bare id, or `namespace::id`) or the tenet the verb asks about; `check` takes one or more tenets, names each provisional one as provisional and still exits 0, and exits 1 on one that is no tenet, is superseded or is demoted; `contradicts` takes any number of paths, read in one pass, and with none reads the whole repository; `forbids` with none lists the replaced tenets that name no word they rule out; `show`, `find`, `related` and `citers` read every namespace of the registry, and `--in <namespace>[,<namespace>]` narrows them, `canon` standing for the namespaces `canon_paths` reaches",
+                description: "the subject, the word, the row (a bare id, or `namespace::id`) or the tenet the verb asks about; `check` takes one or more tenets, names each provisional one as provisional and still exits 0, and exits 1 on one that is no tenet, is superseded, or is held or demoted, and so binds nothing, or states no standing the pack reads; a stamped row keeps its standing and is noted with its stamp; `contradicts` takes any number of paths, read in one pass, and with none reads the whole repository; `forbids` with none lists the replaced tenets that name no word they rule out; `show`, `find`, `related` and `citers` read every namespace of the registry, and `--in <namespace>[,<namespace>]` narrows them, `canon` standing for the namespaces `canon_paths` reaches",
             },
         ]
     }
@@ -181,8 +181,8 @@ fn scope_of(ctx: &ToolContext<'_>, verb: &str) -> Result<Scope, String> {
 /// `check <id>...`: silent when every tenet named exists, still binds and is ratified; one line naming each
 /// provisional one, which is no finding and exits 0, since a tenet that matters now is provisional until
 /// the maintainer goes through it and nothing would pass otherwise; one blocking finding for each that is no tenet, is
-/// superseded or is demoted. A brief names the rows its job derives from, and a job built on a row that
-/// is gone, replaced or demoted is built on nothing, so the coordinator asks before it dispatches.
+/// superseded, is held or demoted, or states no standing the pack reads; a stamped one is noted with its stamp and passes as its standing does. A brief names the rows its job derives from, and a job built on a row that
+/// is gone, replaced, held or demoted is built on nothing, so the coordinator asks before it dispatches.
 fn check_report(ids: &[&str], registry: &RegistryView) -> ToolReport {
     if ids.is_empty() {
         return ToolReport::inconclusive("`canon check` wants one or more tenet ids");

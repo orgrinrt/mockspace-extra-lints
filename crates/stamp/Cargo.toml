@@ -1,0 +1,9 @@
+[package]
+name = "mockspace-extra-stamp"
+description = "The shape of a provisional stamp on a registry row, named once for the lint that holds rows to it and the tools that read it."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]

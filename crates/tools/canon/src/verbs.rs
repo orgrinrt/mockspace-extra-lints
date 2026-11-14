@@ -13,9 +13,10 @@ use std::fmt::Write as _;
 use std::path::Path;
 
 use mockspace::RegistryView;
+use registry_lints::standing::{STAMPED, Standing};
 
 use crate::layout::Layout;
-use crate::rows::{Standing, Tenet, carries, subjects, tenets};
+use crate::rows::{Tenet, carries, subjects, tenets};
 use crate::scope::Scope;
 use crate::tree::mentions;
 use crate::{VERBS, reference};
@@ -96,11 +97,13 @@ pub(crate) fn gist(what: &str) -> String {
     format!("{}...", &cut[.. at])
 }
 
-/// One tenet as a listing line, marked with its standing where the maintainer has not ratified it and with what
-/// replaced it where it is superseded.
+/// One tenet as a listing line, marked with its standing where the maintainer has not ratified it, with its stamp
+/// where it carries one and with what replaced it where it is superseded.
 pub(crate) fn line(out: &mut String, t: &Tenet<'_>, width: usize) {
     let mut note = gist(t.what);
-    if t.standing != Standing::Ratified {
+    if t.stamped() {
+        note = format!("({}, stamped) {note}", t.standing.word());
+    } else if t.standing != Standing::Ratified {
         note = format!("({}) {note}", t.standing.word());
     }
     if t.replaced() {
@@ -255,13 +258,29 @@ pub fn unratified(all: &[Tenet<'_>], ids: &[&str]) -> Vec<String> {
             let id = raw.strip_prefix("tenet::").unwrap_or(raw);
             all.iter()
                 .find(|t| t.id == id && t.binds() && t.standing != Standing::Ratified)
-                .map(|t| format!("`{id}` is {}, not ratified", t.standing.word()))
+                .map(|t| {
+                    if t.stamped() {
+                        let by = if t.stamped_by.is_empty() { "nobody named" } else { t.stamped_by };
+                        let asked = t.ticket().map_or_else(
+                            || "naming no question ticket".to_string(),
+                            |k| format!("asked in ticket `{k}`"),
+                        );
+                        format!(
+                            "`{id}` is {}, stamped by {by}, not ratified, {asked}: {STAMPED}",
+                            t.standing.word()
+                        )
+                    } else {
+                        format!("`{id}` is {}, not ratified", t.standing.word())
+                    }
+                })
         })
         .collect()
 }
 
 /// What is wrong with the tenets `ids` name, one line each: an id that is no tenet, an id whose tenet
-/// something supersedes, and an id whose tenet is demoted and binds nothing. A `tenet::` prefix is the
+/// something supersedes, an id whose tenet is held or demoted and binds nothing, and an id whose tenet
+/// states no standing the pack reads, which the word lints read as binding so it never slips out of
+/// them, and which a brief must not rest on until it is written. A `tenet::` prefix is the
 /// namespace and is read off, as a citation spells it. Empty when every id names a tenet that still
 /// binds, provisional or ratified.
 pub fn check(all: &[Tenet<'_>], ids: &[&str]) -> Vec<String> {
@@ -280,11 +299,14 @@ pub fn check(all: &[Tenet<'_>], ids: &[&str]) -> Vec<String> {
                         t.superseded_by.join(", ")
                     ))
                 },
-                Some(t) if !t.binds() => {
+                Some(t) if t.standing == Standing::Unstated => {
                     Some(format!(
-                        "`{id}` is {}: kept as reference for a later canon of its domain, it binds nothing",
-                        t.standing.word()
+                        "`{id}` states no standing the pack reads; write one of {}",
+                        Standing::WORDS.join(", ")
                     ))
+                },
+                Some(t) if !t.binds() => {
+                    Some(format!("`{id}` is {}: {}", t.standing.word(), t.standing.unbound()))
                 },
                 Some(_) => None,
             }

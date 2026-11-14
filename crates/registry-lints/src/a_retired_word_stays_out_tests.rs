@@ -290,3 +290,31 @@ fn lint() -> ARetiredWordStaysOut {
         content: crate::layout::ContentDirs::new(&["content"]),
     }
 }
+
+#[test]
+fn a_demoted_or_held_tenet_rules_nothing_out_and_the_same_row_ratified_or_stamped_does() {
+    let d = scratch("retired-word-stamped");
+    write(&d, "mock/crates/kaski-a/DESIGN.md.tmpl", "the quillfern stands\n");
+    let held = |standing: &str, stamped: bool| {
+        let mut fields = vec![("rules_out", "quillfern"), ("standing", standing)];
+        if stamped {
+            fields.push(("stamped_by", "coordinators"));
+            fields.push(("stamp", "the coordinators converged, ticket `0123456789ab`"));
+        }
+        view(&[("tenet::there_is_no_quillfern", fields.as_slice())])
+    };
+    for (unbound, reg) in [
+        ("demoted", held("demoted", false)),
+        ("held", held("held", false)),
+    ] {
+        let found = checked(&d, &reg, &config(&[]), &Change::default());
+        assert!(found.is_empty(), "a {unbound} tenet binds nothing: {found:?}");
+    }
+    // THE CONTROL: the same row ratified, or provisional on a stamp, rules the word out, since a stamp
+    // leaves the row binding as its standing does.
+    for (bound, reg) in [("ratified", held("ratified", false)), ("stamped", held("provisional", true))] {
+        let found = checked(&d, &reg, &config(&[]), &Change::default());
+        assert_eq!(found.len(), 1, "{bound}: {found:?}");
+        assert!(found[0].message.contains("there_is_no_quillfern"), "{bound}");
+    }
+}

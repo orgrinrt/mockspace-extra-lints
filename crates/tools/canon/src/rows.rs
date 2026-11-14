@@ -11,59 +11,24 @@
 use std::collections::BTreeMap;
 
 use mockspace::RegistryView;
+use registry_lints::standing::Standing;
 
 /// The separator the engine joins a list field with.
 const JOIN: &str = ", ";
-
-/// Whether the maintainer has ratified a tenet, or demoted it, read from its `standing`. The set is the one
-/// `mockspace.toml` declares for the field, closed there, and named here once.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Standing {
-    /// It matters now and the maintainer has not ratified it yet: the best current statement, never
-    /// cited as settled.
-    Provisional,
-    /// The maintainer went through it on a named date, with the answer in the row's `answers`.
-    Ratified,
-    /// The maintainer does not go through it now: kept as reference for a later canon of its domain, binding
-    /// nothing.
-    Demoted,
-    /// The field is absent or holds a word outside the set, which the schema refuses; read so a test
-    /// over the committed rows can say which.
-    Unstated,
-}
-
-impl Standing {
-    /// The words of the set, as a row writes them.
-    pub const WORDS: [&'static str; 3] = ["provisional", "ratified", "demoted"];
-
-    /// The standing a row's `standing` field spells.
-    pub const fn of(word: &str) -> Self {
-        match word.as_bytes() {
-            b"provisional" => Self::Provisional,
-            b"ratified" => Self::Ratified,
-            b"demoted" => Self::Demoted,
-            _ => Self::Unstated,
-        }
-    }
-
-    /// The word a listing shows for it.
-    pub const fn word(self) -> &'static str {
-        match self {
-            Self::Provisional => "provisional",
-            Self::Ratified => "ratified",
-            Self::Demoted => "demoted",
-            Self::Unstated => "unstated",
-        }
-    }
-}
 
 /// One tenet, as the verbs read it.
 pub struct Tenet<'a> {
     /// Its id, the slug every citation names.
     pub id:            &'a str,
-    /// Whether the maintainer has ratified it or demoted it. Apart from `superseded_by`: a superseded row does not
-    /// bind whatever its standing.
+    /// Whether the maintainer has ratified it, holds it for himself or demoted it. Apart from
+    /// `superseded_by`: a superseded row does not bind whatever its standing.
     pub standing:      Standing,
+    /// Who stamped it provisionally, empty where nobody did. A stamp is never a ratification and changes
+    /// nothing about whether the row binds.
+    pub stamped_by:    &'a str,
+    /// The stamp: what was stamped, why, where it is recorded and the question ticket asking the
+    /// maintainer, empty where there is none.
+    pub stamp:         &'a str,
     /// The subject it names, where it names one.
     pub subject:       Option<&'a str>,
     /// The tenets that replace it, empty while it binds.
@@ -83,9 +48,19 @@ pub struct Tenet<'a> {
 }
 
 impl Tenet<'_> {
-    /// Whether it still binds: nothing supersedes it and it is not demoted.
+    /// Whether it still binds: nothing supersedes it and its standing binds.
     pub fn binds(&self) -> bool {
-        !self.replaced() && self.standing != Standing::Demoted
+        !self.replaced() && self.standing.binds()
+    }
+
+    /// Whether it carries a provisional stamp, which keeps its standing and is never a ratification.
+    pub fn stamped(&self) -> bool {
+        !self.stamped_by.is_empty() || !self.stamp.is_empty()
+    }
+
+    /// The question ticket its stamp names, where it names one.
+    pub fn ticket(&self) -> Option<&str> {
+        stamp::ticket(self.stamp)
     }
 
     /// Whether another tenet replaces it, which is what a supersession chain follows. A demoted row is
@@ -168,6 +143,8 @@ pub fn tenets(reg: &RegistryView) -> Vec<Tenet<'_>> {
             Tenet {
                 id:            slug(q),
                 standing:      Standing::of(text(reg, q, "standing")),
+                stamped_by:    text(reg, q, stamp::STAMPED_BY),
+                stamp:         text(reg, q, stamp::STAMP),
                 subject:       reg
                     .field(q, "subject")
                     .map(str::trim)
