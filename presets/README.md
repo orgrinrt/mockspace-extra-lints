@@ -24,7 +24,7 @@ paths = ["**/*.rs"]
 exempt_paths = ["**/build.rs", "**/benches/**"]
 ```
 
-`primitive` names the catalogue primitive the overlay configures, `name` the lint it lands on. The file name may differ from `name`, so one lint can carry several policies: `commit-conventional.toml` and `commit-hiisi.toml` both target `commit-style`, and three files target `message-attribution`. A project picks one from each group.
+`primitive` names the catalogue primitive the overlay configures, `name` the lint it lands on. The file name may differ from `name`, so one lint can carry several policies: three files target `message-attribution`. A project picks one from each group.
 
 `ls` the directory for the list. `arvo-types-only`, `no-bare-static-str` and `semantic-alias-nudge` have no preset, because their detection is the lint's own and no primitive exists to configure.
 

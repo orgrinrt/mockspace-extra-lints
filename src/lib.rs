@@ -3,8 +3,8 @@
 //!
 //! Some of it is narrow, the bare-primitive family and the arvo and
 //! strategy-marker rules only mean something to a codebase built on that layer,
-//! and some of it is general, the commit-style and forge-body ones fit any
-//! project that has an opinion about its own git text.
+//! and some of it is general, the forge-body one fits any
+//! project that has an opinion about its own git text. The commit subject convention itself is a builtin of mockspace, `commit-subject`, configured under `[lints.commit-subject]`.
 //!
 //! Consumed by a repo's `mockspace.toml`:
 //!
@@ -52,7 +52,6 @@ pub mod lints {
     pub mod arvo_types_only;
     pub(crate) mod authored_message;
     pub mod catalogue_ignore;
-    pub mod commit_style;
     pub mod forge_body;
     pub mod lint_allow_requires_task_id;
     pub mod message_attribution;
@@ -85,7 +84,6 @@ pub mod lints {
 
 use lints::arvo_types_only::ArvoTypesOnly;
 use lints::catalogue_ignore::CatalogueIgnore;
-use lints::commit_style::CommitStyle;
 use lints::forge_body::ForgeBody;
 use lints::lint_allow_requires_task_id::LintAllowRequiresTaskId;
 use lints::message_attribution::MessageAttribution;
@@ -197,7 +195,6 @@ mod own {
         // Both carry configuration, so they are constructed rather than named as
         // unit structs. The macro takes expressions for exactly this case.
         message_lints: [
-            CommitStyle::default(),
             ForgeBody::default(),
             MessageAttribution::default(),
         ],

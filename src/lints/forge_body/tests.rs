@@ -164,10 +164,6 @@ fn the_lint_asks_the_host_for_the_invocation() {
         ForgeBody::default().invocation_wanted(),
         "the lint reads a command it never asked for"
     );
-    assert!(
-        super::super::commit_style::CommitStyle::default().invocation_wanted(),
-        "the subject lint reads a command it never asked for"
-    );
 }
 
 #[test]
