@@ -84,6 +84,10 @@ impl Lint for ReExportForeignNames {
     fn default_severity(&self) -> Severity {
         Severity::HARD_ERROR
     }
+
+    fn finding_kinds(&self) -> &[&str] {
+        &[UNREAD]
+    }
 }
 
 /// What the crate as a whole knows, gathered before any file is judged.

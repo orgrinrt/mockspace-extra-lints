@@ -508,4 +508,21 @@ mod tests {
         assert!(err.contains("no Cargo.toml in"), "{err}");
         assert!(err.contains("repo/mock"), "{err}");
     }
+
+
+    #[test]
+    fn cargo_words_about_a_source_not_fetched_are_unfetched() {
+        assert!(unfetched("error: no matching package named `x` found\nlocation searched: registry\nas offline mode is enabled"));
+        assert!(unfetched("error: failed to get `x` as a dependency\n--offline was specified"));
+    }
+
+    #[test]
+    fn cargo_words_that_are_not_about_fetching_are_not_unfetched() {
+        // The control a body of `true` fails: a manifest that is missing or wrong says nothing of what
+        // this machine has fetched, and reading it as unread would turn a broken workspace into a
+        // warning.
+        assert!(!unfetched("error: could not find `Cargo.toml` in `/tmp/x` or any parent directory"));
+        assert!(!unfetched("error: failed to parse manifest at `/tmp/x/Cargo.toml`"));
+        assert!(!unfetched(""));
+    }
 }
