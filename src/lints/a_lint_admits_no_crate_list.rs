@@ -132,7 +132,6 @@ fn check_file(text: &str, rel: &str) -> Vec<LintError> {
 mod tests {
     use std::collections::BTreeSet;
 
-
     use super::*;
 
     const ADMITTING: &str = "[lints.file-size]\ncommit = \"error\"\nbuild = \"error\"\npush = \"error\"\ncrates = [\n    \"a\",\n]\n";
