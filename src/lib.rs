@@ -47,6 +47,7 @@ pub mod lints {
     //! with its sources, the workspace as a whole, or one commit message or
     //! forge body.
 
+    pub mod a_lint_admits_no_crate_list;
     pub mod a_provisional_stamp_is_not_a_ratification;
     pub(crate) mod agent_identity;
     pub mod arvo_types_only;
@@ -83,6 +84,7 @@ pub mod lints {
     pub mod writing_style;
 }
 
+use lints::a_lint_admits_no_crate_list::ALintAdmitsNoCrateList;
 use lints::arvo_types_only::ArvoTypesOnly;
 use lints::catalogue_ignore::CatalogueIgnore;
 use lints::commit_style::CommitStyle;
@@ -183,6 +185,7 @@ mod own {
             WritingStyle,
         ],
         repo_lints: [
+            ALintAdmitsNoCrateList,
             CatalogueIgnore::default(),
             AGitDependencyIsNotPinned::default(),
             NoSourceIncludeInTest::default(),
