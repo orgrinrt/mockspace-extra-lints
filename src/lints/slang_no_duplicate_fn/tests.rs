@@ -217,3 +217,17 @@ fn a_threshold_of_zero_does_not_call_two_declarations_copies() {
     write(d.path(), BETA, "module shade;\nfloat g(float3 d) { return d * d; }\n");
     assert_eq!(run(&with("0"), d.path()).len(), 1);
 }
+
+#[test]
+fn a_body_copy_with_its_parameters_renamed_is_not_caught_today() {
+    // FIXME(should_slang_no_duplicate_fn_catch_a_copy_whose_parameters_a): the compared tokens
+    // include the parameter names, so `f(float a)` and `g(float b)` with the same body over
+    // `a` and `b` are not the same body; the docs leave a rename to the near-copy tool, and
+    // the ticket asks whether the lint should normalise parameter names.
+    let renamed = LONG.replace('d', "e");
+    let found = tree(&[
+        (ALPHA, &format!("module light;\npublic float f(float d) {LONG}\n")),
+        (BETA, &format!("module shade;\nfloat g(float e) {renamed}\n")),
+    ]);
+    assert!(found.is_empty(), "{found:?}");
+}
