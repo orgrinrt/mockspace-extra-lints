@@ -32,7 +32,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 use tree_sitter::Node;
 
-use crate::dep_surface::{Dependencies, dependencies, exposures, is_reserved, sources};
+use crate::dep_surface::{
+    Dependencies, UNREAD, dependencies, exposures, is_reserved, sources, unfetched,
+};
 use crate::paths::{
     Imports,
     as_root,
@@ -428,14 +430,26 @@ fn carried_surfaces(
             // The promise cannot be checked, and a check that cannot run says
             // so rather than passing: every re-export below would otherwise
             // read as verified.
+            // Where cargo failed for want of a source this machine has not
+            // fetched, the surface is unread rather than wrong: a warning
+            // naming the fetch, and the next run reads it.
             let (rel, line) = carried.values().next().cloned().unwrap_or_default();
-            out.push(err_in_file(
+            let mut e = err_in_file(
                 ctx,
                 rel,
                 line,
                 NAME,
                 format!("the surfaces this crate re-exports could not be read: {why}"),
-            ));
+            );
+            if unfetched(&why) {
+                e.message.push_str(
+                    ". This machine has not fetched what the lockfile pins, so it is not judged: \
+                     run `cargo fetch` in the workspace and the next run reads it",
+                );
+                e.severity = Severity::ADVISORY;
+                e.finding_kind = Some(UNREAD);
+            }
+            out.push(e);
             return;
         },
     };
