@@ -25,6 +25,22 @@ use crate::paths::{
 };
 use crate::util::txt;
 
+/// The finding kind of a surface `cargo metadata` could not read for want of a
+/// source this machine has not fetched. It is a warning, and a consumer that
+/// sets the lint's severity keeps it one with `findings.unread = "warn"`.
+pub const UNREAD: &str = "unread";
+
+/// How cargo says an offline call needed what this machine has not fetched: a
+/// git checkout, a registry download, the index.
+const UNFETCHED: [&str; 2] = ["offline mode", "--offline was specified"];
+
+/// Whether cargo's words `why` say it failed for want of a source this machine
+/// has not fetched, which says nothing of the manifest.
+#[must_use]
+pub fn unfetched(why: &str) -> bool {
+    UNFETCHED.iter().any(|w| why.contains(w))
+}
+
 /// Where each dependency of a package keeps its source, keyed by the name a
 /// path root spells it with.
 pub struct Dependencies {

@@ -303,6 +303,34 @@ fn a_workspace_that_cannot_be_read_is_reported_rather_than_passed() {
 }
 
 #[test]
+fn a_surface_this_machine_has_not_fetched_is_unread_and_not_a_finding() {
+    // Offline, cargo reads only what this machine fetched: a dependency the
+    // lockfile pins and nothing fetched says nothing of the re-export, so the
+    // lint says the surface is unread, at a warning, and names the fetch.
+    let ws = workspace("pub use face::Face;\n", FACE);
+    std::fs::write(
+        ws.path().join("face/Cargo.toml"),
+        "[package]\nname = \"face\"\nversion = \"0.0.0\"\nedition = \"2021\"\n\n[dependencies]\nnever = { git = \
+         \"https://example.invalid/never.git\" }\n",
+    )
+    .unwrap();
+    let fixture = LintFixture::new("pub use face::Face;\n")
+        .with_crate_name("kit", "kit")
+        .with_crate_prefix("kit")
+        .with_deps(&["face"])
+        .with_workspace_root(ws.path());
+    let hits = ReExportForeignNames.check(&fixture.ctx());
+    assert_eq!(hits.len(), 1, "{:?}", hits.iter().map(|e| &e.message).collect::<Vec<_>>());
+    assert_eq!(hits[0].finding_kind, Some("unread"), "{}", hits[0].message);
+    assert!(
+        !hits[0].severity.is_blocking(mockspace_lint_rules::LintMode::Push),
+        "{}",
+        hits[0].message
+    );
+    assert!(hits[0].message.contains("cargo fetch"), "{}", hits[0].message);
+}
+
+#[test]
 #[ignore = "catalogue: an associated type bound to a foreign type in a trait impl is not reached; \
             a consumer of the impl's method still writes the type"]
 fn an_associated_type_in_a_trait_impl_is_part_of_the_surface() {
