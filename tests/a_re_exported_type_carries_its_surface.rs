@@ -12,11 +12,12 @@
 //! the tier is resolved through `cargo metadata` and a fixture that bypassed
 //! it would test the walk and not the resolution.
 
+use std::collections::HashMap;
 use std::path::Path;
 
 use mockspace_extra_lints::lints::re_export_foreign_names::ReExportForeignNames;
-use mockspace_lint_rules::CrateLint;
-use mockspace_lint_rules::testkit::LintFixture;
+use mockspace_lint_rules::{CrateLint, Lint, LintConfig, LintError, LintMode, LintPack, Severity};
+use mockspace_lint_rules::testkit::{self, LintFixture};
 
 /// A workspace of two crates: `kit`, which re-exports, and `face`, which
 /// declares. `kit_root` is `kit/src/lib.rs`.
@@ -297,9 +298,110 @@ fn a_workspace_that_cannot_be_read_is_reported_rather_than_passed() {
     // reading as verified.
     let kit = "pub use face::Face;\n";
     let dir = tempfile::tempdir().unwrap();
-    let hits = check(dir.path(), kit);
-    assert_eq!(hits.len(), 1, "{hits:?}");
-    assert!(hits[0].contains("could not be read"), "{}", hits[0]);
+    let fixture = LintFixture::new(kit)
+        .with_crate_name("kit", "kit")
+        .with_crate_prefix("kit")
+        .with_deps(&["face"])
+        .with_workspace_root(dir.path());
+    let hits = ReExportForeignNames.check(&fixture.ctx());
+    assert_eq!(hits.len(), 1, "{:?}", hits.iter().map(|e| &e.message).collect::<Vec<_>>());
+    assert!(hits[0].message.contains("could not be read"), "{}", hits[0].message);
+    // A missing manifest says nothing of what this machine has fetched: it is no `unread`
+    // advisory but a finding that blocks the push gate.
+    assert_eq!(hits[0].finding_kind, None, "{}", hits[0].message);
+    assert!(
+        hits[0].severity.is_blocking(mockspace_lint_rules::LintMode::Push),
+        "{}",
+        hits[0].message
+    );
+}
+
+/// A kit whose dependency pins a git source this machine has never fetched, so cargo's offline
+/// read of the workspace fails for want of a fetch.
+fn unfetched_workspace() -> (tempfile::TempDir, LintFixture) {
+    let ws = workspace("pub use face::Face;\n", FACE);
+    std::fs::write(
+        ws.path().join("face/Cargo.toml"),
+        "[package]\nname = \"face\"\nversion = \"0.0.0\"\nedition = \"2021\"\n\n[dependencies]\nnever = { git = \
+         \"https://example.invalid/never.git\" }\n",
+    )
+    .unwrap();
+    let fixture = LintFixture::new("pub use face::Face;\n")
+        .with_crate_name("kit", "kit")
+        .with_crate_prefix("kit")
+        .with_deps(&["face"])
+        .with_workspace_root(ws.path());
+    (ws, fixture)
+}
+
+/// The unread finding through the engine's runner with `cfg` as the project's configuration, which
+/// is where a configured severity is put on a finding.
+fn unread_through_the_engine(cfg: &LintConfig) -> Vec<LintError> {
+    let (_ws, fixture) = unfetched_workspace();
+    let pack = LintPack {
+        crate_lints: vec![Box::new(ReExportForeignNames)],
+        ..LintPack::default()
+    };
+    testkit::run(std::slice::from_ref(&fixture), Some(cfg), Some(&pack))
+        .into_iter()
+        .filter(|e| e.lint_name == "re-export-foreign-names")
+        .collect()
+}
+
+fn lint_at_error() -> LintConfig {
+    LintConfig::from_base(HashMap::from([("re-export-foreign-names".to_string(), Severity::HARD_ERROR)]))
+}
+
+#[test]
+fn the_unread_kind_is_declared_so_a_project_can_set_it() {
+    assert_eq!(ReExportForeignNames.finding_kinds(), ["unread"]);
+}
+
+#[test]
+fn a_project_that_sets_the_lint_to_error_keeps_unread_a_warning_by_overriding_its_kind() {
+    let mut cfg = lint_at_error();
+    cfg.findings.insert(
+        "re-export-foreign-names".to_string(),
+        HashMap::from([("unread".to_string(), Severity::ADVISORY)]),
+    );
+    let hits = unread_through_the_engine(&cfg);
+    assert_eq!(hits.len(), 1, "{:?}", hits.iter().map(|e| &e.message).collect::<Vec<_>>());
+    assert_eq!(hits[0].finding_kind, Some("unread"));
+    assert!(!hits[0].severity.is_blocking(LintMode::Push), "{}", hits[0].message);
+}
+
+#[test]
+fn a_project_that_sets_the_lint_to_error_and_overrides_no_kind_gets_unread_as_an_error() {
+    // The engine puts the lint's configured level on every finding whose kind has no override of
+    // its own, so this is the case a project must know: the warning is kept by naming the kind.
+    let hits = unread_through_the_engine(&lint_at_error());
+    assert_eq!(hits.len(), 1, "{:?}", hits.iter().map(|e| &e.message).collect::<Vec<_>>());
+    assert_eq!(hits[0].finding_kind, Some("unread"));
+    assert!(hits[0].severity.is_blocking(LintMode::Push), "{}", hits[0].message);
+}
+
+#[test]
+fn a_project_with_no_configuration_keeps_unread_a_warning() {
+    let hits = unread_through_the_engine(&LintConfig::empty());
+    assert_eq!(hits.len(), 1, "{:?}", hits.iter().map(|e| &e.message).collect::<Vec<_>>());
+    assert!(!hits[0].severity.is_blocking(LintMode::Push), "{}", hits[0].message);
+}
+
+#[test]
+fn a_surface_this_machine_has_not_fetched_is_unread_and_not_a_finding() {
+    // Offline, cargo reads only what this machine fetched: a dependency the
+    // lockfile pins and nothing fetched says nothing of the re-export, so the
+    // lint says the surface is unread, at a warning, and names the fetch.
+    let (_ws, fixture) = unfetched_workspace();
+    let hits = ReExportForeignNames.check(&fixture.ctx());
+    assert_eq!(hits.len(), 1, "{:?}", hits.iter().map(|e| &e.message).collect::<Vec<_>>());
+    assert_eq!(hits[0].finding_kind, Some("unread"), "{}", hits[0].message);
+    assert!(
+        !hits[0].severity.is_blocking(mockspace_lint_rules::LintMode::Push),
+        "{}",
+        hits[0].message
+    );
+    assert!(hits[0].message.contains("cargo fetch"), "{}", hits[0].message);
 }
 
 #[test]

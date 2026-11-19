@@ -25,6 +25,22 @@ use crate::paths::{
 };
 use crate::util::txt;
 
+/// The finding kind of a surface `cargo metadata` could not read for want of a
+/// source this machine has not fetched. It is a warning, and a consumer that
+/// sets the lint's severity keeps it one with `findings.unread = "warn"`.
+pub const UNREAD: &str = "unread";
+
+/// How cargo says an offline call needed what this machine has not fetched: a
+/// git checkout, a registry download, the index.
+const UNFETCHED: [&str; 2] = ["offline mode", "--offline was specified"];
+
+/// Whether cargo's words `why` say it failed for want of a source this machine
+/// has not fetched, which says nothing of the manifest.
+#[must_use]
+pub fn unfetched(why: &str) -> bool {
+    UNFETCHED.iter().any(|w| why.contains(w))
+}
+
 /// Where each dependency of a package keeps its source, keyed by the name a
 /// path root spells it with.
 pub struct Dependencies {
@@ -491,5 +507,21 @@ mod tests {
         let err = above(&mock).unwrap_err();
         assert!(err.contains("no Cargo.toml in"), "{err}");
         assert!(err.contains("repo/mock"), "{err}");
+    }
+
+    #[test]
+    fn cargo_words_about_a_source_not_fetched_are_unfetched() {
+        assert!(unfetched("error: no matching package named `x` found\nlocation searched: registry\nas offline mode is enabled"));
+        assert!(unfetched("error: failed to get `x` as a dependency\n--offline was specified"));
+    }
+
+    #[test]
+    fn cargo_words_that_are_not_about_fetching_are_not_unfetched() {
+        // The control a body of `true` fails: a manifest that is missing or wrong says nothing of what
+        // this machine has fetched, and reading it as unread would turn a broken workspace into a
+        // warning.
+        assert!(!unfetched("error: could not find `Cargo.toml` in `/tmp/x` or any parent directory"));
+        assert!(!unfetched("error: failed to parse manifest at `/tmp/x/Cargo.toml`"));
+        assert!(!unfetched(""));
     }
 }
