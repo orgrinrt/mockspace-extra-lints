@@ -509,7 +509,6 @@ mod tests {
         assert!(err.contains("repo/mock"), "{err}");
     }
 
-
     #[test]
     fn cargo_words_about_a_source_not_fetched_are_unfetched() {
         assert!(unfetched("error: no matching package named `x` found\nlocation searched: registry\nas offline mode is enabled"));
