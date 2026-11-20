@@ -325,3 +325,29 @@ fn a_task_is_held_by_the_holder_the_table_names_and_by_nobody_where_it_names_non
     let board = held.board();
     assert_eq!(board.values().next().expect("a task").2, "helpers");
 }
+
+#[test]
+fn a_marker_tagged_with_a_name_the_table_gives_the_maintainer_owes_a_decision() {
+    let mut r = Repo::new();
+    r.write(SIM, "// §(op): whether rain wets the ground\n");
+    let mut params = mockspace::tool::ToolParams::new();
+    params.set(corpus::maintainer::NAMES, vec!["op".to_string()]);
+    r.owed.configure(&params);
+    r.run(&[]);
+    let s = r.store();
+    let (_, t) = s.tickets.iter().next().expect("a task was filed");
+    assert!(
+        t.one("what").contains("the marker says the maintainer decides"),
+        "{}",
+        t.one("what")
+    );
+
+    // THE CONTROL: the same marker with no names given is a seam, and no decision is said to be owed.
+    let plain = Repo::new();
+    plain.write(SIM, "// §(op): whether rain wets the ground\n");
+    plain.run(&[]);
+    let s = plain.store();
+    let (_, t) = s.tickets.iter().next().expect("a task was filed");
+    assert!(!t.one("what").contains("the maintainer decides"), "{}", t.one("what"));
+    assert!(t.one("title").contains("Placeholders tagged op"), "{}", t.one("title"));
+}

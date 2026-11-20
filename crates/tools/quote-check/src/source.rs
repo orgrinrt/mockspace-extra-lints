@@ -7,7 +7,8 @@
 //!
 //! A [`Source`] answers a file's lines at a revision and the files a revision holds. [`Git`] reads a
 //! clone through `git show` and `git ls-tree` and keeps what it read, so a file cited by a thousand rows
-//! is read once; the tests hand the comparison a source held in memory instead.
+//! is read once. [`Memory`] holds its files in memory, for a source that is not on disk and for the
+//! tests, which hand the comparison one instead of a clone.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -97,5 +98,40 @@ impl Source for Git {
                     .collect()
             })
             .unwrap_or_default()
+    }
+}
+
+/// A source held in memory: files by revision and path, and the paths of each revision.
+#[derive(Default)]
+pub struct Memory {
+    files: HashMap<(String, String), Vec<String>>,
+}
+
+impl Memory {
+    /// Adds `text` as `path` at `rev`, split as [`split`] splits it.
+    #[must_use]
+    pub fn with(mut self, rev: &str, path: &str, text: &str) -> Self {
+        self.files
+            .insert((rev.to_owned(), path.to_owned()), split(text));
+        self
+    }
+}
+
+impl Source for Memory {
+    fn lines(&mut self, rev: &str, path: &str) -> Option<&[String]> {
+        self.files
+            .get(&(rev.to_owned(), path.to_owned()))
+            .map(Vec::as_slice)
+    }
+
+    fn paths(&mut self, rev: &str) -> Vec<String> {
+        let mut p: Vec<String> = self
+            .files
+            .keys()
+            .filter(|(r, _)| r == rev)
+            .map(|(_, p)| p.clone())
+            .collect();
+        p.sort();
+        p
     }
 }
