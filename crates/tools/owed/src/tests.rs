@@ -60,6 +60,7 @@ impl Repo {
             owed: Owed {
                 holder:  "coord".to_string(),
                 content: registry_lints::layout::ContentDirs::new(&["content"]),
+                names:   Vec::new(),
             },
         }
     }

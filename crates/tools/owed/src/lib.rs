@@ -30,11 +30,13 @@ mod plan;
 use fixme_markers::Scope;
 use plan::{Candidate, File, Inputs};
 
-/// The maker, holding what `[tools.owed]` names: who holds what it files, and the content directories.
+/// The maker, holding what `[tools.owed]` names: who holds what it files, the content directories, and
+/// what the project calls its maintainer.
 #[derive(Default)]
 pub struct Owed {
     holder:  String,
     content: ContentDirs,
+    names:   Vec<String>,
 }
 
 /// The keys of `[tools.owed]`.
@@ -44,6 +46,10 @@ const KEYS: &[ConfigKey] = &[
         description: "who holds the tasks `owed` files, such as the channel of the coordinator whose agents evaluate them; nobody when unset",
     },
     CONTENT_DIRS_KEY,
+    ConfigKey {
+        name:        corpus::maintainer::NAMES,
+        description: "what the project calls its maintainer besides `maintainer`: a marker tagged with one of the names owes the maintainer a decision; none when unset",
+    },
 ];
 
 /// What the command line said.
@@ -119,6 +125,9 @@ impl Tool for Owed {
         if let Some(h) = params.one(plan::HOLDER) {
             self.holder = h.to_string();
         }
+        if let Some(n) = params.list(corpus::maintainer::NAMES) {
+            self.names = n.to_vec();
+        }
         self.content.configure_tool(params);
     }
 
@@ -127,7 +136,7 @@ impl Tool for Owed {
     }
 
     fn help(&self) -> &'static str {
-        "Reads every authored file for placeholder markers, and the research for candidate files. A marker that cites no ticket is grouped with the markers that say the same, a task is filed for the group on the registry, in the backlog and held by the `holder` of `[tools.owed]`, nobody where it names none, and the marker is rewritten to cite it, keeping its reason. A canon silence, a `maintainer` tag and a candidate file are tasks too, never questions: the task says an agent is to evaluate each marker against the code and the canon, and the list gives each marker with its file and line as it stood then. A marker an earlier run listed on a ticket cites that ticket again and files nothing, whatever line it has moved to. A ticket this filed whose markers are all gone is closed, a task as done and a question filed before this as dropped. Silent when there is nothing to do. `--dry` says what it would do and writes nothing, `--only` takes comma separated patterns, `*` standing for any run of characters, and limits the run to the files they match, so nothing is closed, and `--no-fetch` does not fetch the trunk to say whether the tree is behind it."
+        "Reads every authored file for placeholder markers, and the research for candidate files. A marker that cites no ticket is grouped with the markers that say the same, a task is filed for the group on the registry, in the backlog and held by the `holder` of `[tools.owed]`, nobody where it names none, and the marker is rewritten to cite it, keeping its reason. A canon silence, a tag of `maintainer` or of a name in `maintainer_names`, and a candidate file are tasks too, never questions: the task says an agent is to evaluate each marker against the code and the canon, and the list gives each marker with its file and line as it stood then. A marker an earlier run listed on a ticket cites that ticket again and files nothing, whatever line it has moved to. A ticket this filed whose markers are all gone is closed, a task as done and a question filed before this as dropped. Silent when there is nothing to do. `--dry` says what it would do and writes nothing, `--only` takes comma separated patterns, `*` standing for any run of characters, and limits the run to the files they match, so nothing is closed, and `--no-fetch` does not fetch the trunk to say whether the tree is behind it."
     }
 
     fn run(&self, ctx: &ToolContext<'_>) -> ToolReport {
@@ -207,6 +216,7 @@ impl Owed {
             subjects:       &subjects,
             prefix:         &registry_lints::project::Project::of(&view, ctx.mock_dir).prefix,
             layout:         &layout,
+            names:          &self.names,
             full:           args.only.is_empty(),
         });
         if plan.is_empty() {
