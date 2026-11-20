@@ -27,7 +27,7 @@ pub const WORDS_VAR: &str = "MOCKSPACE_MAINTAINER_WORDS";
 /// [`WORDS`] as a tool declares it.
 pub const WORDS_KEY: ConfigKey = ConfigKey {
     name:        WORDS,
-    description: "the directory of the maintainer's captured words, relative to the repository root or absolute; MOCKSPACE_MAINTAINER_WORDS where unset, and not read where neither names one",
+    description: "the directory of the maintainer's captured words, relative to the clone's main checkout, which every worktree of it shares, or absolute; MOCKSPACE_MAINTAINER_WORDS where unset, and not read where neither names one",
 };
 
 /// [`NAMES`] as a tool declares it.
@@ -73,9 +73,12 @@ impl Maintainer {
 
 /// The directory of the maintainer's captured words, from the key's value and the variable's.
 ///
-/// The key wins over the variable, and a blank value names nothing. A relative path is read from
-/// `repo_root`. Whether the directory exists is left to the reader, so a name pointing nowhere is
-/// reported as such rather than mistaken for no name at all.
+/// The key wins over the variable, and a blank value names nothing. A relative path is read from the
+/// clone's main checkout, which is `repo_root` itself unless `repo_root` is a linked worktree, so every
+/// worktree of one clone reads the directory its clone does: a path that leaves the repository, such as
+/// one into the workspace a clone sits in, means the same from a worktree kept elsewhere. Whether the
+/// directory exists is left to the reader, so a name pointing nowhere is reported as such rather than
+/// mistaken for no name at all.
 #[must_use]
 pub fn maintainer_words_dir(
     repo_root: &Path,
@@ -87,7 +90,25 @@ pub fn maintainer_words_dir(
         .flatten()
         .map(str::trim)
         .find(|n| !n.is_empty())?;
-    Some(repo_root.join(named))
+    Some(main_checkout(repo_root).join(named))
+}
+
+/// The main checkout of the clone `root` belongs to. Where `root` is a linked worktree, its `.git` is a
+/// file naming its git directory, whose `commondir` names the clone's common git directory, and the
+/// checkout is the directory holding that one. Otherwise, or where any of it cannot be read, or where
+/// the common directory is not called `.git` and so stands beside no checkout, it is `root` itself.
+fn main_checkout(root: &Path) -> PathBuf {
+    let linked = || -> Option<PathBuf> {
+        let pointer = std::fs::read_to_string(root.join(".git")).ok()?;
+        let gitdir = root.join(pointer.trim().strip_prefix("gitdir:")?.trim());
+        let common = std::fs::read_to_string(gitdir.join("commondir")).ok()?;
+        let common = gitdir.join(common.trim()).canonicalize().ok()?;
+        if common.file_name()? != ".git" {
+            return None;
+        }
+        common.parent().map(Path::to_path_buf)
+    };
+    linked().unwrap_or_else(|| root.to_path_buf())
 }
 
 /// Why the maintainer's words were not read, given the directory that was named for them, if any.
@@ -193,5 +214,64 @@ mod tests {
         p.set(NAMES, vec!["Lead".to_string(), "lead designer".to_string()]);
         m.configure(&p);
         assert_eq!(m.names(), ["Lead", "lead designer"]);
+    }
+
+    /// A workspace on disk holding a clone and a linked worktree of it kept outside the clone, laid
+    /// out as git lays them out, removed when the test ends.
+    struct Linked(PathBuf);
+
+    impl Linked {
+        fn new(name: &str) -> Self {
+            let ws = std::env::temp_dir().join(format!("maintainer-{name}-{}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&ws);
+            let gitdir = ws.join("clone/.git/worktrees/seat");
+            std::fs::create_dir_all(&gitdir).unwrap();
+            std::fs::write(gitdir.join("commondir"), "../..\n").unwrap();
+            std::fs::create_dir_all(ws.join("seats/seat")).unwrap();
+            std::fs::write(
+                ws.join("seats/seat/.git"),
+                format!("gitdir: {}\n", gitdir.display()),
+            )
+            .unwrap();
+            Self(ws.canonicalize().unwrap())
+        }
+    }
+
+    impl Drop for Linked {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn a_relative_directory_is_read_from_the_clone_a_worktree_belongs_to() {
+        let ws = Linked::new("linked");
+        let seat = ws.0.join("seats/seat");
+        assert_eq!(
+            maintainer_words_dir(&seat, Some("../words"), None),
+            Some(ws.0.join("clone/../words"))
+        );
+        // an absolute one is read as it is
+        assert_eq!(
+            maintainer_words_dir(&seat, Some("/abs/words"), None),
+            Some(PathBuf::from("/abs/words"))
+        );
+        // THE CONTROL: from the clone itself, whose `.git` is a directory, it is read from the clone.
+        let clone = ws.0.join("clone");
+        assert_eq!(
+            maintainer_words_dir(&clone, Some("../words"), None),
+            Some(clone.join("../words"))
+        );
+    }
+
+    #[test]
+    fn a_worktree_whose_git_pointer_cannot_be_followed_reads_from_itself() {
+        let ws = Linked::new("broken");
+        let seat = ws.0.join("seats/seat");
+        std::fs::write(seat.join(".git"), "gitdir: /no/such/gitdir\n").unwrap();
+        assert_eq!(
+            maintainer_words_dir(&seat, Some("../words"), None),
+            Some(seat.join("../words"))
+        );
     }
 }
