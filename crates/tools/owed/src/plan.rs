@@ -74,6 +74,9 @@ pub struct Inputs<'a> {
     pub prefix:         &'a str,
     /// Where the mock tree and the content sit, which a marker's area is named by.
     pub layout:         &'a Layout,
+    /// What the project calls its maintainer besides `maintainer`, which a marker tagged with one owes a
+    /// decision of.
+    pub names:          &'a [String],
     /// Nothing was left out by `--only`, so a ticket none of whose markers is found is closed.
     pub full:           bool,
 }
@@ -239,7 +242,7 @@ pub fn plan(inp: &Inputs<'_>) -> Plan {
             }
             items.push(Item {
                 rel:    file.rel.clone(),
-                class:  Class::of(marker.tag.as_deref()),
+                class:  Class::of(marker.tag.as_deref(), inp.names),
                 reason: marker.reason.clone(),
                 area:   group::area(&file.rel, inp.layout),
                 line:   marker.line,

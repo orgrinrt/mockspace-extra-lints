@@ -20,22 +20,38 @@ fn shapes(items: &[Item]) -> Vec<(How, Vec<usize>)> {
 
 #[test]
 fn a_tag_is_a_class_and_the_questions_are_the_canon_silence_and_the_maintainer() {
-    assert_eq!(Class::of(None), Class::Unmarked);
-    assert_eq!(Class::of(Some("  ")), Class::Unmarked);
-    assert_eq!(Class::of(Some("stand-in")), Class::StandIn);
-    assert_eq!(Class::of(Some("Stand In")), Class::StandIn);
-    assert_eq!(Class::of(Some("canon silent")), Class::CanonSilent);
-    assert_eq!(Class::of(Some("canon-silent")), Class::CanonSilent);
-    assert_eq!(Class::of(Some("maintainer")), Class::Maintainer);
+    assert_eq!(Class::of(None, &[]), Class::Unmarked);
+    assert_eq!(Class::of(Some("  "), &[]), Class::Unmarked);
+    assert_eq!(Class::of(Some("stand-in"), &[]), Class::StandIn);
+    assert_eq!(Class::of(Some("Stand In"), &[]), Class::StandIn);
+    assert_eq!(Class::of(Some("canon silent"), &[]), Class::CanonSilent);
+    assert_eq!(Class::of(Some("canon-silent"), &[]), Class::CanonSilent);
+    assert_eq!(Class::of(Some("maintainer"), &[]), Class::Maintainer);
     assert_eq!(
-        Class::of(Some("gpu-pass")),
+        Class::of(Some("gpu-pass"), &[]),
         Class::Seam("gpu-pass".to_string())
     );
     let owing: Vec<bool> = ["canon silent", "maintainer", "stand-in", "gpu-pass"]
         .iter()
-        .map(|t| Class::of(Some(t)).owes_a_decision())
+        .map(|t| Class::of(Some(t), &[]).owes_a_decision())
         .collect();
     assert_eq!(owing, [true, true, false, false]);
+}
+
+#[test]
+fn a_tag_naming_the_maintainer_by_a_name_the_project_gives_is_a_point_for_the_maintainer() {
+    let names = ["op".to_string(), "lead designer".to_string()];
+    assert_eq!(Class::of(Some("op"), &names), Class::Maintainer);
+    assert_eq!(Class::of(Some("OP"), &names), Class::Maintainer);
+    assert_eq!(Class::of(Some("lead-designer"), &names), Class::Maintainer);
+    assert!(Class::of(Some("op"), &names).owes_a_decision());
+    // `maintainer` stays one whatever the names are.
+    assert_eq!(Class::of(Some("maintainer"), &names), Class::Maintainer);
+    // THE CONTROL: with no names given the same tag is a seam, and no decision is owed.
+    assert_eq!(Class::of(Some("op"), &[]), Class::Seam("op".to_string()));
+    assert!(!Class::of(Some("op"), &[]).owes_a_decision());
+    // nor does a name match a tag it only begins
+    assert_eq!(Class::of(Some("operator"), &names), Class::Seam("operator".to_string()));
 }
 
 #[test]

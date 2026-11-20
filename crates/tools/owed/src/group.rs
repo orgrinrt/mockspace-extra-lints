@@ -33,7 +33,8 @@ const GIST_CHARS: usize = 100;
 pub enum Class {
     /// The canon is silent on it: a decision is owed.
     CanonSilent,
-    /// Its tag says the maintainer must settle it: a decision is owed.
+    /// Its tag says the maintainer must settle it, as `maintainer` or one of the names the project gives
+    /// the maintainer: a decision is owed.
     Maintainer,
     /// A stand-in for what is to come.
     StandIn,
@@ -44,15 +45,19 @@ pub enum Class {
 }
 
 impl Class {
-    /// The class of a marker from what stands between its parentheses.
-    pub fn of(tag: Option<&str>) -> Class {
+    /// The class of a marker from what stands between its parentheses, `names` being what the project
+    /// calls its maintainer besides `maintainer`, matched as a tag is: ignoring case, a dash or an
+    /// underscore read as a space.
+    pub fn of(tag: Option<&str>, names: &[String]) -> Class {
         let Some(tag) = tag.map(str::trim).filter(|t| !t.is_empty()) else {
             return Class::Unmarked;
         };
-        match tag.to_ascii_lowercase().replace(['-', '_'], " ").as_str() {
+        let said = spoken(tag);
+        match said.as_str() {
             "canon silent" => Class::CanonSilent,
             "maintainer" => Class::Maintainer,
             "stand in" | "standin" => Class::StandIn,
+            _ if names.iter().any(|n| spoken(n) == said) => Class::Maintainer,
             _ => Class::Seam(tag.to_string()),
         }
     }
@@ -72,6 +77,11 @@ impl Class {
             Class::Seam(tag) => format!("placeholders tagged {tag}"),
         }
     }
+}
+
+/// A tag or a name as it is compared: trimmed, lowercase, a dash or an underscore read as a space.
+fn spoken(text: &str) -> String {
+    text.trim().to_ascii_lowercase().replace(['-', '_'], " ")
 }
 
 /// The words that carry no gap: said of everything, so sharing them says nothing.
