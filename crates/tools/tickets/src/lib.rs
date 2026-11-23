@@ -13,7 +13,15 @@
 
 use mockspace::LintError;
 use mockspace::tool::{
-    ArgSpec, ConfigKey, NotALint, Outcome, Purpose, Tool, ToolContext, ToolParams, ToolReport,
+    ArgSpec,
+    ConfigKey,
+    NotALint,
+    Outcome,
+    Purpose,
+    Tool,
+    ToolContext,
+    ToolParams,
+    ToolReport,
 };
 
 pub mod answerable;
@@ -201,12 +209,20 @@ impl Tickets {
                 let rows = view::list(&store, &plan, &answerable::open_questions(&req.filter));
                 // The index is made only where there is a question to ask about.
                 let ready = (!rows.is_empty()).then(|| {
-                    corpus::repo::ready(ctx.mock_dir, ctx.repo_root, Some(&self.maintainer))
+                    corpus::repo::open(
+                        ctx.mock_dir,
+                        ctx.repo_root,
+                        Some(&self.maintainer),
+                        &corpus::repo::background,
+                    )
                 });
                 let (mut out, n) = answerable::report(&store, &rows, &|text| {
-                    ready.as_ref().map_or_else(Vec::new, |r| {
-                        corpus::repo::find(&r.index, text, answerable::PER_QUESTION)
-                    })
+                    ready
+                        .as_ref()
+                        .and_then(|r| r.index.as_ref())
+                        .map_or_else(Vec::new, |index| {
+                            corpus::repo::find(index, text, answerable::PER_QUESTION)
+                        })
                 });
                 if let Some(r) = &ready {
                     for note in &r.notes {
@@ -308,8 +324,6 @@ mockspace::lint_pack! {
 }
 
 #[cfg(test)]
-mod tests;
-#[cfg(test)]
 mod answerable_tests;
 #[cfg(test)]
 mod branch_tests;
@@ -335,6 +349,8 @@ mod successor_tests;
 mod supersedes_tests;
 #[cfg(test)]
 mod tags_tests;
+#[cfg(test)]
+mod tests;
 #[cfg(test)]
 mod tracks_tests;
 #[cfg(test)]

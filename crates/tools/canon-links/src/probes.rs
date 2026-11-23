@@ -4,7 +4,8 @@
 //--------------------------------------------------------------------------------------------------
 
 //! The probe set: questions put the way a reader would type them, and the tenets that ought to come
-//! back, run against `canon find` and `canon related` as they answer now.
+//! back, run against the tenets that carry a word and the tenets joined to a tenet, as the registry
+//! answers them now.
 //!
 //! The expected tenets are chosen by reading the rows, not by running the tool, so a probe fails where
 //! the metadata does not carry what a reader would arrive with, and passes once it does.
@@ -14,9 +15,9 @@ use canon::{Tenet, carries, joined_to};
 /// How a probe asks.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Via {
-    /// `canon find <word>`.
+    /// The tenets that carry a word.
     Find(String),
-    /// `canon related <id>`: the tenets joined to it through `cites` or a tenet link in `related`, either direction.
+    /// The tenets joined to it through `cites` or a tenet link in `related`, either direction.
     Related(String),
 }
 

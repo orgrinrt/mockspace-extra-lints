@@ -13,8 +13,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
-use crate::layout::Layout;
 use crate::dropped::{SHOWN_WORDS, show, still_named, word_counts};
+use crate::layout::Layout;
 use crate::retired_words::{EXCUSE_REACH, Hit, Retiring, split_under, unit_of};
 use crate::rows::Tenet;
 use crate::tree::{Tier, mentions};
@@ -37,10 +37,15 @@ pub fn retiring(all: &[Tenet<'_>]) -> Vec<Retiring> {
 
 /// `forbids <id>`: whether the tenet binds, the words it rules out, and the tenets it replaces with
 /// theirs, since a replaced tenet's words are the first place a retired concept hides.
-pub fn forbids_answer(repo: &Path, layout: &Layout, all: &[Tenet<'_>], id: &str) -> Result<(String, usize), String> {
+pub fn forbids_answer(
+    repo: &Path,
+    layout: &Layout,
+    all: &[Tenet<'_>],
+    id: &str,
+) -> Result<(String, usize), String> {
     let Some(t) = all.iter().find(|t| t.id == id) else {
         return Err(format!(
-            "there is no tenet `{id}`; `canon find <word>` looks for one"
+            "there is no tenet `{id}`; `search <word> --rows` looks for one"
         ));
     };
     let words = |t: &Tenet<'_>| {
@@ -146,7 +151,12 @@ pub fn unretired_answer(repo: &Path, layout: &Layout, all: &[Tenet<'_>]) -> (Str
 /// `contradicts [path]...`: every design, code and content line naming a word a binding tenet rules out, in
 /// the whole repository or in the paths named. Several paths are read in one pass, which is what a landing
 /// asks of the files a branch touches.
-pub fn contradicts_answer(repo: &Path, layout: &Layout, all: &[Tenet<'_>], paths: &[&str]) -> (String, usize) {
+pub fn contradicts_answer(
+    repo: &Path,
+    layout: &Layout,
+    all: &[Tenet<'_>],
+    paths: &[&str],
+) -> (String, usize) {
     let rules = retiring(all);
     let under: Vec<PathBuf> = paths.iter().map(|p| relative(repo, p)).collect();
     if rules.is_empty() {
@@ -163,7 +173,13 @@ pub fn contradicts_answer(repo: &Path, layout: &Layout, all: &[Tenet<'_>], paths
         );
     }
     let named: Vec<&Path> = under.iter().map(PathBuf::as_path).collect();
-    let (hits, excused) = split_under(&mockspace::reading::Reading::new(repo).view(), repo, &rules, &named, layout);
+    let (hits, excused) = split_under(
+        &mockspace::reading::Reading::new(repo).view(),
+        repo,
+        &rules,
+        &named,
+        layout,
+    );
     let mut by_rule: BTreeMap<&str, Vec<&Hit>> = BTreeMap::new();
     for h in &hits {
         by_rule.entry(h.rule.as_str()).or_default().push(h);

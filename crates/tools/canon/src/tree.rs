@@ -29,7 +29,11 @@ pub struct Line {
 /// Every line in the tree naming a tenet in `known`, by the tenet it names.
 ///
 /// A registry row's own `id = "..."` line declares the tenet rather than naming it, and is not counted.
-pub fn mentions<'a>(repo: &Path, layout: &Layout, known: &BTreeSet<&'a str>) -> BTreeMap<&'a str, Vec<Line>> {
+pub fn mentions<'a>(
+    repo: &Path,
+    layout: &Layout,
+    known: &BTreeSet<&'a str>,
+) -> BTreeMap<&'a str, Vec<Line>> {
     let mut out: BTreeMap<&'a str, Vec<Line>> = BTreeMap::new();
     let reading = mockspace::reading::Reading::new(repo);
     let view = reading.view();

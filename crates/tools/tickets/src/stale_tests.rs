@@ -6,8 +6,8 @@
 //! What `tickets check` prints of the tickets that may have stopped being true: a line for each, the count,
 //! and no failure for any of them.
 
-use ticket_model::{Heirs, Tree};
 use mockspace::tool::Outcome;
+use ticket_model::{Heirs, Tree};
 
 use crate::landing::{Landing, Trunk};
 use crate::testkit::Scratch;

@@ -51,15 +51,15 @@ pub trait Trunk {
 
 /// The trunk of the repository at a path, `origin/dev` where it has one and `dev` otherwise.
 pub struct Git<'a> {
-    root:            &'a Path,
+    root:                  &'a Path,
     /// The heads of `origin` by branch name, asked once and only when a branch is not among the local refs: a
     /// clone fetches `dev` alone, so every other branch read as unknown and a landed ticket went unnamed until a
     /// move made somebody fetch its branch (job_72_sky and job_75, 7 November).
-    heads:           OnceCell<BTreeMap<String, String>>,
+    heads:                 OnceCell<BTreeMap<String, String>>,
     /// What the tree said of a name already, so a name that many tickets repeat is asked of git once.
-    pub(crate) gone: RefCell<BTreeMap<String, Option<String>>>,
+    pub(crate) gone:       RefCell<BTreeMap<String, Option<String>>>,
     /// The repository's `crate_prefix`, which a crate a ticket names alone starts with.
-    pub(crate) prefix: String,
+    pub(crate) prefix:     String,
     /// The directories crates live in, relative to the root: the source directories of the config.
     pub(crate) crate_dirs: Vec<String>,
 }
@@ -79,7 +79,10 @@ impl<'a> Git<'a> {
     /// The repository a tool is run in, its crates named and found as its config says: the
     /// `crate_prefix` and the source directories.
     pub fn of(ctx: &mockspace::tool::ToolContext<'a>) -> Self {
-        let project = registry_lints::project::Project::of(&mockspace::reading::Reading::new(ctx.repo_root).view(), ctx.mock_dir);
+        let project = registry_lints::project::Project::of(
+            &mockspace::reading::Reading::new(ctx.repo_root).view(),
+            ctx.mock_dir,
+        );
         let dirs = ctx
             .src_dirs
             .iter()

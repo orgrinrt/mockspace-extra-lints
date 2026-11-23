@@ -39,7 +39,7 @@ pub const COVERS: &str = "Covers:";
 /// What a task filed by `owed` says to the agent that takes it. A question written from a marker
 /// alone has neither the context nor the options a reader of the code and the canon gives it, so
 /// `owed` files none, and the agent files the question it finds there is.
-const EVALUATE: &str = "\n\nAn agent is to evaluate each marker below: read the code at its place and the canon (`mock canon find`, `mock canon subject`), then do one of three things. Put a question to the maintainer, with a subject and real options, where the canon is silent and the gap is the maintainer's to settle. Settle the marker, where the code or the canon already answers it. Drop the marker, where it names nothing owed. This task files no question of its own, and the line of each marker is where it stood when the task was filed.";
+const EVALUATE: &str = "\n\nAn agent is to evaluate each marker below: read the code at its place and the canon (`mock search <term> --rows`, `mock search --subject <subject> --rows`), then do one of three things. Put a question to the maintainer, with a subject and real options, where the canon is silent and the gap is the maintainer's to settle. Settle the marker, where the code or the canon already answers it. Drop the marker, where it names nothing owed. This task files no question of its own, and the line of each marker is where it stood when the task was filed.";
 
 /// The line that names the file a candidate task is about.
 pub const CANDIDATE: &str = "Candidate file: ";

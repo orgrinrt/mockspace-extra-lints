@@ -3,13 +3,14 @@
 // SPDX-License-Identifier: MPL-2.0     https://mozilla.org/MPL/2.0        contact@hiisi.digital
 //--------------------------------------------------------------------------------------------------
 
-//! `mock canon <verb>`: what the canon holds by subject, word and relation, and who names a tenet.
+//! `mock canon <verb>`: the canon's subjects, a row shown whole, who names a tenet, what a replaced tenet
+//! forbids, and whether a brief's tenets bind. Finding rows by word, by subject or by relation is
+//! `mock search`, with `--namespace`, `--subject` and `--linked`.
 //!
 //! Read from the same rows `mock query` resolves against, which the engine hands a tool, and from the
 //! tree the citations live in. The verbs and what each answers are in the workflow's section on the
 //! canon.
 
-use corpus::repo::Near;
 use mockspace::tool::{
     ArgSpec,
     ConfigKey,
@@ -23,16 +24,14 @@ use mockspace::tool::{
     positional_args,
 };
 use mockspace::{LintError, RegistryView};
-
-use crate::scope::Scope;
-
 // which files are read, the tiers and how a retired word is matched are owned by the lints directory,
 // where `a-retired-word-stays-out` reads the same files, so the verb and the gate cannot disagree
 use registry_lints::canon_tree;
 use registry_lints::layout::{self, CONTENT_DIRS_KEY, ContentDirs, Layout};
+
+use crate::scope::Scope;
 mod dropped;
 mod names;
-mod near;
 mod reference;
 mod retired;
 use registry_lints::retired_words;
@@ -53,12 +52,9 @@ pub struct Canon {
 }
 
 /// The verbs, in the order the help lists them.
-pub const VERBS: [&str; 11] = [
+pub const VERBS: [&str; 8] = [
     "subjects",
-    "subject",
     "show",
-    "find",
-    "related",
     "citers",
     "uncited",
     "forbids",
@@ -73,7 +69,7 @@ impl Tool for Canon {
     }
 
     fn description(&self) -> &'static str {
-        "answers what the canon holds by subject, word and relation, and who names a tenet"
+        "the canon's subjects, a row shown whole, who names a tenet, what a replaced tenet forbids, and whether tenets bind"
     }
 
     fn purpose(&self) -> Purpose {
@@ -85,12 +81,12 @@ impl Tool for Canon {
             ArgSpec {
                 name:        "verb",
                 required:    true,
-                description: "`subjects`, `subject`, `show`, `find`, `related`, `citers`, `uncited`, `forbids`, `contradicts` or `check`",
+                description: "`subjects`, `show`, `citers`, `uncited`, `forbids`, `contradicts`, `check` or `stats`",
             },
             ArgSpec {
                 name:        "term",
                 required:    false,
-                description: "the subject, the word, the row (a bare id, or `namespace::id`) or the tenet the verb asks about; `check` takes one or more tenets, names each provisional one as provisional and still exits 0, and exits 1 on one that is no tenet, is superseded, or is held or demoted, and so binds nothing, or states no standing the pack reads; a stamped row keeps its standing and is noted with its stamp; `contradicts` takes any number of paths, read in one pass, and with none reads the whole repository; `forbids` with none lists the replaced tenets that name no word they rule out; `show`, `find`, `related` and `citers` read every namespace of the registry, and `--in <namespace>[,<namespace>]` narrows them, `canon` standing for the namespaces `canon_paths` reaches",
+                description: "the row (a bare id, or `namespace::id`) or the tenet the verb asks about; `check` takes one or more tenets, names each provisional one as provisional and still exits 0, and exits 1 on one that is no tenet, is superseded, or is held or demoted, and so binds nothing, or states no standing the pack reads; a stamped row keeps its standing and is noted with its stamp; `contradicts` takes any number of paths, read in one pass, and with none reads the whole repository; `forbids` with none lists the replaced tenets that name no word they rule out; `show` and `citers` read every namespace of the registry, and `--in <namespace>[,<namespace>]` narrows them, `canon` standing for the namespaces `canon_paths` reaches",
             },
         ]
     }
@@ -110,32 +106,29 @@ impl Tool for Canon {
     fn run(&self, ctx: &ToolContext<'_>) -> ToolReport {
         let words = positional_args(self, ctx.args);
         if words.first() == Some(&"stats") {
-            let ready = corpus::repo::ready(ctx.mock_dir, ctx.repo_root, None);
+            let opened =
+                corpus::repo::open(ctx.mock_dir, ctx.repo_root, None, &corpus::repo::background);
+            let Some(index) = opened.index else {
+                return ToolReport::inconclusive(opened.notes.join(" "));
+            };
             let Some(which) = words.get(1) else {
                 return ToolReport::inconclusive(format!(
                     "stats wants a table: {}",
                     stats::TABLES.join(", ")
                 ));
             };
-            return match stats::table(&ready.index, which, words.get(2).copied()) {
+            return match stats::table(&index, which, words.get(2).copied()) {
                 Ok(text) => ToolReport::reported(text, 1),
                 Err(e) => ToolReport::inconclusive(e),
             };
         }
-        self.run_with(ctx, &|question| {
-            let ready = corpus::repo::ready(ctx.mock_dir, ctx.repo_root, None);
-            corpus::repo::near_words(&ready.index, question, NEAR_PER_WORD)
-        })
+        self.run_with(ctx)
     }
 }
 
-/// How many forms and synonyms of each word of a question `find` follows.
-const NEAR_PER_WORD: usize = 5;
-
 impl Canon {
-    /// [`Tool::run`] with the near words given by a function, so a test needs no index. Asked only
-    /// by `find`, and after the plain answer is in hand.
-    fn run_with(&self, ctx: &ToolContext<'_>, near_of: &dyn Fn(&str) -> Vec<Near>) -> ToolReport {
+    /// [`Tool::run`] for every verb that reads the registry and the tree alone.
+    fn run_with(&self, ctx: &ToolContext<'_>) -> ToolReport {
         let words = positional_args(self, ctx.args);
         let Some(verb) = words.first() else {
             return ToolReport::inconclusive(format!("canon wants a verb: {}", VERBS.join(", ")));
@@ -150,16 +143,16 @@ impl Canon {
         let term = words.get(1).copied();
         let more = words.get(2 ..).unwrap_or_default();
         let layout = Layout::of(ctx.mock_dir, ctx.repo_root, &self.content);
-        match verbs::answer(ctx.registry, ctx.repo_root, &layout, verb, term, more, &scope) {
-            Ok((mut text, examined)) => {
-                if *verb == "find"
-                    && let Some(question) = term
-                {
-                    let near = near_of(question);
-                    text.push_str(&near::section(&rows::tenets(ctx.registry), &near, &text));
-                }
-                ToolReport::reported(text, examined)
-            },
+        match verbs::answer(
+            ctx.registry,
+            ctx.repo_root,
+            &layout,
+            verb,
+            term,
+            more,
+            &scope,
+        ) {
+            Ok((text, examined)) => ToolReport::reported(text, examined),
             Err(e) => ToolReport::inconclusive(e),
         }
     }
@@ -213,9 +206,6 @@ mockspace::lint_pack! {
 
 #[cfg(test)]
 mod tests;
-
-#[cfg(test)]
-mod near_tests;
 
 #[cfg(test)]
 mod stats_tests;

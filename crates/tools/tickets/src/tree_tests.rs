@@ -8,8 +8,8 @@
 
 use ticket_model::Tree;
 
-use crate::landing::Git;
 use crate::branch_tests::{commit, git};
+use crate::landing::Git;
 
 fn repository(tag: &str) -> std::path::PathBuf {
     let dir = std::env::temp_dir().join(format!("tickets-tree-{tag}-{}", std::process::id()));
@@ -30,20 +30,33 @@ fn repository(tag: &str) -> std::path::PathBuf {
 #[test]
 fn a_crate_the_trunk_deleted_is_gone_with_the_commit_that_deleted_it() {
     let dir = repository("lost");
-    let said = Git::at(&dir).with_crates("kaski".into(), vec!["mock/crates".into()]).gone("kaski-lost").expect("gone");
+    let said = Git::at(&dir)
+        .with_crates("kaski".into(), vec!["mock/crates".into()])
+        .gone("kaski-lost")
+        .expect("gone");
     assert!(said.contains("delete the lost crate"), "{said}");
 }
 
 #[test]
 fn a_crate_the_trunk_still_holds_is_not_gone() {
     let dir = repository("kept");
-    assert_eq!(Git::at(&dir).with_crates("kaski".into(), vec!["mock/crates".into()]).gone("kaski-kept"), None);
+    assert_eq!(
+        Git::at(&dir)
+            .with_crates("kaski".into(), vec!["mock/crates".into()])
+            .gone("kaski-kept"),
+        None
+    );
 }
 
 #[test]
 fn a_name_the_trunk_never_held_is_not_gone() {
     let dir = repository("never");
-    assert_eq!(Git::at(&dir).with_crates("kaski".into(), vec!["mock/crates".into()]).gone("kaski-never"), None);
+    assert_eq!(
+        Git::at(&dir)
+            .with_crates("kaski".into(), vec!["mock/crates".into()])
+            .gone("kaski-never"),
+        None
+    );
 }
 
 #[test]

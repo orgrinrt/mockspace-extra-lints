@@ -16,7 +16,7 @@ use mockspace::RegistryView;
 use registry_lints::standing::{STAMPED, Standing};
 
 use crate::layout::Layout;
-use crate::rows::{Tenet, carries, subjects, tenets};
+use crate::rows::{Tenet, subjects, tenets};
 use crate::scope::Scope;
 use crate::tree::mentions;
 use crate::{VERBS, reference};
@@ -45,10 +45,7 @@ pub fn answer(
     let want = |what: &str| term.ok_or_else(|| format!("`canon {verb}` wants {what}"));
     let (mut text, shown) = match verb {
         "subjects" => subjects_answer(reg, &all),
-        "subject" => subject_answer(reg, &all, want("a subject")?)?,
         "show" => reference::show(reg, want("a row")?, scope)?,
-        "find" => reference::find(reg, &all, want("a word")?, scope),
-        "related" => reference::related(reg, &all, want("a row")?, scope)?,
         "citers" => reference::citers(reg, repo, layout, want("a row")?, scope)?,
         "uncited" => uncited_answer(repo, layout, &all),
         "forbids" => {
@@ -69,14 +66,14 @@ pub fn answer(
         },
     };
     let mut read = format!("{} tenets", all.len());
-    if matches!(verb, "show" | "find" | "related" | "citers") {
+    if matches!(verb, "show" | "citers") {
         let (label, rows) = reference::read(reg, scope);
         read = label;
         examined = rows;
         if verb == "citers" {
             read.push_str(" and the tree");
         }
-    } else if matches!(verb, "subjects" | "subject") {
+    } else if verb == "subjects" {
         let n = subjects(reg).len();
         examined += n;
         let _ = write!(read, " and {n} subjects");
@@ -150,86 +147,6 @@ fn subjects_answer(reg: &RegistryView, all: &[Tenet<'_>]) -> (String, usize) {
     (out, subs.len())
 }
 
-fn subject_answer(
-    reg: &RegistryView,
-    all: &[Tenet<'_>],
-    slug: &str,
-) -> Result<(String, usize), String> {
-    let subs = subjects(reg);
-    let Some((_, what)) = subs.iter().find(|(s, _)| *s == slug) else {
-        let names: Vec<&str> = subs.iter().map(|(s, _)| *s).collect();
-        return Err(format!(
-            "there is no subject `{slug}`; the subjects are {}",
-            names.join(", ")
-        ));
-    };
-    let held: Vec<&Tenet<'_>> = all.iter().filter(|t| t.subject == Some(slug)).collect();
-    let mut out = format!("{slug}: {what} ({} tenets)\n\n", held.len());
-    let w = width(held.iter().copied());
-    let shown = held.len();
-    for t in held {
-        line(&mut out, t, w);
-    }
-    Ok((out, shown))
-}
-
-pub(crate) fn tenet_hits(all: &[Tenet<'_>], word: &str) -> (String, usize) {
-    let needle = word.to_lowercase();
-    let hits: Vec<&Tenet<'_>> = all.iter().filter(|t| carries(t, &needle)).collect();
-    let mut out = format!("{} tenets carry `{word}`\n\n", hits.len());
-    let w = width(hits.iter().copied());
-    let shown = hits.len();
-    for t in hits {
-        line(&mut out, t, w);
-    }
-    (out, shown)
-}
-
-fn find_tenet<'a, 'b>(all: &'b [Tenet<'a>], id: &str) -> Result<&'b Tenet<'a>, String> {
-    all.iter()
-        .find(|t| t.id == id)
-        .ok_or_else(|| format!("there is no tenet `{id}`; `canon find <word>` looks for one"))
-}
-
-fn ids_or_nothing(ids: &[&str]) -> String {
-    if ids.is_empty() { "nothing".to_string() } else { ids.join(", ") }
-}
-
-pub(crate) fn related_answer(all: &[Tenet<'_>], id: &str) -> Result<(String, usize), String> {
-    let t = find_tenet(all, id)?;
-    let cited_by: Vec<&str> = all
-        .iter()
-        .filter(|o| o.cites.contains(&id))
-        .map(|o| o.id)
-        .collect();
-    let related_by: Vec<&str> = all
-        .iter()
-        .filter(|o| o.links.contains(&id))
-        .map(|o| o.id)
-        .collect();
-    let supersedes: Vec<&str> = all
-        .iter()
-        .filter(|o| o.superseded_by.contains(&id))
-        .map(|o| o.id)
-        .collect();
-    let mut out = format!("{id}\n");
-    let _ = writeln!(out, "  standing:      {}", t.standing.word());
-    let _ = writeln!(out, "  subject:       {}", t.subject.unwrap_or("none"));
-    let _ = writeln!(out, "  cites:         {}", ids_or_nothing(&t.cites));
-    let _ = writeln!(out, "  cited by:      {}", ids_or_nothing(&cited_by));
-    let _ = writeln!(out, "  links to:      {}", ids_or_nothing(&t.links));
-    let _ = writeln!(out, "  related by:    {}", ids_or_nothing(&related_by));
-    let _ = writeln!(out, "  supersedes:    {}", ids_or_nothing(&supersedes));
-    let _ = writeln!(out, "  superseded by: {}", ids_or_nothing(&t.superseded_by));
-    let shown: BTreeSet<&str> =
-        [&t.cites, &cited_by, &t.links, &related_by, &supersedes, &t.superseded_by]
-            .into_iter()
-            .flatten()
-            .copied()
-            .collect();
-    Ok((out, shown.len()))
-}
-
 fn uncited_answer(repo: &Path, layout: &Layout, all: &[Tenet<'_>]) -> (String, usize) {
     let known: BTreeSet<&str> = all.iter().map(|t| t.id).collect();
     let found = mentions(repo, layout, &known);
@@ -260,7 +177,8 @@ pub fn unratified(all: &[Tenet<'_>], ids: &[&str]) -> Vec<String> {
                 .find(|t| t.id == id && t.binds() && t.standing != Standing::Ratified)
                 .map(|t| {
                     if t.stamped() {
-                        let by = if t.stamped_by.is_empty() { "nobody named" } else { t.stamped_by };
+                        let by =
+                            if t.stamped_by.is_empty() { "nobody named" } else { t.stamped_by };
                         let asked = t.ticket().map_or_else(
                             || "naming no question ticket".to_string(),
                             |k| format!("asked in ticket `{k}`"),
@@ -290,7 +208,7 @@ pub fn check(all: &[Tenet<'_>], ids: &[&str]) -> Vec<String> {
             match all.iter().find(|t| t.id == id) {
                 None => {
                     Some(format!(
-                        "`{id}` is no tenet; `canon find <word>` looks for one"
+                        "`{id}` is no tenet; `search <word> --rows` looks for one"
                     ))
                 },
                 Some(t) if t.replaced() => {
@@ -306,7 +224,11 @@ pub fn check(all: &[Tenet<'_>], ids: &[&str]) -> Vec<String> {
                     ))
                 },
                 Some(t) if !t.binds() => {
-                    Some(format!("`{id}` is {}: {}", t.standing.word(), t.standing.unbound()))
+                    Some(format!(
+                        "`{id}` is {}: {}",
+                        t.standing.word(),
+                        t.standing.unbound()
+                    ))
                 },
                 Some(_) => None,
             }

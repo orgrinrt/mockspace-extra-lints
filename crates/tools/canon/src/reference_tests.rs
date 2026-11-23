@@ -8,7 +8,7 @@
 //! tenets, and `--in canon` narrows to the namespaces `canon_paths` names.
 
 use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use mockspace::RegistryView;
 use mockspace::tool::Outcome;
@@ -103,78 +103,6 @@ pub(crate) fn wide() -> RegistryView {
     RegistryView::new(rows, referrers)
 }
 
-/// A repository whose `canon_paths` reach the subjects and the tenets, as kaski's do, and not the
-/// reference namespaces.
-pub(crate) fn canon_repo() -> PathBuf {
-    let repo = scratch();
-    write(
-        &repo,
-        "mockspace.toml",
-        "canon_paths = [\"mock/registry/*.toml\", \"mock/registry/tenet/*.toml\", \
-         \"mock/registry/tenet/**/*.toml\"]\n",
-    );
-    write(
-        &repo,
-        "mock/registry/subject.toml",
-        "[[subject]]\nid = \"sky\"\n",
-    );
-    write(
-        &repo,
-        "mock/registry/tenet/sky.toml",
-        "[[tenet]]\nid = \"the_sun_rises\"\n",
-    );
-    write(
-        &repo,
-        "mock/registry/tenet/deeper/more.toml",
-        "[[tenet]]\nid = \"days_follow_the_sun\"\n",
-    );
-    write(
-        &repo,
-        "mock/registry/ikiuni-renderer/100_core.toml",
-        "[[ikiuni-renderer]]\nid = \"a_sky_pass\"\n",
-    );
-    write(
-        &repo,
-        "mock/registry/bevy/100.toml",
-        "[[bevy]]\nid = \"sun_light\"\n",
-    );
-    repo
-}
-
-/// What an answer lists, by section: the header line and the ids under it.
-pub(crate) fn sections(text: &str) -> Vec<(String, Vec<String>)> {
-    let mut out: Vec<(String, Vec<String>)> = Vec::new();
-    for l in text.lines() {
-        if l.is_empty() || l.starts_with("read ") {
-            continue;
-        }
-        if let Some(entry) = l.strip_prefix("  ") {
-            let id = entry.split_whitespace().next().unwrap_or_default();
-            out.last_mut()
-                .expect("a header first")
-                .1
-                .push(id.to_owned());
-        } else {
-            out.push((l.to_owned(), Vec::new()));
-        }
-    }
-    out
-}
-
-/// The ids listed under the section for `ns`, or nothing where it has none.
-pub(crate) fn listed_in(text: &str, ns: &str) -> Vec<String> {
-    let want = if ns == "tenet" {
-        " tenets carry ".to_owned()
-    } else {
-        format!(" {ns} rows carry ")
-    };
-    sections(text)
-        .into_iter()
-        .find(|(h, _)| h.contains(&want))
-        .map(|(_, ids)| ids)
-        .unwrap_or_default()
-}
-
 pub(crate) fn refused(reg: &RegistryView, repo: &Path, args: &[&str]) -> String {
     match run(reg, repo, args).outcome {
         Outcome::Inconclusive {
@@ -193,91 +121,17 @@ pub(crate) fn line_of<'a>(text: &'a str, key: &str) -> &'a str {
 // --- find ----------------------------------------------------------------------------------------
 
 #[test]
-fn find_reads_every_namespace_when_nothing_narrows_it() {
-    let text = answered(&run(&wide(), &scratch(), &["find", "sun"])).to_owned();
-    assert_eq!(listed_in(&text, "tenet"), [
-        "days_follow_the_sun",
-        "the_sun_rises"
-    ]);
-    assert_eq!(listed_in(&text, "ikiuni-renderer"), [
-        "a_sky_pass",
-        "a_sun_disc"
-    ]);
-    assert_eq!(listed_in(&text, "ikiuni"), ["the_sun_rises"]);
-    assert_eq!(listed_in(&text, "bevy"), ["sun_light"]);
-    assert!(
-        sections(&text).iter().all(|(h, _)| !h.contains("subject")),
-        "no subject carries the word: {text}"
-    );
-}
-
-#[test]
-fn find_matches_a_reference_row_by_the_words_of_its_quote_and_its_name() {
-    let reg = wide();
-    let repo = scratch();
-    // the word is in the quote of `a_sky_pass` and nowhere in its id, name or keywords
-    assert_eq!(
-        listed_in(
-            answered(&run(&reg, &repo, &["find", "DRAWN"])),
-            "ikiuni-renderer"
-        ),
-        ["a_sky_pass"]
-    );
-    // and in the name of `a_sun_disc` only
-    assert_eq!(
-        listed_in(
-            answered(&run(&reg, &repo, &["find", "sun disc"])),
-            "ikiuni-renderer"
-        ),
-        ["a_sun_disc"]
-    );
-}
-
-#[test]
-fn find_narrowed_by_in_reads_only_the_namespaces_it_names() {
-    let reg = wide();
-    let repo = scratch();
-    let only = |args: &[&str]| {
-        sections(answered(&run(&reg, &repo, args)))
-            .into_iter()
-            .map(|(h, ids)| (h.split_once(" carry").expect("a header").0.to_owned(), ids))
-            .collect::<Vec<_>>()
-    };
-    assert_eq!(only(&["find", "sun", "--in", "ikiuni-renderer"]), [(
-        "2 ikiuni-renderer rows".to_owned(),
-        vec!["a_sky_pass".to_owned(), "a_sun_disc".to_owned()]
-    )]);
-    assert_eq!(only(&["find", "sun", "--in=bevy"]), [(
-        "1 bevy rows".to_owned(),
-        vec!["sun_light".to_owned()]
-    )]);
-    // the flag may come first, and several namespaces are one comma list
-    let both = only(&["--in", "tenet,bevy", "find", "sun"]);
-    assert_eq!(both.iter().map(|(h, _)| h.as_str()).collect::<Vec<_>>(), [
-        "2 tenets",
-        "1 bevy rows"
-    ]);
-    // narrowed to the tenets alone, the answer is the one the tenets had before it read the rest
-    let tenets = run(&reg, &repo, &["find", "sun", "--in", "tenet"]);
-    assert_eq!(
-        answered(&tenets),
-        "2 tenets carry `sun`\n\n  days_follow_the_sun  A day is the_sun_rises again.\n  the_sun_rises        \
-         The sun rises in the east.\n\nread 2 tenets, shown 2\n"
-    );
-}
-
-#[test]
 fn a_filter_naming_no_namespace_is_refused_with_the_ones_there_are() {
     let reg = wide();
     let repo = scratch();
-    let why = refused(&reg, &repo, &["find", "sun", "--in", "nosuch"]);
+    let why = refused(&reg, &repo, &["show", "sun", "--in", "nosuch"]);
     assert!(why.contains("`nosuch`"), "{why}");
     for ns in ["bevy", "ikiuni", "ikiuni-renderer", "subject", "tenet", "canon"] {
         assert!(why.contains(ns), "`{ns}` missing from {why}");
     }
-    assert!(refused(&reg, &repo, &["find", "sun", "--in", "bevy,nosuch"]).contains("`nosuch`"));
-    assert!(refused(&reg, &repo, &["find", "sun", "--in"]).contains("--in"));
-    assert!(refused(&reg, &repo, &["find", "sun", "--in", ","]).contains("--in"));
+    assert!(refused(&reg, &repo, &["show", "sun", "--in", "bevy,nosuch"]).contains("`nosuch`"));
+    assert!(refused(&reg, &repo, &["show", "sun", "--in"]).contains("--in"));
+    assert!(refused(&reg, &repo, &["show", "sun", "--in", ","]).contains("--in"));
 }
 
 #[test]
@@ -286,47 +140,20 @@ fn a_filter_is_refused_by_the_verbs_that_are_about_tenets_alone() {
     let repo = scratch();
     for verb in ["subjects", "uncited", "forbids", "contradicts"] {
         let why = refused(&reg, &repo, &[verb, "--in", "tenet"]);
-        assert!(
-            why.contains("find, related, citers and show"),
-            "{verb}: {why}"
-        );
+        assert!(why.contains("citers and show"), "{verb}: {why}");
     }
 }
 
 // --- the canon namespaces ------------------------------------------------------------------------
 
 #[test]
-fn in_canon_narrows_to_the_namespaces_canon_paths_reach() {
-    let reg = wide();
-    let repo = canon_repo();
-    // the word is a subject, and the id of one reference row and a field of another that relates to it
-    let all = answered(&run(&reg, &repo, &["find", "sky"])).to_owned();
-    assert_eq!(listed_in(&all, "ikiuni-renderer"), [
-        "a_sky_pass",
-        "a_sun_disc"
-    ]);
-    assert_eq!(listed_in(&all, "subject"), ["sky"]);
-    let canon = answered(&run(&reg, &repo, &["find", "sky", "--in", "canon"])).to_owned();
-    assert_eq!(listed_in(&canon, "subject"), ["sky"]);
-    assert!(listed_in(&canon, "ikiuni-renderer").is_empty(), "{canon}");
-    // `canon` is a name among the others, so it can be listed with one a person adds
-    let more = answered(&run(&reg, &repo, &["find", "sun", "--in", "canon,bevy"])).to_owned();
-    assert_eq!(listed_in(&more, "bevy"), ["sun_light"]);
-    assert_eq!(listed_in(&more, "tenet"), [
-        "days_follow_the_sun",
-        "the_sun_rises"
-    ]);
-    assert!(listed_in(&more, "ikiuni-renderer").is_empty(), "{more}");
-}
-
-#[test]
 fn in_canon_is_refused_where_the_repository_declares_no_canon() {
     let reg = wide();
     let none = scratch();
-    let why = refused(&reg, &none, &["find", "sun", "--in", "canon"]);
+    let why = refused(&reg, &none, &["show", "sun", "--in", "canon"]);
     assert!(why.contains("canon_paths"), "{why}");
     write(&none, "mockspace.toml", "mock_dir = \"mock\"\n");
-    assert!(refused(&reg, &none, &["find", "sun", "--in", "canon"]).contains("canon_paths"));
+    assert!(refused(&reg, &none, &["show", "sun", "--in", "canon"]).contains("canon_paths"));
 }
 
 // --- show ----------------------------------------------------------------------------------------
@@ -423,4 +250,3 @@ fn show_refuses_what_is_no_row_or_is_outside_the_filter() {
     );
     assert!(refused(&reg, &repo, &["show"]).contains("wants a row"));
 }
-
