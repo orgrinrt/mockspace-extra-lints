@@ -32,9 +32,8 @@ use mockspace_extra_lints::lints::no_std::NoStd;
 use mockspace_lint_rules::CrateLint;
 use mockspace_lint_rules::testkit::LintFixture;
 
-/// A crate of one file. `no-std` decides whether it is looking at the crate root by comparing the
-/// root's text against the first source file, and the fixture holds the one text as both. These
-/// fixtures are ordinary crates, since all three lints skip proc-macro source.
+/// A crate of one file, the root. `no-std` and `no-alloc` hold it only when that root declares
+/// `#![no_std]`. These fixtures are ordinary crates, since all three lints skip proc-macro source.
 fn ctx(source: &str) -> LintFixture {
     LintFixture::new(source).with_workspace_root(std::path::Path::new("/tmp"))
 }
@@ -56,15 +55,16 @@ fn a_fully_qualified_std_call_with_no_import_fires() {
     assert_eq!(hits[0].line, 4, "the finding names the calling line");
 }
 
-/// The root half, which a per-line scanner has no notion of at all: the
-/// attribute's absence is a fact about the crate rather than about any line.
+/// The root half the pack does not carry. Whether a crate declares `#![no_std]` is what decides
+/// that the lint holds it at all, so a root without the attribute is left alone, and an enforcer
+/// that requires the attribute of every crate is still a local one's to keep.
 #[test]
-fn a_root_missing_the_attribute_fires_with_no_offending_line() {
-    let src = "use core::fmt;\n";
+fn a_root_missing_the_attribute_is_left_to_a_local_enforcer() {
+    let src = "use core::fmt;\nuse std::vec::Vec;\n";
     let hits = NoStd.check(&ctx(src).ctx());
     assert!(
-        hits.iter().any(|h| h.line == 1),
-        "a root with no `#![no_std]` must fire: {hits:?}"
+        hits.is_empty(),
+        "a crate declaring no `#![no_std]` is not the pack lint's: {hits:?}"
     );
 }
 
@@ -92,7 +92,7 @@ fn the_map_and_handle_containers_fire() {
         "let a: Arc<T> = todo!();\n",
         "let r: Rc<T> = todo!();\n",
     ] {
-        let hits = NoAlloc.check(&ctx(src).ctx());
+        let hits = NoAlloc.check(&ctx(&format!("#![no_std]\n{src}")).ctx());
         assert!(!hits.is_empty(), "must fire on {src:?}");
     }
 }

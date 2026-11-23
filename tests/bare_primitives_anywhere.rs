@@ -17,11 +17,16 @@ use mockspace_extra_lints::lints::no_public_raw_field::NoPublicRawField;
 use mockspace_lint_rules::CrateLint;
 use mockspace_lint_rules::testkit::LintFixture;
 
+/// A crate of the stack's vocabulary, which every stack lint holds whatever its root declares.
+const VOCABULARY_MANIFEST: &str = "[package]\nname = \"arvo-fixture\"\n";
+
 /// An ordinary crate of one file. Source lints skip proc-macro crates by default, because a proc
 /// macro's own heap-using parser never ships in a consumer binary, and these fixtures are not
 /// proc-macro crates, so the default is the honest setting.
 fn ctx_with(source: &str) -> LintFixture {
-    LintFixture::new(source).with_workspace_root(std::path::Path::new("/tmp"))
+    LintFixture::new(source)
+        .with_doc("Cargo.toml", VOCABULARY_MANIFEST)
+        .with_workspace_root(std::path::Path::new("/tmp"))
 }
 
 // ---- arvo-types-only ------------------------------------------------------
@@ -62,7 +67,9 @@ fn arvo_types_only_fires_on_a_const_binding_beside_a_literal_suffix() {
 
     let suffix_alone = "fn f() { let _ = 0u32; }\n";
     assert!(
-        ArvoTypesOnly.check(&ctx_with(suffix_alone).ctx()).is_empty(),
+        ArvoTypesOnly
+            .check(&ctx_with(suffix_alone).ctx())
+            .is_empty(),
         "pinning the gap rather than hiding it: a suffix on its own is missed",
     );
 }
@@ -250,6 +257,7 @@ fn ctx_with_files(files: Vec<(&str, &str)>) -> LintFixture {
         .unwrap_or("");
     LintFixture::new(lib_source)
         .with_sources(&files)
+        .with_doc("Cargo.toml", VOCABULARY_MANIFEST)
         .with_workspace_root(std::path::Path::new("/tmp"))
 }
 
@@ -262,7 +270,8 @@ fn arvo_types_only_fires_in_module_file_not_lib_rs() {
     let hits = ArvoTypesOnly.check(&ctx.ctx());
     assert!(!hits.is_empty(), "drift in src/bits.rs must be flagged");
     assert!(
-        hits.iter().any(|e| e.path.as_deref() == Some("src/bits.rs")),
+        hits.iter()
+            .any(|e| e.path.as_deref() == Some("src/bits.rs")),
         "the finding should carry the offending file as its path"
     );
 }
@@ -276,7 +285,8 @@ fn no_bare_option_fires_in_module_file_not_lib_rs() {
     let hits = NoBareOption.check(&ctx.ctx());
     assert!(!hits.is_empty(), "Option in src/resolve.rs must be flagged");
     assert!(
-        hits.iter().any(|e| e.path.as_deref() == Some("src/resolve.rs")),
+        hits.iter()
+            .any(|e| e.path.as_deref() == Some("src/resolve.rs")),
         "the finding should carry the offending file as its path"
     );
 }
@@ -290,12 +300,18 @@ fn ctx_with_crate_and_introductions(
 ) -> LintFixture {
     let introductions_map: std::collections::BTreeMap<String, Vec<String>> = introductions
         .into_iter()
-        .map(|(k, v)| (k.to_string(), v.into_iter().map(|s| s.to_string()).collect()))
+        .map(|(k, v)| {
+            (
+                k.to_string(),
+                v.into_iter().map(|s| s.to_string()).collect(),
+            )
+        })
         .collect();
     LintFixture::new(source)
         .with_crate_name(crate_name, crate_name)
         .with_workspace_root(std::path::Path::new("/tmp"))
         .with_primitive_introductions(introductions_map)
+        .with_doc("Cargo.toml", VOCABULARY_MANIFEST)
 }
 
 #[test]
@@ -428,7 +444,8 @@ fn no_public_raw_field_fires_in_module_file_not_lib_rs() {
         "tuple-struct raw u32 in src/handle.rs must be flagged"
     );
     assert!(
-        hits.iter().any(|e| e.path.as_deref() == Some("src/handle.rs")),
+        hits.iter()
+            .any(|e| e.path.as_deref() == Some("src/handle.rs")),
         "the finding should carry the offending file as its path"
     );
 }
@@ -441,11 +458,26 @@ fn a_bare_primitive_message_does_not_repeat_its_path() {
         ctx_with_files(vec![("src/lib.rs", "pub mod m;\n"), (module, text)])
     };
     let cases: Vec<(&str, Vec<mockspace_lint_rules::LintError>)> = vec![
-        ("arvo-types-only", ArvoTypesOnly.check(&files("src/m.rs", "pub struct B(u64);\n").ctx())),
-        ("no-bare-option", NoBareOption.check(&files("src/m.rs", "fn f() -> Option<u8> { None }\n").ctx())),
-        ("no-bare-result", NoBareResult.check(&files("src/m.rs", "fn f() -> Result<u8, u8> { Ok(1) }\n").ctx())),
-        ("no-bare-string", NoBareString.check(&files("src/m.rs", "fn f(s: String) {}\n").ctx())),
-        ("no-public-raw-field", NoPublicRawField.check(&files("src/m.rs", "pub struct S(pub u32);\n").ctx())),
+        (
+            "arvo-types-only",
+            ArvoTypesOnly.check(&files("src/m.rs", "pub struct B(u64);\n").ctx()),
+        ),
+        (
+            "no-bare-option",
+            NoBareOption.check(&files("src/m.rs", "fn f() -> Option<u8> { None }\n").ctx()),
+        ),
+        (
+            "no-bare-result",
+            NoBareResult.check(&files("src/m.rs", "fn f() -> Result<u8, u8> { Ok(1) }\n").ctx()),
+        ),
+        (
+            "no-bare-string",
+            NoBareString.check(&files("src/m.rs", "fn f(s: String) {}\n").ctx()),
+        ),
+        (
+            "no-public-raw-field",
+            NoPublicRawField.check(&files("src/m.rs", "pub struct S(pub u32);\n").ctx()),
+        ),
     ];
     for (lint, hits) in cases {
         assert!(!hits.is_empty(), "{lint} must flag src/m.rs");

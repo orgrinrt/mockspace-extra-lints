@@ -25,6 +25,7 @@
 mod const_generic_parameters;
 mod dep_surface;
 mod manifest_toml;
+mod nature;
 mod paths;
 mod repo_scope;
 pub mod slang;

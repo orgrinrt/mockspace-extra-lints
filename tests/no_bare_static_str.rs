@@ -12,16 +12,25 @@ use mockspace_extra_lints::lints::no_bare_static_str::NoBareStaticStr;
 use mockspace_lint_rules::CrateLint;
 use mockspace_lint_rules::testkit::LintFixture;
 
+/// A crate of the stack's vocabulary, which every stack lint holds whatever its root declares.
+const VOCABULARY_MANIFEST: &str = "[package]\nname = \"arvo-fixture\"\n";
+
 /// Source lints skip proc-macro crates by default, and these fixtures are ordinary crates.
 fn ctx(crate_name: &str, introductions: Vec<(&str, Vec<&str>)>, source: &str) -> LintFixture {
     let introductions_map: BTreeMap<String, Vec<String>> = introductions
         .into_iter()
-        .map(|(k, v)| (k.to_string(), v.into_iter().map(|s| s.to_string()).collect()))
+        .map(|(k, v)| {
+            (
+                k.to_string(),
+                v.into_iter().map(|s| s.to_string()).collect(),
+            )
+        })
         .collect();
     LintFixture::new(source)
         .with_crate_name(crate_name, crate_name)
         .with_workspace_root(std::path::Path::new("/tmp"))
         .with_primitive_introductions(introductions_map)
+        .with_doc("Cargo.toml", VOCABULARY_MANIFEST)
 }
 
 fn plain_ctx(source: &str) -> LintFixture {

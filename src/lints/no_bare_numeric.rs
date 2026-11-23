@@ -20,6 +20,8 @@
 //! This lint is retained alongside `arvo-types-only` so configs that
 //! named it still apply; the two are semantically equivalent today.
 //! Prefer `arvo-types-only` in new configs.
+//!
+//! Where it applies is the crate's own nature, read by `crate::nature`, never a list.
 
 use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 
@@ -52,6 +54,10 @@ impl Lint for NoBareNumeric {
 
 impl CrateLint for NoBareNumeric {
     fn check(&self, ctx: &LintContext) -> Vec<LintError> {
+        // Only a crate built on the stack's vocabulary can be held to it.
+        if !crate::nature::is_of_the_stack(ctx) {
+            return Vec::new();
+        }
         if ctx.should_skip_proc_macro_source_lint() {
             return Vec::new();
         }
