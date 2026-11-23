@@ -122,7 +122,19 @@ fn run_about(mock: &Path, reg: &RegistryView, args: &[&str], about: &[String]) -
             registry: reg,
         },
         about,
-        &|| corpus::repo::ready_at(Some(&cache), mock, mock, None, &[]),
+        &|| {
+            // The planted directory is its own checkout, and its index is kept apart per directory.
+            let _ = std::process::Command::new("git")
+                .args(["init", "-q"])
+                .current_dir(mock)
+                .status();
+            let name = mock
+                .file_name()
+                .map_or_else(String::new, |n| n.to_string_lossy().into_owned());
+            let path = cache.join(name).join("search.sqlite");
+            let _ = corpus::repo::refresh_at(&path, mock, mock, None);
+            corpus::repo::open_at(&path, mock, mock, None, &|_: &Path| {})
+        },
     )
 }
 
@@ -388,9 +400,15 @@ fn the_subjects_about_the_work_come_from_the_tools_table() {
         "the key is declared, so the engine hands it over"
     );
     let mut params = mockspace::tool::ToolParams::new();
-    params.set("about_the_work", vec!["workflow".to_owned(), "tools".to_owned()]);
+    params.set("about_the_work", vec![
+        "workflow".to_owned(),
+        "tools".to_owned(),
+    ]);
     t.configure(&params);
-    assert_eq!(t.about_the_work, vec!["workflow".to_owned(), "tools".to_owned()]);
+    assert_eq!(t.about_the_work, vec![
+        "workflow".to_owned(),
+        "tools".to_owned()
+    ]);
     // A table that sets the key to an empty array names no subject.
     params.set("about_the_work", Vec::new());
     t.configure(&params);

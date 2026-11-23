@@ -8,9 +8,9 @@
 
 use std::collections::BTreeMap;
 
-use ticket_model::Tree;
 use mockspace::RegistryView;
 use mockspace::tool::Outcome;
+use ticket_model::Tree;
 
 use crate::landing::{Landing, Trunk};
 use crate::refs::Known;

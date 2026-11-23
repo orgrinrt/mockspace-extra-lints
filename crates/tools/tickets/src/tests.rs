@@ -303,14 +303,10 @@ fn listing_is_in_board_order_and_empty_when_nothing_matches() {
         .unwrap();
     let c = s.add("Ranked backlog item", &[("rank", &["1"])]).unwrap();
     let store = crate::load(&s.root).unwrap();
-    let ids: Vec<String> = view::list(
-        &store,
-        &planning::Plan::default(),
-        &view::Filter::default(),
-    )
-    .into_iter()
-    .map(|r| r.id)
-    .collect();
+    let ids: Vec<String> = view::list(&store, &planning::Plan::default(), &view::Filter::default())
+        .into_iter()
+        .map(|r| r.id)
+        .collect();
     assert_eq!(ids, [c, a, b]);
     let held = view::list(&store, &planning::Plan::default(), &view::Filter {
         holder: vec!["alpha".into()],

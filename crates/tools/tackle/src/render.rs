@@ -42,7 +42,7 @@ pub(crate) fn render_table(out: &mut String, ranked: &[score::Scored], corpus_re
     if corpus_read == 0 {
         out.push_str(
             "\n  NO RESEARCH WAS READ, so `unrd` is zero everywhere and this ranking is missing the \
-             signal it was rebuilt for. Run `mock corpus` to find out why.\n",
+             signal it was rebuilt for. Run `mock search --status` to find out why.\n",
         );
     } else {
         out.push_str(&format!(
@@ -124,9 +124,9 @@ pub(crate) fn render_brief(
         "unread" => out.push_str(
             "GO AND READ, BEFORE YOU DERIVE ANYTHING.\n\n\
              This is thin because what was said is in the research, the rounds or the maintainer's \
-             captures and never reached the canon. `mock unearth <subject> uncited` ranks that \
-             material and shows what no row cites yet; `mock already-said <term>` says which rows \
-             already carry a word.\n\n\
+             captures and never reached the canon. `mock search <subject> --uncited` ranks \
+             that material and shows what no row cites yet; `mock search <term> --rows` says which \
+             rows already carry a word.\n\n\
              Where the maintainer's words settle something, it becomes a tenet in this subject's file \
              citing them by heading. Where the research argues something the maintainer has not said, \
              it is a question for the maintainer, put with what the tools returned.\n\n",
@@ -134,28 +134,28 @@ pub(crate) fn render_brief(
         "moving" => out.push_str(
             "THIS SUBJECT IS STILL MOVING.\n\n\
              Much of what was written here has been superseded. Read each replacement beside what it \
-             replaced with `mock canon related <id>`, check `mock parallel-statements <subject>` for a \
-             binding row still saying what a superseded one said, and check with `mock already-said` \
+             replaced with `mock search --linked <id>`, check `mock parallel-statements <subject>` for a \
+             binding row still saying what a superseded one said, and check with `mock search <term> --spoken` \
              whether the maintainer's latest words settle what is still open.\n\n",
         ),
         "gaps" => out.push_str(
             "THE HOLES ARE ALREADY NAMED.\n\n\
              This subject's rows mark more left open than any other's, so somebody has done the \
              finding already. Read them. A hole the research or the maintainer's captures already \
-             close is a transcription, found with `mock unearth`; one they do not close is a question \
+             close is a transcription, found with `mock search`; one they do not close is a question \
              for the maintainer.\n\n",
         ),
         "islands" => out.push_str(
             "THE ROWS HERE ARE JOINED TO NOTHING.\n\n\
              The subject is written and its tenets neither cite nor are cited by another, so it reads \
-             as a pile of answers rather than a design. `mock canon related <id>` and `mock canon \
+             as a pile of answers rather than a design. `mock search --linked <id>` and `mock canon \
              citers <id>` show what each touches. A relation goes into a tenet's words first; `cites` \
              follows the words.\n\n",
         ),
         _ => out.push_str(
             "LITTLE BINDS HERE.\n\n\
-             Start with `mock unearth <subject>`, which reads the research, the rounds and the \
-             maintainer's captures rather than the rows, because thin here does not always mean \
+             Start with `mock search <subject>`, which reads the research, the rounds and the \
+             maintainer's captures as well as the rows, because thin here does not always mean \
              unthought. What the maintainer has said becomes tenets citing those words. What nobody \
              has asked is researched wide first, by category before variant, and then put to the \
              maintainer as a question with the options and what the tools returned.\n\n",

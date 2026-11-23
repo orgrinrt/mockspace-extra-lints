@@ -1,0 +1,16 @@
+[package]
+name = "mockspace-extra-corpus"
+description = "Opens the repository's own index for a question, keeps it current from the checkout's files, and reads the maintainer's captured words."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+# the trait crate under the name the generated collector gives it; the engine patches every spelling
+# of it to the one it is built from
+mockspace.workspace = true
+registry-lints.workspace = true
+# the index the query tools ask, which is muisti's: private, so spelled over ssh
+muisti.workspace = true
+toml.workspace = true

@@ -18,8 +18,8 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::path::Path;
 
-use crate::layout::Layout;
 use crate::canon_tree::{Tier, files, tier_of};
+use crate::layout::Layout;
 use crate::retired_words::{scanned, words};
 use crate::rows::Tenet;
 

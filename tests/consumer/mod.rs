@@ -24,7 +24,12 @@ pub fn write(root: &Path, rel: &str, text: &str) {
 
 /// Runs git in `root`, asserting it succeeds.
 pub fn git(root: &Path, args: &[&str]) {
-    let out = Command::new("git").arg("-C").arg(root).args(args).output().unwrap();
+    let out = Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(args)
+        .output()
+        .unwrap();
     assert!(
         out.status.success(),
         "git {args:?}: {}",

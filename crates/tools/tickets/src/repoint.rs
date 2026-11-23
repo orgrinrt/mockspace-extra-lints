@@ -12,8 +12,8 @@
 
 use std::path::Path;
 
-use ticket_model::{Fields, heirs};
 use mockspace::RegistryView;
+use ticket_model::{Fields, heirs};
 
 use crate::write::{MoveRequest, move_ticket};
 
