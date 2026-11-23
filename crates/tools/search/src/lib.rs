@@ -61,7 +61,9 @@ impl Tool for Search {
     }
 
     fn purpose(&self) -> Purpose {
-        Purpose::Check(NotALint::TakesAQuestion)
+        // Not `TakesAQuestion`: `--status`, `--refresh` and a search by row filters alone ask no words, and
+        // the answer is the output in every case.
+        Purpose::Check(NotALint::NoFailingCase)
     }
 
     fn args(&self) -> &'static [ArgSpec] {

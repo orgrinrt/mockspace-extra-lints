@@ -275,3 +275,11 @@ fn a_row_carrying_more_of_the_question_still_wins() {
     let df = |k: &str| if k == "rare" { 2 } else { 800 };
     assert_eq!(rank_keywords(candidates, df, 1), ["common but on point"]);
 }
+
+#[test]
+fn the_engine_registers_the_tool_as_it_is_declared() {
+    // A tool the engine refuses at registration takes every tool of the consumer down with it, which
+    // is how a search with no required question failed as `takes-a-question`.
+    let faults = mockspace::tool::contract_faults(&Search::default(), None);
+    assert!(faults.is_empty(), "{faults:?}");
+}
