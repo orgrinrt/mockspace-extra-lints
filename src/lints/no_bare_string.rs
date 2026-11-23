@@ -8,6 +8,8 @@
 //! Scans every non-comment, non-string line; any appearance in any
 //! position is drift. Line-local `lint:allow(no-bare-string)` is the
 //! only escape hatch, for foreign-crate boundaries.
+//!
+//! Where it applies is the crate's own nature, read by `crate::nature`, never a list.
 
 use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 
@@ -40,6 +42,10 @@ impl Lint for NoBareString {
 
 impl CrateLint for NoBareString {
     fn check(&self, ctx: &LintContext) -> Vec<LintError> {
+        // Only a crate built on the stack's vocabulary can be held to it.
+        if !crate::nature::is_of_the_stack(ctx) {
+            return Vec::new();
+        }
         if ctx.should_skip_proc_macro_source_lint() {
             return Vec::new();
         }

@@ -17,12 +17,14 @@ use mockspace_extra_lints::lints::no_public_raw_field::NoPublicRawField;
 use mockspace_lint_rules::testkit::LintFixture;
 use mockspace_lint_rules::{CrateLint, LintError};
 
-/// A crate of one file, named and prefixed the way the checks below expect.
+/// A crate of one file, named and prefixed the way the checks below expect, and of the stack's
+/// vocabulary by its manifest so the stack lints hold it.
 fn fixture(source: &str) -> LintFixture {
     LintFixture::new(source)
         .with_crate_name("a-consumer", "a-consumer")
         .with_workspace_root(std::path::Path::new("/tmp"))
         .with_crate_prefix("a")
+        .with_doc("Cargo.toml", "[package]\nname = \"arvo-consumer\"\n")
 }
 
 /// Both lints, because the pack's own documentation says they are semantically
