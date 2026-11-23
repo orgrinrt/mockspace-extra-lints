@@ -9,8 +9,8 @@
 //! - A lint that walks `all_sources` itself must declare `per_file(false)`, or
 //!   the dispatcher asks it once per file and it reports its whole crate each
 //!   time.
-//! - A lint making a claim about the crate root must fire that claim only when
-//!   `source` is the root, or every module file is reported as a root.
+//! - A lint reading the crate root reads it once for the crate, not the file
+//!   `source` happens to hold, or a module file is read as a root.
 //!
 //! These tests assert the declarations and simulate the dispatcher, because the
 //! defect lives in the interaction rather than in either half alone.
@@ -27,10 +27,14 @@ use mockspace_extra_lints::lints::re_export_foreign_names::ReExportForeignNames;
 use mockspace_lint_rules::testkit::{self, LintFixture};
 use mockspace_lint_rules::{CrateLint, Lint, LintPack};
 
+/// A crate built on the stack's vocabulary, which with a `#![no_std]` root makes it a crate of the stack.
+const STACK_MANIFEST: &str = "[package]\nname = \"fixture\"\n\n[dependencies]\narvo = \"0.1\"\n";
+
 /// A crate of several files. `files[0]` is the root, as the engine documents.
 fn ctx_over(files: &[(&str, &str)]) -> LintFixture {
     LintFixture::new(files[0].1)
         .with_sources(files)
+        .with_doc("Cargo.toml", STACK_MANIFEST)
         .with_workspace_root(std::path::Path::new("/tmp"))
 }
 
@@ -118,18 +122,17 @@ fn a_walker_names_the_file_it_found_the_drift_in() {
 // ---- no-std's two halves --------------------------------------------------
 
 #[test]
-fn no_std_reports_a_missing_root_attribute_once() {
+fn no_std_leaves_a_crate_that_declares_no_attribute_alone() {
+    // A crate that does not declare `#![no_std]` has said nothing the lint could hold it to, so
+    // neither its root nor a module importing std is reported.
     const NO_ATTR: &[(&str, &str)] = &[
         ("src/lib.rs", "pub struct A;\n"),
-        ("src/b.rs", "pub struct B;\n"),
+        ("src/b.rs", "use std::vec::Vec;\npub struct B;\n"),
         ("src/c.rs", "pub struct C;\n"),
     ];
     let ctx = ctx_over(NO_ATTR);
     let n = dispatch(NoStd, &ctx);
-    assert_eq!(
-        n, 1,
-        "the root is missing `#![no_std]` once, not once per module file"
-    );
+    assert_eq!(n, 0, "a std crate is not the no-std lint's");
 }
 
 #[test]

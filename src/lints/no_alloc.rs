@@ -5,6 +5,8 @@
 //! Default severity: HARD_ERROR.
 //!
 //! Escape hatch for a single line: `// lint:allow(no-alloc) reason: ...; tracked: #N`.
+//!
+//! Where it applies is the crate's own nature, read by `crate::nature`, never a list.
 
 use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 
@@ -56,6 +58,10 @@ impl Lint for NoAlloc {
 
 impl CrateLint for NoAlloc {
     fn check(&self, ctx: &LintContext) -> Vec<LintError> {
+        // A crate that does not declare `#![no_std]` has said nothing this lint could hold it to.
+        if !crate::nature::declares_no_std(ctx) {
+            return Vec::new();
+        }
         // Proc-macro crates run in the compiler host context and use std
         // by construction. Their heap usage is not consumer-runtime heap.
         if ctx.should_skip_proc_macro_source_lint() {

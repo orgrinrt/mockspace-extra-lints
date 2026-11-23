@@ -10,6 +10,8 @@
 //! tier at compile time via notko-macros. Attributed items should
 //! carry `lint:allow(no-bare-result)` since the textual form still
 //! mentions `Result`.
+//!
+//! Where it applies is the crate's own nature, read by `crate::nature`, never a list.
 
 use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 
@@ -36,6 +38,10 @@ impl Lint for NoBareResult {
 
 impl CrateLint for NoBareResult {
     fn check(&self, ctx: &LintContext) -> Vec<LintError> {
+        // Only a crate built on the stack's vocabulary can be held to it.
+        if !crate::nature::is_of_the_stack(ctx) {
+            return Vec::new();
+        }
         if ctx.should_skip_proc_macro_source_lint() {
             return Vec::new();
         }
