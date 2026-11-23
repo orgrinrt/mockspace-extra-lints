@@ -73,6 +73,8 @@ impl World {
         }
         write::add(&registry, &AddRequest {
             title: "Which way".to_string(),
+            under: None,
+            leaf: None,
             kind: "question".to_string(),
             holder: "maintainer".to_string(),
             state: Some("waiting".to_string()),

@@ -24,6 +24,7 @@ pub mod landing;
 pub mod member;
 pub mod refs;
 pub mod repoint;
+mod tag_edit;
 mod row;
 #[cfg(any(test, feature = "testkit"))]
 pub mod testkit;
@@ -46,7 +47,32 @@ use ticket_model::{Heirs, Store, Tree, rules};
 /// When a file cannot be read, or the crate refuses what it holds.
 pub fn load(registry: &std::path::Path) -> Result<Store, String> {
     let texts = read_texts(registry)?;
-    Store::from_texts(texts.iter().map(|(p, s)| (p.as_str(), s.as_str())))
+    Store::from_texts_declared(
+        &declaration(registry)?,
+        texts.iter().map(|(p, s)| (p.as_str(), s.as_str())),
+    )
+}
+
+/// What the consumer's `mockspace.toml` declares of the ticket namespace, read from the nearest one
+/// above `registry`, the search ending at the repository root. A registry with none above it
+/// declares nothing, and its ids are the flat slugs they always were.
+///
+/// # Errors
+///
+/// When the file cannot be read or does not declare its namespaces as a namespace is.
+pub fn declaration(registry: &std::path::Path) -> Result<ticket_model::Declaration, String> {
+    for dir in registry.ancestors() {
+        let file = dir.join("mockspace.toml");
+        if file.is_file() {
+            let text = std::fs::read_to_string(&file)
+                .map_err(|e| format!("cannot read {}: {e}", file.display()))?;
+            return ticket_model::Declaration::from_config(&text);
+        }
+        if dir.join(".git").exists() {
+            break;
+        }
+    }
+    Ok(ticket_model::Declaration::default())
 }
 
 /// Reads every planning row under `registry`, wherever it sits, into the planning crate's `Plan`.
@@ -157,6 +183,9 @@ impl Tickets {
         let notice = if machine { String::new() } else { reading.notice };
         let store = reading.store;
         let plan = reading.plan;
+        if let Err(e) = view::chosen(&store, &req.filter) {
+            return (String::new(), ToolReport::inconclusive(e));
+        }
         let git = landing::Git::of(ctx);
         let report = match &req.verb {
             Verb::Check => {

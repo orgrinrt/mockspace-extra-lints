@@ -14,6 +14,8 @@ use crate::write::{AddRequest, MemberWrite, MoveRequest, TagEdit};
 /// Flags that take the word after them, for `add`.
 pub const ADD_FLAGS: &[&str] = &[
     "--id",
+    "--under",
+    "--leaf",
     "--kind",
     "--state",
     "--holder",
@@ -131,6 +133,11 @@ pub fn at(flag: Option<&&str>) -> String {
     flag.map_or_else(|| format_utc(now_secs()), |s| (*s).to_string())
 }
 
+/// Refuses each ticket reference that is twelve to forty hex digits: a ticket is named by its id.
+fn refuse_shas(refs: impl IntoIterator<Item = String>) -> Result<(), String> {
+    refs.into_iter().try_for_each(|r| ticket_model::path::refuse_sha(&r))
+}
+
 /// `ticket-add <title> [flags]`.
 ///
 /// # Errors
@@ -174,9 +181,12 @@ pub fn add(args: &[&str]) -> Result<AddRequest, String> {
     if let Some(v) = f.get("--options") {
         fields.insert("options".to_string(), split_options(v));
     }
+    refuse_shas(["--id", "--needs", "--part-of", "--superseded-by"].iter().filter_map(|k| f.get(k)).flat_map(|v| list(Some(v))))?;
     Ok(AddRequest {
         title,
         id: f.get("--id").map(|s| (*s).to_string()),
+        under: f.get("--under").map(|s| (*s).to_string()),
+        leaf: f.get("--leaf").map(|s| (*s).to_string()),
         kind: f
             .get("--kind")
             .map_or_else(|| "task".to_string(), |s| (*s).to_string()),
@@ -213,6 +223,7 @@ pub fn move_(args: &[&str]) -> Result<MoveRequest, String> {
             );
         },
     };
+    refuse_shas([ticket].into_iter().chain(["--for", "--needs", "--part-of", "--superseded-by"].iter().filter_map(|k| p.flags.get(k).copied())).flat_map(|v| list(Some(&v))))?;
     let mut links = BTreeMap::new();
     for (flag, field, many) in [
         ("--kind", "kind", false),
@@ -351,8 +362,9 @@ pub fn tickets(args: &[&str]) -> Result<ListRequest, String> {
         }
     };
     let verb = match verb {
-        "list" | "next" | "check" | "tracks" | "answerable" if !rest.is_empty() => {
-            return Err("tickets takes one verb".to_string());
+        "check" if !rest.is_empty() => return Err("tickets takes one verb".to_string()),
+        "list" | "next" | "tracks" | "answerable" if rest.len() > 1 => {
+            return Err(format!("`{verb}` takes one query pattern, and is given {}", rest.len()));
         },
         "list" => Verb::List,
         "next" => Verb::Next,
@@ -360,7 +372,11 @@ pub fn tickets(args: &[&str]) -> Result<ListRequest, String> {
         "answerable" => Verb::Answerable,
         "check" => Verb::Check,
         "branch" => Verb::Branch(one("branch name")?),
-        "landed" => Verb::Landed(one("ticket id")?),
+        "landed" => {
+            let id = one("ticket id")?;
+            ticket_model::path::refuse_sha(&id)?;
+            Verb::Landed(id)
+        },
         "contract" if rest.is_empty() => return Err("`contract` wants a contract path".to_string()),
         "contract" => Verb::Contract(rest.iter().map(|w| (*w).to_string()).collect()),
         other => {
@@ -368,6 +384,10 @@ pub fn tickets(args: &[&str]) -> Result<ListRequest, String> {
                 "`{other}` is no verb of tickets; the verbs are `list`, `next`, `check`, `branch`, `landed`, `contract`, `tracks` and `answerable`"
             ));
         },
+    };
+    let query = match &verb {
+        Verb::List | Verb::Next | Verb::Tracks | Verb::Answerable => rest.first().map(|q| (*q).to_string()),
+        _ => None,
     };
     Ok(ListRequest {
         verb,
@@ -377,6 +397,7 @@ pub fn tickets(args: &[&str]) -> Result<ListRequest, String> {
             kind:   list(p.flags.get("--kind")),
             epoch:  list(p.flags.get("--epoch")),
             tag:    list(p.flags.get("--tag")),
+            query,
         },
         opts: crate::trunk::Opts {
             tree:  p.bare.contains(&"--tree"),

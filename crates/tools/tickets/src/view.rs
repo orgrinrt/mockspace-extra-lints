@@ -23,6 +23,8 @@ pub struct Filter {
     pub epoch:  Vec<String>,
     /// Tags; a ticket matches when it holds at least one of them, each matched whole.
     pub tag:    Vec<String>,
+    /// A pattern over `ticket::<id>`, as `ticket::question::engine` or `ticket::**::internals::**`.
+    pub query:  Option<String>,
 }
 
 /// One ticket as the list shows it.
@@ -57,6 +59,17 @@ fn unblocked_by(store: &Store, ticket: &str) -> usize {
     seen.len()
 }
 
+/// The ids a filter's query selects, or nothing where it has none.
+///
+/// # Errors
+///
+/// The reason the query selects nothing it can say.
+pub fn chosen<'a>(store: &'a Store, filter: &Filter) -> Result<Option<BTreeSet<&'a str>>, String> {
+    let Some(query) = &filter.query else { return Ok(None) };
+    let ids = ticket_model::path::select(query, store.tickets.keys().map(String::as_str))?;
+    Ok(Some(ids.into_iter().collect()))
+}
+
 /// Every ticket that passes `filter`, in board order: by the state's column, then rank, then when it
 /// was added, then id.
 pub fn list(store: &Store, plan: &Plan, filter: &Filter) -> Vec<Row> {
@@ -72,11 +85,15 @@ pub fn list(store: &Store, plan: &Plan, filter: &Filter) -> Vec<Row> {
             .unwrap_or_default()
             .to_string()
     };
+    let chosen = chosen(store, filter).unwrap_or_default();
     let mut rows: Vec<(i64, i64, String, Row)> = Vec::new();
     for t in store.tickets.values() {
         let Some(now) = store.now_of(&t.id) else {
             continue;
         };
+        if chosen.as_ref().is_some_and(|c| !c.contains(t.id.as_str())) {
+            continue;
+        }
         if !matches(&filter.state, &now.to)
             || !matches(&filter.holder, &now.holder)
             || !matches(&filter.kind, t.one("kind"))

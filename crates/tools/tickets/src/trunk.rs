@@ -234,11 +234,22 @@ fn tree_store(registry: &Path) -> Result<(Store, Plan), String> {
     Ok((crate::load(registry)?, crate::load_plan(registry)?))
 }
 
+/// What the trunk's `mockspace.toml` declares of the ticket namespace: nothing where it has no such file.
+fn trunk_declaration(root: &Path) -> Result<ticket_model::Declaration, String> {
+    match ok(root, &["show", &format!("{}:mockspace.toml", trunk_ref())]) {
+        Some(text) => ticket_model::Declaration::from_config(&text),
+        None => Ok(ticket_model::Declaration::default()),
+    }
+}
+
 /// The ticket and planning rows at the trunk, as a store and a plan.
 fn trunk_store(root: &Path, registry_rel: &str) -> Result<(Store, Plan), String> {
     let mut files = trunk_files(root, &format!("{registry_rel}/ticket"))?;
     files.extend(trunk_files(root, &format!("{registry_rel}/plan"))?);
-    let store = Store::from_texts(files.iter().map(|(p, s)| (p.as_str(), s.as_str())))?;
+    let store = Store::from_texts_declared(
+        &trunk_declaration(root)?,
+        files.iter().map(|(p, s)| (p.as_str(), s.as_str())),
+    )?;
     Ok((store, crate::plan_of(&files)?))
 }
 

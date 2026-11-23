@@ -55,6 +55,8 @@ pub fn apply(
         write::add_with(store, registry, &AddRequest {
             title: t.title.clone(),
             id: Some(t.id.clone()),
+            under: None,
+            leaf: None,
             kind: "task".to_string(),
             state: None,
             holder: holder.to_string(),

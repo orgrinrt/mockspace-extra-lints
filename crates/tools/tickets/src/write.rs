@@ -5,7 +5,9 @@
 
 //! Adding a ticket and moving one: the requests, the rules applied, the text written.
 //!
-//! A ticket is one file, `ticket/items/<id>.toml` under the registry, holding its row and its moves,
+//! A ticket is one file, `ticket/items/<the id's names joined by />.toml` under the registry
+//! (`task::engine::reads` is `ticket/items/task/engine/reads.toml`; a flat id is one file in the
+//! directory), holding its row and its moves,
 //! so a ticket's history is its file's and two writers meet only when they touch the same ticket. A
 //! move is appended to that file and a ticket is created with `create_new`, so nothing here replaces
 //! text it did not write.
@@ -28,6 +30,10 @@ pub const ITEMS: &str = "ticket/items";
 pub struct AddRequest {
     pub title:  String,
     pub id:     Option<String>,
+    /// Where the ticket goes under its kind, for a namespace that folds `path`.
+    pub under:  Option<String>,
+    /// The last name of the id, for a namespace that folds `path`.
+    pub leaf:   Option<String>,
     pub kind:   String,
     pub state:  Option<String>,
     pub holder: String,
@@ -73,34 +79,7 @@ pub struct MoveRequest {
     pub tags:      TagEdit,
 }
 
-/// An edit of a ticket's tags against the ones it holds: the held ones less `remove`, then `add` not held.
-#[derive(Debug, Clone, Default)]
-pub struct TagEdit {
-    pub add:    Vec<String>,
-    pub remove: Vec<String>,
-}
-
-impl TagEdit {
-    /// Whether it changes nothing.
-    pub fn is_empty(&self) -> bool {
-        self.add.is_empty() && self.remove.is_empty()
-    }
-
-    /// The list that results from `held`, in the order held and then added.
-    pub fn applied(&self, held: &[String]) -> Vec<String> {
-        let mut out: Vec<String> = held
-            .iter()
-            .filter(|t| !self.remove.contains(t))
-            .cloned()
-            .collect();
-        for t in &self.add {
-            if !out.contains(t) {
-                out.push(t.clone());
-            }
-        }
-        out
-    }
-}
+pub use crate::tag_edit::TagEdit;
 
 /// A TOML basic string.
 pub(crate) fn quote(s: &str) -> String {
@@ -164,9 +143,13 @@ pub(crate) fn written_fields() -> Vec<&'static str> {
     ORDER.iter().map(|(key, ..)| *key).collect()
 }
 
-fn render_ticket(id: &str, fields: &Fields) -> String {
+/// A ticket's row. A field the id folds is never written: the id is its one owner.
+fn render_ticket(id: &str, fields: &Fields, decl: &ticket_model::Declaration) -> String {
     let mut out = format!("[[ticket]]\nid = {}\n", quote(id));
     for (key, integer, list) in ORDER {
+        if decl.is_folded(key) {
+            continue;
+        }
         if let Some(v) = fields.get(key) {
             line(&mut out, key, v, integer, list);
         }
@@ -192,7 +175,9 @@ fn render_move(m: &Move) -> String {
 }
 
 fn item_path(registry: &Path, id: &str) -> PathBuf {
-    registry.join(ITEMS).join(format!("{id}.toml"))
+    registry
+        .join(ITEMS)
+        .join(format!("{}.toml", ticket_model::path::file_stem(id)))
 }
 
 fn check_who_when(by: &str, at: &str) -> Result<(), String> {
@@ -212,8 +197,9 @@ fn check_who_when(by: &str, at: &str) -> Result<(), String> {
 /// want of it (proposal A7 of the ticket sweep). `held` is what the ticket carries where `fields` has no `tags`.
 fn stamp_tag(fields: &mut Fields, held: &[String], kind: &str, ticket: &str, why: &str) {
     const TAG: &str = "provisional-stamp";
+    // the leaf is what the test reads: the names before it are where the ticket goes
     if kind != "question"
-        || !(ticket.starts_with("stamp_") || why.to_lowercase().contains("provisional stamp"))
+        || !(ticket_model::path::leaf(ticket).starts_with("stamp_") || why.to_lowercase().contains("provisional stamp"))
     {
         return;
     }
@@ -249,6 +235,8 @@ pub fn add_with(store: &Store, registry: &Path, r: &AddRequest) -> Result<String
     let made = rules::new_ticket(store, &rules::NewRequest {
         title:   r.title.clone(),
         id:      r.id.clone(),
+        under:   r.under.clone(),
+        leaf:    r.leaf.clone(),
         kind:    r.kind.clone(),
         state:   r.state.clone(),
         holder:  r.holder.clone(),
@@ -262,7 +250,7 @@ pub fn add_with(store: &Store, registry: &Path, r: &AddRequest) -> Result<String
     stamp_tag(&mut fields, &[], &r.kind, &id, &r.why);
     let path = item_path(registry, &id);
     std::fs::create_dir_all(path.parent().unwrap_or(registry)).map_err(|e| e.to_string())?;
-    let text = format!("{}\n{}", render_ticket(&id, &fields), render_move(&first));
+    let text = format!("{}\n{}", render_ticket(&id, &fields, &store.decl), render_move(&first));
     let mut file = std::fs::OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -352,6 +340,11 @@ pub fn move_ticket(registry: &Path, r: &MoveRequest) -> Result<String, String> {
         .ok_or_else(|| format!("`{}` is no ticket", r.ticket))?;
     let file = PathBuf::from(&held.file);
     let mut links = tag_links(r, held.many("tags"))?;
+    if let Some(field) = store.decl.written(links.keys().map(String::as_str)).first() {
+        return Err(format!(
+            "`{field}` is folded into the id of a ticket (`folded-field-written`), so a move cannot set it: the id is its one owner"
+        ));
+    }
     ticket_model::contracts::check_fields(&links)?;
     stamp_tag(
         &mut links,

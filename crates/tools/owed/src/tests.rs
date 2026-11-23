@@ -417,6 +417,8 @@ fn a_question_filed_before_owed_filed_tasks_is_still_closed_as_dropped_when_its_
     tickets::write::add_with(&store, &registry, &tickets::write::AddRequest {
         title: "kaski-weather: how a front moves over a ridge".to_string(),
         id: Some("an_old_question".to_string()),
+        under: None,
+        leaf: None,
         kind: "question".to_string(),
         state: Some("waiting".to_string()),
         holder: "op".to_string(),

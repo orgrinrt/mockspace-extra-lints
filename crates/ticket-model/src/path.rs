@@ -186,3 +186,22 @@ pub fn leaf_of_title(title: &str) -> String {
     }
     leaf
 }
+
+/// The ids among `ids` that a query over `ticket::<id>` selects: `ticket::question::engine`,
+/// `ticket::**::internals::**`, `ticket::{task,question}::engine::*`. A branch stands for the tickets
+/// below it.
+///
+/// # Errors
+///
+/// The registry crate's refusal of the query, worded for the person.
+pub fn select<'a>(query: &str, ids: impl IntoIterator<Item = &'a str>) -> Result<Vec<&'a str>, String> {
+    let ids: Vec<&str> = ids.into_iter().collect();
+    let qualified: Vec<String> = ids.iter().map(|id| format!("{NAMESPACE}::{id}")).collect();
+    let refs: Vec<&str> = qualified.iter().map(String::as_str).collect();
+    let chosen = mockspace_registry::select_ids(query, &refs).map_err(|r| r.say(query))?;
+    let prefix = format!("{NAMESPACE}::");
+    Ok(ids
+        .into_iter()
+        .filter(|id| chosen.iter().any(|c| c.strip_prefix(&prefix) == Some(*id)))
+        .collect())
+}

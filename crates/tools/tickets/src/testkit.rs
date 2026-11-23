@@ -94,6 +94,8 @@ impl Scratch {
         write::add(&self.root, &AddRequest {
             title:  title.to_string(),
             id:     None,
+            under:  None,
+            leaf:   None,
             kind:   kind.to_string(),
             state:  state.map(String::from),
             holder: holder.to_string(),

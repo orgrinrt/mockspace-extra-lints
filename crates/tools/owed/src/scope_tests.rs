@@ -194,6 +194,8 @@ fn a_list_written_before_lines_were_listed_is_matched_as_it_was() {
         &tickets::write::AddRequest {
             title: "kaski-sim: a flat roof for now".to_string(),
             id: Some("an_old_task".to_string()),
+            under: None,
+            leaf: None,
             kind: "task".to_string(),
             state: None,
             holder: String::new(),
@@ -226,6 +228,8 @@ fn question_closed(r: &Repo, id: &str, to: &str, answer: &str, picks: &[&str]) {
     tickets::write::add_with(&store, &registry, &tickets::write::AddRequest {
         title: "Which roof".to_string(),
         id: Some(id.to_string()),
+        under: None,
+        leaf: None,
         kind: "question".to_string(),
         state: Some("waiting".to_string()),
         holder: "op".to_string(),
