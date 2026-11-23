@@ -14,11 +14,13 @@ pub mod gives;
 pub mod heirs;
 pub mod model;
 pub mod options;
+pub mod path;
 pub mod rules;
 pub mod stale;
 pub mod tracks;
 
 pub use heirs::{Heirs, Repointed};
 pub use model::{Fields, Kind, Move, State, Store, Ticket};
+pub use path::Declaration;
 pub use rules::Finding;
 pub use stale::Tree;

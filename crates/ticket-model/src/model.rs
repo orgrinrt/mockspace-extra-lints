@@ -134,6 +134,8 @@ pub struct Store {
     pub tickets: BTreeMap<String, Ticket>,
     /// Oldest first, by `at`, and in the order read where two share a second.
     pub moves:   Vec<Move>,
+    /// What the consumer declares of the ticket namespace: whether ids fold fields.
+    pub decl:    crate::path::Declaration,
 }
 
 /// A scalar or an array as a list of text, a float included so that a number a rule reads as a whole number
@@ -177,7 +179,27 @@ impl Store {
     pub fn from_texts<'a>(
         files: impl IntoIterator<Item = (&'a str, &'a str)>,
     ) -> Result<Self, String> {
-        let mut store = Store::default();
+        Self::from_texts_declared(&crate::path::Declaration::default(), files)
+    }
+
+    /// `from_texts` for a consumer whose `ticket` namespace declares `decl`: where it folds fields
+    /// into the id, each is read from the id and put in the ticket's fields, so a reader of `kind`
+    /// finds it where it always was, and a row that writes one is refused.
+    ///
+    /// # Errors
+    ///
+    /// As `from_texts`, and where a ticket row writes a folded field or its id reads no way or
+    /// several as the declaration says.
+    pub fn from_texts_declared<'a>(
+        decl: &crate::path::Declaration,
+        files: impl IntoIterator<Item = (&'a str, &'a str)>,
+    ) -> Result<Self, String> {
+        let mut store = Store {
+            decl: decl.clone(),
+            ..Store::default()
+        };
+        let mut tickets: Vec<(String, Fields, String)> = Vec::new();
+        let mut named = std::collections::BTreeSet::new();
         for (path, src) in files {
             let doc: toml::Table = src
                 .parse()
@@ -192,9 +214,30 @@ impl Store {
                         .and_then(toml::Value::as_str)
                         .ok_or_else(|| format!("a `{ns}` row in {path} has no id"))?
                         .to_string();
-                    store.add_row(ns, id, fields_of(row), path)?;
+                    if ns == "ticket" {
+                        if !named.insert(id.clone()) {
+                            return Err(format!("`ticket::{id}` is declared twice"));
+                        }
+                        tickets.push((id, fields_of(row), path.to_string()));
+                    } else {
+                        store.add_row(ns, id, fields_of(row), path)?;
+                    }
                 }
             }
+        }
+        // the ids are read against the kinds and states, which are all held by now
+        let referenced = store.referenced();
+        for (id, mut fields, file) in tickets {
+            if let Some(field) = decl.written(fields.keys().map(String::as_str)).first() {
+                return Err(format!(
+                    "`ticket::{id}` in {file} writes `{field}`, which the ticket namespace folds into the id \
+                     (`folded-field-written`): the id is its one owner, so remove the field from the row"
+                ));
+            }
+            for (field, value) in decl.fold(&referenced, &id).map_err(|e| format!("{e} ({file})"))? {
+                fields.insert(field, vec![value]);
+            }
+            store.add_row("ticket", id, fields, &file)?;
         }
         // by `at` alone: the sort keeps the order of equal keys, so moves of one second stay in the order
         // they were read, which is the order they were written, and an id's nonce orders nothing
@@ -268,6 +311,14 @@ impl Store {
             },
         }
         Ok(())
+    }
+
+    /// The ids of the rows a folded field can name, by namespace key: the kinds and the states.
+    pub fn referenced(&self) -> BTreeMap<String, std::collections::BTreeSet<String>> {
+        BTreeMap::from([
+            ("ticket_kind".to_string(), self.kinds.keys().cloned().collect()),
+            ("ticket_state".to_string(), self.states.keys().cloned().collect()),
+        ])
     }
 
     /// A ticket's moves, oldest first.

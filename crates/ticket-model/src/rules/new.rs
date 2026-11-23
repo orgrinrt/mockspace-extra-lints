@@ -43,6 +43,10 @@ pub fn slugify(text: &str) -> String {
 pub struct NewRequest {
     pub title:   String,
     pub id:      Option<String>,
+    /// Where the ticket goes under its kind, as names joined by `::`, for a namespace that folds `path`.
+    pub under:   Option<String>,
+    /// The last name of the id, for a namespace that folds `path`; made from the title when absent.
+    pub leaf:    Option<String>,
     pub kind:    String,
     pub state:   Option<String>,
     pub holder:  String,
@@ -69,6 +73,52 @@ fn missing(store: &Store, ids: &[String], what: &str) -> Result<(), String> {
     }
 }
 
+/// The id a request makes where the namespace folds `path`: `--id` as given, or the kind, `--under`
+/// and the leaf joined. It must read as the folded fields back, the kind among them agreeing with
+/// `--kind`, and be neither a prefix of a ticket's id nor have one as its prefix.
+fn folded_id(store: &Store, r: &NewRequest) -> Result<String, String> {
+    let id = match &r.id {
+        Some(id) => {
+            if r.under.is_some() || r.leaf.is_some() {
+                return Err("`--id` is the whole id: give it, or `--under` and `--leaf`, not both".to_string());
+            }
+            id.clone()
+        },
+        None => {
+            let under = r.under.as_deref().filter(|u| !u.is_empty()).ok_or_else(|| {
+                format!(
+                    "a ticket's id is `{}::<names>::<leaf>`: say where it goes with `--under <names>`, or give the whole id with `--id`",
+                    r.kind
+                )
+            })?;
+            let leaf = match &r.leaf {
+                Some(leaf) => leaf.clone(),
+                None => crate::path::leaf_of_title(&r.title),
+            };
+            if leaf.is_empty() {
+                return Err("the title leaves no word to name the ticket by: give one with `--leaf`".to_string());
+            }
+            if leaf.contains("::") {
+                return Err(format!("`--leaf` is one name, and `{leaf}` is a path"));
+            }
+            format!("{}::{under}::{leaf}", r.kind)
+        },
+    };
+    crate::path::names(&id)?;
+    let read = store.decl.fold(&store.referenced(), &id)?;
+    if let Some((field, value)) = read.iter().find(|(f, v)| f == "kind" && *v != r.kind) {
+        return Err(format!("`{id}` reads `{field}` as `{value}`, and `--{field}` is `{}`", r.kind));
+    }
+    let ids: Vec<&str> = store.tickets.keys().map(String::as_str).chain(std::iter::once(id.as_str())).collect();
+    let held = |other: &str| {
+        store.tickets.get(other).map_or_else(|| "the ticket being added".to_string(), |t| t.file.clone())
+    };
+    match crate::path::branch_messages(&ids, Some(&id), held).into_iter().next() {
+        Some(message) => Err(message),
+        None => Ok(id),
+    }
+}
+
 /// The ticket a request makes, or the sentence that refuses it: the id is a slug no ticket holds, the kind
 /// exists, a rank or a priority is a whole number, `needs` and `part_of` name tickets that exist, the
 /// branch is no other ticket's, and `entry` accepts the first state. Nothing is written.
@@ -80,12 +130,23 @@ pub fn new_ticket(store: &Store, r: &NewRequest) -> Result<NewTicket, String> {
     if r.title.trim().is_empty() {
         return Err("a ticket needs a title".to_string());
     }
-    let id = r.id.clone().unwrap_or_else(|| slugify(&r.title));
-    if !is_valid_slug(&id) {
-        return Err(format!(
-            "`{id}` is not a slug: lowercase letters, digits and underscores, starting with a letter"
-        ));
-    }
+    let id = if store.decl.folds() {
+        folded_id(store, r)?
+    } else {
+        if r.under.is_some() || r.leaf.is_some() {
+            return Err(
+                "`--under` and `--leaf` name the parts of a path id, and the ticket namespace declares no `path`"
+                    .to_string(),
+            );
+        }
+        let id = r.id.clone().unwrap_or_else(|| slugify(&r.title));
+        if !is_valid_slug(&id) {
+            return Err(format!(
+                "`{id}` is not a slug: lowercase letters, digits and underscores, starting with a letter"
+            ));
+        }
+        id
+    };
     if store.tickets.contains_key(&id) {
         return Err(format!(
             "`{id}` is a ticket already; name another with `--id`"

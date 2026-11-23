@@ -276,6 +276,13 @@ pub fn check_store(store: &Store) -> Vec<Finding> {
             message,
         })
     };
+    if store.decl.folds() {
+        let held = |id: &str| store.tickets.get(id).map_or_else(String::new, |t| t.file.clone());
+        let ids: Vec<&str> = store.tickets.keys().map(String::as_str).collect();
+        for message in crate::path::branch_messages(&ids, None, held) {
+            say("ticket".to_string(), message);
+        }
+    }
     for t in store.tickets.values() {
         let row = format!("ticket::{}", t.id);
         if !store.kinds.contains_key(t.one("kind")) {
