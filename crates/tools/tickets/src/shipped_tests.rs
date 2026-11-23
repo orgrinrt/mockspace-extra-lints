@@ -8,12 +8,12 @@
 
 use std::collections::BTreeSet;
 
-use ticket_model::model::Store;
-use ticket_model::rules;
 use mockspace::testkit::check_repo;
 use mockspace::{RegistryView, RepoInput};
-
 use registry_lints::a_ticket_graph_holds;
+use ticket_model::model::Store;
+use ticket_model::rules;
+
 use crate::testkit::{Scratch, shipped_registry};
 
 fn shipped() -> Store {
@@ -23,7 +23,8 @@ fn shipped() -> Store {
 /// The field names the pack's shipped declarations, which a consumer copies into its `mockspace.toml`,
 /// give a namespace.
 fn declared_fields(namespace: &str) -> BTreeSet<String> {
-    let src = std::fs::read_to_string(shipped_registry().join("namespaces.toml")).expect("the shipped declarations");
+    let src = std::fs::read_to_string(shipped_registry().join("namespaces.toml"))
+        .expect("the shipped declarations");
     let doc: toml::Table = src.parse().expect("the shipped declarations parse");
     let spaces = doc["registry"]["namespace"].as_array().expect("namespaces");
     let space = spaces

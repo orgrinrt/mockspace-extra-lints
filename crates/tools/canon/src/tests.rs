@@ -95,7 +95,7 @@ pub(crate) fn run(reg: &RegistryView, repo: &Path, args: &[&str]) -> ToolReport 
         stdin: None,
         registry: reg,
     };
-    canon().run_with(&ctx, &|_| Vec::new())
+    canon().run_with(&ctx)
 }
 
 pub(crate) fn answered(r: &ToolReport) -> &str {
@@ -166,86 +166,6 @@ fn subjects_counts_each_subject_s_tenets_and_how_many_bind() {
         time.contains("2 tenets") && time.contains("2 binding"),
         "{time}"
     );
-}
-
-#[test]
-fn a_subject_lists_exactly_its_tenets_and_marks_the_superseded() {
-    let reg = fixture();
-    let out = run(&reg, &scratch(), &["subject", "sky"]);
-    let text = answered(&out);
-    assert_eq!(listed(text), ["the_sun_rises", "the_sun_rose"]);
-    let rose = text
-        .lines()
-        .find(|l| l.contains("the_sun_rose "))
-        .expect("listed");
-    assert!(rose.contains("superseded by the_sun_rises"), "{rose}");
-    match run(&reg, &scratch(), &["subject", "weather"]).outcome {
-        Outcome::Inconclusive {
-            reason,
-        } => assert!(reason.contains("sky, time"), "{reason}"),
-        other => panic!("{other:?}"),
-    }
-    assert!(matches!(
-        run(&reg, &scratch(), &["subject"]).outcome,
-        Outcome::Inconclusive { .. }
-    ));
-}
-
-#[test]
-fn find_matches_an_id_a_keyword_or_the_words_ignoring_case() {
-    let reg = fixture();
-    let repo = scratch();
-    assert_eq!(listed(answered(&run(&reg, &repo, &["find", "DAWN"]))), [
-        "the_sun_rises"
-    ]);
-    assert_eq!(
-        listed(answered(&run(&reg, &repo, &["find", "moonless"]))),
-        ["nobody_names_this"]
-    );
-    assert_eq!(listed(answered(&run(&reg, &repo, &["find", "sun"]))), [
-        "days_follow_the_sun",
-        "the_sun_rises",
-        "the_sun_rose"
-    ]);
-    assert!(listed(answered(&run(&reg, &repo, &["find", "comet"]))).is_empty());
-}
-
-#[test]
-fn related_gives_both_directions_of_both_relations() {
-    let reg = fixture();
-    let out = run(&reg, &scratch(), &["related", "the_sun_rises"]);
-    let text = answered(&out);
-    let line = |k: &str| {
-        text.lines()
-            .find(|l| l.trim_start().starts_with(k))
-            .unwrap_or_else(|| panic!("no `{k}` in {text}"))
-            .to_string()
-    };
-    assert!(line("subject").contains("sky"));
-    assert!(line("cites:").ends_with("nothing"), "{}", line("cites:"));
-    assert!(line("cited by:").contains("days_follow_the_sun"));
-    assert!(
-        line("links to:").ends_with("nothing"),
-        "{}",
-        line("links to:")
-    );
-    assert!(line("related by:").contains("nobody_names_this"));
-    assert!(line("supersedes:").contains("the_sun_rose"));
-    assert!(line("superseded by:").ends_with("nothing"));
-    let from = run(&reg, &scratch(), &["related", "nobody_names_this"]);
-    assert!(
-        answered(&from)
-            .lines()
-            .any(|l| l.trim_start().starts_with("links to:") && l.ends_with("the_sun_rises")),
-        "{}",
-        from.output
-    );
-    match run(&reg, &scratch(), &["related", "no_such_tenet"]).outcome {
-        Outcome::Inconclusive {
-            reason,
-        } => assert!(reason.contains("no_such_tenet"), "{reason}"),
-        other => panic!("{other:?}"),
-    }
 }
 
 #[test]
@@ -375,7 +295,10 @@ fn uncited_lists_the_binding_tenets_nothing_names() {
 
 /// The layout the fixtures are written in: the mock tree under `mock`, the content under `content`.
 pub(crate) fn layout() -> registry_lints::layout::Layout {
-    registry_lints::layout::Layout::new("mock", registry_lints::layout::ContentDirs::new(&["content"]))
+    registry_lints::layout::Layout::new(
+        "mock",
+        registry_lints::layout::ContentDirs::new(&["content"]),
+    )
 }
 
 /// The tool as a project with its content under `content` configures it.

@@ -151,10 +151,10 @@ pub fn canon_namespaces(repo: &Path) -> Result<BTreeSet<String>, String> {
 }
 
 /// The verbs `--in` narrows.
-pub const SCOPED: [&str; 4] = ["show", "find", "related", "citers"];
+pub const SCOPED: [&str; 2] = ["show", "citers"];
 
 /// The same, as an error lists them.
-pub const SCOPED_NAMES: &str = "find, related, citers and show";
+pub const SCOPED_NAMES: &str = "citers and show";
 
 /// The value of `--in` among a verb's arguments, as `--in <value>` or `--in=<value>`.
 ///

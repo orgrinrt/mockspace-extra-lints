@@ -1,0 +1,15 @@
+[package]
+name = "mockspace-extra-search"
+description = "The one search over the repository: documents and registry rows, narrowed by filters that compose, answered from the index and never building it."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+# the trait crate under the name the generated collector gives it; the engine patches every spelling
+# of it to the one it is built from
+mockspace.workspace = true
+corpus.workspace = true
+# the index the query tools ask, which is muisti's: private, so spelled over ssh
+muisti.workspace = true

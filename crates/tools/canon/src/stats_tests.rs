@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use crate::stats::table;
 
-fn planted() -> (PathBuf, corpus::repo::Ready) {
+fn planted() -> (PathBuf, corpus::repo::Index) {
     let repo = std::env::temp_dir().join(format!("kaski_canon_stats_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&repo);
     let reg = repo.join("mock/registry/tenet");
@@ -14,15 +14,21 @@ fn planted() -> (PathBuf, corpus::repo::Ready) {
         "[[tenet]]\nid = \"a\"\nsubject = \"air\"\nwhat = \"heat rises\"\ncites = [\"tenet::hub\"]\n\n[[tenet]]\nid = \"hub\"\nsubject = \"air\"\nwhat = \"heat spreads\"\n\n[[tenet]]\nid = \"loner\"\nwhat = \"apart\"\n",
     )
     .unwrap();
-    let cache = repo.join("cache");
-    let ready = corpus::repo::ready_at(Some(&cache), &repo.join("mock"), &repo, None, &[]);
-    (repo, ready)
+    let ok = std::process::Command::new("git")
+        .args(["init", "-q"])
+        .current_dir(&repo)
+        .status();
+    assert!(ok.is_ok_and(|s| s.success()), "git init");
+    let index = repo.join("index").join("search.sqlite");
+    corpus::repo::refresh_at(&index, &repo.join("mock"), &repo, None).unwrap();
+    let opened = corpus::repo::open_at(&index, &repo.join("mock"), &repo, None, &|_| {});
+    (repo, opened.index.unwrap())
 }
 
 #[test]
 fn each_table_answers_from_the_index_and_a_wrong_question_is_refused() {
-    let (repo, ready) = planted();
-    let i = &ready.index;
+    let (repo, index) = planted();
+    let i = &index;
     assert!(table(i, "cited", None).unwrap().contains("tenet::hub"));
     let orphans = table(i, "orphans", None).unwrap();
     assert!(

@@ -136,11 +136,9 @@ pub fn collect(pack: &mut mockspace_lint_rules::LintPack) {
 mod workflow {
     pub fn collect(pack: &mut mockspace_lint_rules::LintPack) {
         mockspace_extra_registry_lints::collect(pack);
-        mockspace_extra_already_said::collect(pack);
         mockspace_extra_build_weigh::collect(pack);
         mockspace_extra_canon::collect(pack);
         mockspace_extra_canon_links::collect(pack);
-        mockspace_extra_corpus::collect(pack);
         mockspace_extra_finish::collect(pack);
         mockspace_extra_intent_or_mechanism::collect(pack);
         mockspace_extra_known_red::collect(pack);
@@ -153,7 +151,7 @@ mod workflow {
         mockspace_extra_ticket_add::collect(pack);
         mockspace_extra_ticket_move::collect(pack);
         mockspace_extra_tickets::collect(pack);
-        mockspace_extra_unearth::collect(pack);
+        mockspace_extra_search::collect(pack);
     }
 }
 

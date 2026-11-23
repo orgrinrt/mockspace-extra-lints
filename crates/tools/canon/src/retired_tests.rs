@@ -342,17 +342,32 @@ fn a_line_let_through_by_the_ruling_tenet_is_counted_and_listed_for_a_path() {
 fn a_line_that_only_cites_the_ruling_tenet_names_nothing_held_or_let_through() {
     let rules = [rule()];
     let path = Path::new("mock/DESIGN.md.tmpl");
-    let (held, excused) = split_text(path, "it stands on `there_is_no_zorblax`\n", &rules, &layout());
+    let (held, excused) = split_text(
+        path,
+        "it stands on `there_is_no_zorblax`\n",
+        &rules,
+        &layout(),
+    );
     assert!(
         held.is_empty() && excused.is_empty(),
         "{held:?} {excused:?}"
     );
     // the control: the same words outside the id are a hit, and the id beside them lets it through
-    let (held, excused) = split_text(path, "a zorblax stands on `there_is_no_zorblax`\n", &rules, &layout());
+    let (held, excused) = split_text(
+        path,
+        "a zorblax stands on `there_is_no_zorblax`\n",
+        &rules,
+        &layout(),
+    );
     assert!(held.is_empty());
     assert_eq!(excused.len(), 1);
     // a longer id is another tenet's, and neither blanked nor an excuse
-    let (held, excused) = split_text(path, "stands on `there_is_no_zorblax_at_all`\n", &rules, &layout());
+    let (held, excused) = split_text(
+        path,
+        "stands on `there_is_no_zorblax_at_all`\n",
+        &rules,
+        &layout(),
+    );
     assert_eq!((held.len(), excused.len()), (1, 0));
 }
 
@@ -424,14 +439,34 @@ fn contradicts_with_a_path_among_several_that_is_not_there_names_it() {
 fn split_under_with_no_path_reads_the_whole_repository_and_with_paths_only_those() {
     let d = tree();
     let rules = [rule()];
-    let whole = split_under(&mockspace::reading::Reading::new(&d).view(), &d, &rules, &[], &layout()).0;
+    let whole = split_under(
+        &mockspace::reading::Reading::new(&d).view(),
+        &d,
+        &rules,
+        &[],
+        &layout(),
+    )
+    .0;
     assert_eq!(whole.len(), 2, "{whole:?}");
-    let one = split_under(&mockspace::reading::Reading::new(&d).view(), &d, &rules, &[Path::new("mock/crates/kaski-a/src")], &layout()).0;
+    let one = split_under(
+        &mockspace::reading::Reading::new(&d).view(),
+        &d,
+        &rules,
+        &[Path::new("mock/crates/kaski-a/src")],
+        &layout(),
+    )
+    .0;
     assert_eq!(one.len(), 1, "{one:?}");
-    let two = split_under(&mockspace::reading::Reading::new(&d).view(), &d, &rules, &[
-        Path::new("mock/crates/kaski-a/src"),
-        Path::new("mock/crates/kaski-a/DESIGN.md.tmpl"),
-    ], &layout())
+    let two = split_under(
+        &mockspace::reading::Reading::new(&d).view(),
+        &d,
+        &rules,
+        &[
+            Path::new("mock/crates/kaski-a/src"),
+            Path::new("mock/crates/kaski-a/DESIGN.md.tmpl"),
+        ],
+        &layout(),
+    )
     .0;
     assert_eq!(two.len(), 2, "{two:?}");
 }
@@ -452,19 +487,24 @@ fn contradicts_reads_no_word_a_demoted_or_held_tenet_rules_out_and_reads_a_stamp
         }
         view(&[("tenet::there_is_no_zorblax", fields.as_slice())])
     };
-    for (unbound, reg) in [
-        ("demoted", held("demoted", false)),
-        ("held", held("held", false)),
-    ] {
+    for (unbound, reg) in [("demoted", held("demoted", false)), ("held", held("held", false))] {
         let r = run(&reg, &d, &["contradicts"]);
         let text = answered(&r);
-        assert!(!text.contains("kaski-a/DESIGN.md.tmpl"), "a {unbound} tenet binds nothing: {text}");
+        assert!(
+            !text.contains("kaski-a/DESIGN.md.tmpl"),
+            "a {unbound} tenet binds nothing: {text}"
+        );
     }
     // THE CONTROL: the same row ratified, or provisional on a stamp, rules the word out, since a stamp
     // leaves the row binding as its standing does.
-    for (bound, reg) in [("ratified", held("ratified", false)), ("stamped", held("provisional", true))] {
+    for (bound, reg) in
+        [("ratified", held("ratified", false)), ("stamped", held("provisional", true))]
+    {
         let r = run(&reg, &d, &["contradicts"]);
         let text = answered(&r);
-        assert!(text.contains("design  mock/crates/kaski-a/DESIGN.md.tmpl:1"), "{bound}: {text}");
+        assert!(
+            text.contains("design  mock/crates/kaski-a/DESIGN.md.tmpl:1"),
+            "{bound}: {text}"
+        );
     }
 }

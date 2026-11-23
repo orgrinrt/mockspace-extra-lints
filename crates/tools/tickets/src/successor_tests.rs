@@ -6,8 +6,8 @@
 //! A move made `--for` another ticket: what the registry holds a successor to, and that a move
 //! refused for it writes nothing. The markers it hands on are the `ticket-move` tool's.
 
-use crate::testkit::Scratch;
 use crate::tags_tests::{added, file, moved, moves};
+use crate::testkit::Scratch;
 use crate::{args, load, write};
 
 fn state_of(s: &Scratch, id: &str) -> String {

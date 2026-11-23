@@ -6,8 +6,8 @@
 //! `mock canon-links [view]`: how well the canon's rows are joined and found.
 //!
 //! A report from the registry alone. `totals` counts keywords and relations and names the rows joined
-//! to nothing, `rows` is one line a tenet, and `probes` puts the committed probe set to `canon find`
-//! and `canon related` as they answer now, so a pass over the metadata can be measured against the
+//! to nothing, `rows` is one line a tenet, and `probes` puts the committed probe set to the tenets that
+//! carry a word and the tenets joined to one, as the registry answers them now, so a pass over the metadata can be measured against the
 //! one before it.
 
 use mockspace::tool::{ArgSpec, NotALint, Purpose, Tool, ToolContext, ToolReport};

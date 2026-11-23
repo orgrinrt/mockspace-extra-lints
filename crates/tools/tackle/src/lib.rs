@@ -21,11 +21,17 @@ mod score;
 
 use std::collections::BTreeMap;
 
-use mockspace::tool::{
-    ArgSpec, ConfigKey, NotALint, Purpose, Tool, ToolContext, ToolParams, ToolReport,
-};
-
 use corpus::maintainer::{NAMES_KEY, WORDS_KEY};
+use mockspace::tool::{
+    ArgSpec,
+    ConfigKey,
+    NotALint,
+    Purpose,
+    Tool,
+    ToolContext,
+    ToolParams,
+    ToolReport,
+};
 
 use crate::render::{render_brief, render_namespaces, render_table};
 
@@ -103,7 +109,12 @@ impl Tool for Tackle {
 
     fn run(&self, ctx: &ToolContext<'_>) -> ToolReport {
         run_with(ctx, &self.about_the_work, &|| {
-            corpus::repo::ready(ctx.mock_dir, ctx.repo_root, Some(&self.maintainer))
+            corpus::repo::open(
+                ctx.mock_dir,
+                ctx.repo_root,
+                Some(&self.maintainer),
+                &corpus::repo::background,
+            )
         })
     }
 }
@@ -113,7 +124,7 @@ impl Tool for Tackle {
 fn run_with(
     ctx: &ToolContext<'_>,
     about_the_work: &[String],
-    make: &dyn Fn() -> corpus::repo::Ready,
+    make: &dyn Fn() -> corpus::repo::Opened,
 ) -> ToolReport {
     {
         if let Some(first) = ctx.args.first()
@@ -147,18 +158,18 @@ fn run_with(
 
         // The corpus, once, for every subject.
         let ready = make();
-        let corpus_read = ready.index.len().unwrap_or(0);
+        let corpus_read = ready.index.as_ref().map_or(0, |i| i.len().unwrap_or(0));
         // Subjects whose name and vocabulary are all words too common to search. Their `unrd` is
         // zero because no document was opened rather than because no research sits behind them.
         let mut unasked: Vec<String> = Vec::new();
-        if corpus_read > 0 {
+        if let Some(index) = ready.index.as_ref().filter(|_| corpus_read > 0) {
             for (subject, terms) in &vocab {
                 let words = corpus::repo::question_of(subject, terms);
                 if !corpus::repo::askable(&words) {
                     unasked.push(subject.clone());
                     continue;
                 }
-                let found = corpus::repo::find(&ready.index, &words, CORPUS_DEPTH);
+                let found = corpus::repo::find(index, &words, CORPUS_DEPTH);
                 if let Some(r) = raws.get_mut(subject) {
                     r.corpus = found.iter().map(|h| h.score).sum();
                 }

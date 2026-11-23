@@ -80,13 +80,10 @@ fn a_rank_is_written_as_a_number_in_its_plain_form_and_read_back_as_one() {
     let store = crate::load(&s.root).unwrap();
     assert_eq!(store.tickets[&id].rank(), Some(7));
     assert_eq!(store.tickets[&neg].rank(), Some(-2));
-    let order: Vec<String> = view::list(
-        &store,
-        &planning::Plan::default(),
-        &view::Filter::default(),
-    )
-    .into_iter()
-    .map(|r| r.id)
-    .collect();
+    let order: Vec<String> =
+        view::list(&store, &planning::Plan::default(), &view::Filter::default())
+            .into_iter()
+            .map(|r| r.id)
+            .collect();
     assert_eq!(order, [neg, id], "the board orders by the number");
 }

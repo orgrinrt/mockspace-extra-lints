@@ -18,7 +18,7 @@ use mockspace_extra_lints::lints::no_bare_string::NoBareString;
 use mockspace_extra_lints::lints::no_public_raw_field::NoPublicRawField;
 use mockspace_extra_lints::lints::no_std::NoStd;
 use mockspace_lint_rules::testkit::LintFixture;
-use mockspace_lint_rules::{CrateLint, Lint};
+use mockspace_lint_rules::CrateLint;
 
 /// Drift every one of the nine lints reports in a crate it holds.
 const DRIFT: &str = "\

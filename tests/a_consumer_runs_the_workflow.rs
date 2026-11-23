@@ -1,7 +1,7 @@
 //! A repository that names the pack with the `workflow` feature, declares the namespaces the pack
 //! ships in `registry/namespaces.toml` and copies its vocabulary, gets the workflow tools from the
 //! pack alone and nothing of its own: a ticket is added, moved and listed, a tenet is written by
-//! hand, and `canon find` and `canon check` answer over it.
+//! hand, and `search` and `canon check` answer over it.
 //!
 //! Every step goes the way a run goes: the engine's own config reader reads the scratch's
 //! `mockspace.toml`, the registry is loaded and viewed as the tool runner loads it, and the tool is
@@ -36,7 +36,7 @@ fn every_tool_name_is_registered_once() {
         .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
         .collect();
     expected.sort();
-    assert_eq!(expected.len(), 18, "{expected:?}");
+    assert_eq!(expected.len(), 16, "{expected:?}");
     for name in &expected {
         assert!(seen.contains(name.as_str()), "`{name}` is not registered");
     }
@@ -110,7 +110,20 @@ fn a_consumer_adds_moves_and_lists_a_ticket_and_asks_its_canon() {
          provenance = [\"research::202611130000_ground::NOTES::#rain\"]\n",
     );
 
-    let found = run(&pack, &root, "canon", &["find", "puddle"]);
+    // The search reads the checkout's own index, which a refresh builds and a question never does.
+    let inited = std::process::Command::new("git")
+        .args(["init", "-q"])
+        .current_dir(&root)
+        .status();
+    assert!(inited.is_ok_and(|s| s.success()), "git init");
+    let refreshed = run(&pack, &root, "search", &["--refresh"]);
+    assert!(
+        clean(&refreshed),
+        "{:?} {}",
+        refreshed.outcome,
+        refreshed.output
+    );
+    let found = run(&pack, &root, "search", &["puddle", "--rows"]);
     assert!(
         found.output.contains("rain_wets_the_ground"),
         "{:?} {}",
@@ -120,7 +133,7 @@ fn a_consumer_adds_moves_and_lists_a_ticket_and_asks_its_canon() {
 
     // THE CONTROL: a word no row carries finds nothing, so the hit above is the tenet's keyword and
     // not a listing of every row.
-    let missed = run(&pack, &root, "canon", &["find", "glacier"]);
+    let missed = run(&pack, &root, "search", &["glacier", "--rows"]);
     assert!(
         !missed.output.contains("rain_wets_the_ground"),
         "{:?} {}",

@@ -11,9 +11,9 @@
 
 use std::collections::BTreeSet;
 
+use mockspace::RegistryView;
 use ticket_model::model::{Fields, Store};
 use ticket_model::rules::Finding;
-use mockspace::RegistryView;
 
 /// The links of a ticket that name a canon row: `related` entries as `tenet::<id>` or `subject::<id>`, and
 /// the `tenets` field, whose entries are `tenet::<id>` or a bare id.
@@ -76,7 +76,7 @@ impl Known {
             return Ok(());
         }
         Err(format!(
-            "{} no row of the canon: `cargo mock canon subjects` and `cargo mock canon find <term>` name the \
+            "{} no row of the canon: `cargo mock canon subjects` and `cargo mock search <term> --rows` name the \
              ones there are",
             bad.iter()
                 .map(|b| format!("`{b}` is"))
