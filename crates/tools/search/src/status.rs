@@ -98,8 +98,8 @@ pub fn report(ctx: &ToolContext<'_>, opened: &Opened) -> ToolReport {
             b.gone.len(),
             b.commits
         ));
-        if let Some(d) = &b.definition {
-            out.push_str(&format!("  {d}\n"));
+        for why in b.definition.iter().chain(b.history.iter()) {
+            out.push_str(&format!("  {why}\n"));
         }
     }
     if !opened.notes.is_empty() {

@@ -118,9 +118,10 @@ pub fn open_at(
             if behind.commits == 1 { "" } else { "s" },
             behind
                 .definition
-                .as_deref()
+                .iter()
+                .chain(behind.history.iter())
                 .map(|d| format!(", and {d}"))
-                .unwrap_or_default()
+                .collect::<String>()
         ));
     }
     Opened {
