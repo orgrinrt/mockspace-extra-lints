@@ -3,16 +3,16 @@
 
 use mockspace::tool::ToolContext;
 use muisti::repo::filter::{
+    Changed,
     Classes,
     Linked,
     Meaning,
     Namespace,
+    Newest,
     OfSubject,
     Phrase,
-    Since,
     Spoken,
     Under,
-    Until,
 };
 use muisti::repo::{Filter, RepoIndex};
 
@@ -34,11 +34,14 @@ pub fn build(
     if let Some(prefix) = &spec.under {
         out.push(Box::new(Under(prefix.clone())));
     }
-    if let Some(day) = spec.since {
-        out.push(Box::new(Since(day)));
+    // One window for both ends: a file changed before it and again after it changed in neither.
+    if spec.windowed() {
+        let f = Changed::within(index, spec.since, spec.until)
+            .map_err(|e| format!("what changed in the window could not be read: {e}"))?;
+        out.push(Box::new(f));
     }
-    if let Some(day) = spec.until {
-        out.push(Box::new(Until(day)));
+    if spec.newest {
+        out.push(Box::new(Newest));
     }
     if spec.spoken {
         out.push(Box::new(Spoken));

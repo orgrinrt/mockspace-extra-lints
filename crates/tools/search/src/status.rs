@@ -15,14 +15,11 @@ use crate::registry::mock_prefix;
 pub fn refresh(ctx: &ToolContext<'_>, maintainer: &Maintainer) -> ToolReport {
     match corpus::repo::refresh(ctx.mock_dir, ctx.repo_root, Some(maintainer)) {
         Ok(Some(done)) => {
-            let mut out = format!(
-                "refreshed: {} added, {} changed, {} removed\n",
-                done.added, done.changed, done.removed
-            );
+            let mut out = format!("{}\n", counts(&done));
             for c in &done.caveats {
                 out.push_str(&format!("NOTE: {c}\n"));
             }
-            ToolReport::reported(out, done.added + done.changed + done.removed)
+            ToolReport::reported(out, done.added + done.changed + done.removed + done.commits)
         },
         Ok(None) => {
             ToolReport::reported(
@@ -32,6 +29,14 @@ pub fn refresh(ctx: &ToolContext<'_>, maintainer: &Maintainer) -> ToolReport {
         },
         Err(e) => ToolReport::inconclusive(e),
     }
+}
+
+/// What a refresh read, as one line.
+fn counts(done: &muisti::repo::Refreshed) -> String {
+    format!(
+        "refreshed: {} added, {} changed, {} removed, {} commits read",
+        done.added, done.changed, done.removed, done.commits
+    )
 }
 
 /// The index of this checkout: where it is, what it holds by class, and how far behind it is.
@@ -68,11 +73,15 @@ pub fn report(ctx: &ToolContext<'_>, opened: &Opened) -> ToolReport {
         out.push_str("  current with the checkout's files\n");
     } else {
         out.push_str(&format!(
-            "  {} new, {} changed, {} gone\n",
+            "  {} new, {} changed, {} gone, {} commits\n",
             b.missing.len(),
             b.moved.len(),
-            b.gone.len()
+            b.gone.len(),
+            b.commits
         ));
+        for why in b.definition.iter().chain(b.history.iter()) {
+            out.push_str(&format!("  {why}\n"));
+        }
     }
     if !opened.notes.is_empty() {
         out.push('\n');

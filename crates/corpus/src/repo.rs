@@ -70,7 +70,7 @@ pub fn open_at(
     {
         notes.push(unread(m.named(), words.as_deref()));
     }
-    let index = match RepoIndex::open_reader(path) {
+    let mut index = match RepoIndex::open_reader(path) {
         Ok(i) => i,
         Err(e) => {
             start(repo_root);
@@ -87,7 +87,15 @@ pub fn open_at(
     };
     let listing = list(mock_dir, repo_root, words.as_deref());
     notes.extend(listing.notes);
-    let behind = match index.behind(&listing.roots) {
+    // Measured against what a refresh would record, so a changed speaker list or row spec is behind.
+    index.set_row_spec(Some(registry_spec()));
+    index.set_speakers(
+        maintainer
+            .map_or(&[][..], Maintainer::names)
+            .iter()
+            .cloned(),
+    );
+    let behind = match index.behind(&listing.roots, Some(repo_root)) {
         Ok(b) => b,
         Err(e) => {
             notes.push(format!(
@@ -99,13 +107,21 @@ pub fn open_at(
     if !behind.is_empty() {
         start(repo_root);
         notes.push(format!(
-            "the index is behind by {} file{} ({} new, {} changed, {} gone); a refresh was \
-             started in the background, and this answer is from the index as it stood",
+            "the index is behind by {} file{} ({} new, {} changed, {} gone) and {} commit{}{}; a \
+             refresh was started in the background, and this answer is from the index as it stood",
             behind.len(),
             if behind.len() == 1 { "" } else { "s" },
             behind.missing.len(),
             behind.moved.len(),
-            behind.gone.len()
+            behind.gone.len(),
+            behind.commits,
+            if behind.commits == 1 { "" } else { "s" },
+            behind
+                .definition
+                .iter()
+                .chain(behind.history.iter())
+                .map(|d| format!(", and {d}"))
+                .collect::<String>()
         ));
     }
     Opened {
@@ -113,6 +129,65 @@ pub fn open_at(
         behind,
         notes,
     }
+}
+
+/// The index of the checkout at `repo_root` as a question asks it: where it exists it is brought
+/// current first over what moved, and the note says what that read; where it does not, nothing is
+/// built in the question's path, `start` is handed the root to build it in the background, and the
+/// question is told so, as [`open`] tells it.
+#[must_use]
+pub fn current(
+    mock_dir: &Path,
+    repo_root: &Path,
+    maintainer: Option<&Maintainer>,
+    start: &dyn Fn(&Path),
+) -> Opened {
+    match index_path(repo_root) {
+        Ok(path) => current_at(&path, mock_dir, repo_root, maintainer, start),
+        Err(_) => open(mock_dir, repo_root, maintainer, start),
+    }
+}
+
+/// [`current`] with the index's file given.
+#[must_use]
+pub fn current_at(
+    path: &Path,
+    mock_dir: &Path,
+    repo_root: &Path,
+    maintainer: Option<&Maintainer>,
+    start: &dyn Fn(&Path),
+) -> Opened {
+    let refreshed = path
+        .is_file()
+        .then(|| refresh_at(path, mock_dir, repo_root, maintainer));
+    let mut opened = open_at(path, mock_dir, repo_root, maintainer, start);
+    match refreshed {
+        Some(Ok(Some(done))) => {
+            let mut s = format!(
+                "the index was brought current first: {} added, {} changed, {} removed, {} \
+                 commits read",
+                done.added, done.changed, done.removed, done.commits
+            );
+            for c in &done.caveats {
+                s.push_str(&format!("; {c}"));
+            }
+            opened.notes.insert(0, s);
+        },
+        Some(Ok(None)) => {
+            opened.notes.insert(
+                0,
+                "another refresh holds the index, so this answer is from the index as it stood"
+                    .to_string(),
+            );
+        },
+        Some(Err(e)) => {
+            opened
+                .notes
+                .insert(0, format!("the index could not be brought current: {e}"));
+        },
+        None => {},
+    }
+    opened
 }
 
 /// Bring the index of the checkout at `repo_root` up to date: a new one starts as a copy of the
