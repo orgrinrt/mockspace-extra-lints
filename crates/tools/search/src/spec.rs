@@ -54,6 +54,9 @@ pub struct Spec {
     pub limit:     usize,
 }
 
+/// The refusal of a second opening of the window, by `--since` or `--days`.
+const OPENS_TWICE: &str = "the window opens twice: `--since` or `--days` was given already";
+
 /// How many documents a report shows unless `--limit` says otherwise. A reader given sixty files
 /// has been handed the problem back.
 pub const SHOWN: usize = 5;
@@ -149,23 +152,21 @@ impl Spec {
                     .ok_or_else(|| format!("`{flag}` wants a date as YYYY-MM-DD, not `{v}`"))?;
                 if flag == "--since" {
                     if self.since.is_some() {
-                        return Err(
-                            "`--days` and `--since` both say where the window opens; give \
-                                    one"
-                            .to_string(),
-                        );
+                        return Err(OPENS_TWICE.to_string());
                     }
                     self.since = Some(day);
                 } else {
+                    if self.until.is_some() {
+                        return Err(
+                            "the window closes twice: `--until` was given already".to_string()
+                        );
+                    }
                     self.until = Some(day);
                 }
             },
             "--days" => {
                 if self.since.is_some() {
-                    return Err(
-                        "`--days` and `--since` both say where the window opens; give one"
-                            .to_string(),
-                    );
+                    return Err(OPENS_TWICE.to_string());
                 }
                 let n: i64 = v
                     .parse()

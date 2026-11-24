@@ -71,7 +71,7 @@ fn a_commit_is_a_class_of_hit_with_its_date_and_filters_like_any_class() {
     ]);
     let out = output(&under);
     assert_eq!(out.matches("history  .git/").count(), 1, "{out}");
-    assert!(out.contains("changed src/lib.rs"), "{out}");
+    assert!(out.contains("touched src/lib.rs"), "{out}");
 }
 
 #[test]
@@ -86,9 +86,13 @@ fn the_window_keeps_what_changed_in_it_files_and_commits_alike() {
     ]);
     let out = output(&may);
     assert!(out.contains("mock/research/quokka.md:"), "{out}");
+    let note = out
+        .lines()
+        .find(|l| l.contains("mock/research/quokka.md:"))
+        .unwrap();
     assert!(
-        out.contains("changed 2026-05-01"),
-        "first-added stays the day: {out}"
+        note.contains("2026-03-01") && note.contains("changed 2026-05-01"),
+        "first-added stays the day, the last change beside it: {out}"
     );
     assert_eq!(out.matches("history  .git/").count(), 1, "{out}");
     assert!(!out.contains("src/lib.rs:"), "{out}");
@@ -115,7 +119,7 @@ fn a_window_with_no_words_lists_what_changed_newest_first() {
     p.refresh();
     let lately = p.ask(&no_rows(), &["--days", "2"]);
     let out = output(&lately);
-    let wombat = out.find("feat: a wombat today").expect(out);
+    assert!(out.contains("feat: a wombat today"), "{out}");
     assert!(out.contains("src/new.rs:"), "{out}");
     assert!(!out.contains("mock/research/quokka.md:"), "{out}");
     // newest first over a wider window: today's commit before May's
@@ -124,7 +128,6 @@ fn a_window_with_no_words_lists_what_changed_newest_first() {
     let today = out.find("feat: a wombat today").expect(out);
     let may = out.find("fix: the quokka sleeps all day").expect(out);
     assert!(today < may, "{out}");
-    assert!(wombat > 0);
     // THE CONTROL: with no words and no window there is nothing to list.
     let none = p.ask(&no_rows(), &["--class", "history"]);
     assert!(matches!(
@@ -173,5 +176,96 @@ fn days_and_since_both_opening_the_window_are_refused() {
         Spec::parse(&["--days", "soon"])
             .unwrap_err()
             .contains("--days")
+    );
+}
+
+#[test]
+fn the_window_opens_and_closes_once() {
+    for args in [
+        &["x", "--since", "2026-01-01", "--since", "2026-02-01"][..],
+        &["x", "--days", "3", "--days", "4"][..],
+        &["x", "--since", "2026-01-01", "--days", "4"][..],
+    ] {
+        assert!(
+            Spec::parse(args).unwrap_err().contains("opens twice"),
+            "{args:?}"
+        );
+    }
+    assert!(
+        Spec::parse(&["x", "--until", "2026-01-01", "--until", "2026-02-01"])
+            .unwrap_err()
+            .contains("closes twice")
+    );
+    // THE CONTROL: one opening and one closing are taken.
+    assert!(Spec::parse(&["x", "--since", "2026-01-01", "--until", "2026-02-01"]).is_ok());
+}
+
+/// The index as a search of `args` opens it, with no refresh of the test's own, and how many
+/// background refreshes it started.
+fn opened(p: &Planted, args: &[&str]) -> (corpus::repo::Opened, usize) {
+    let crates = std::collections::BTreeSet::new();
+    let dirs: Vec<std::path::PathBuf> = Vec::new();
+    let reg = no_rows();
+    let ctx = ToolContext {
+        mock_dir: &p.mock(),
+        repo_root: &p.repo,
+        all_crates: &crates,
+        src_dirs: &dirs,
+        args,
+        stdin: None,
+        registry: &reg,
+    };
+    let spec = Spec::parse(args).unwrap();
+    let started = std::cell::Cell::new(0);
+    let o = opened_for(&spec, &p.index, &ctx, None, &|_: &std::path::Path| {
+        started.set(started.get() + 1);
+    });
+    (o, started.get())
+}
+
+#[test]
+fn a_question_brings_a_behind_index_current_and_never_builds_a_missing_one() {
+    // missing: nothing built in the question's path, the background refresh started, and said
+    let p = Planted::new("missing-index");
+    p.file(
+        "mock/research/quokka.md",
+        "# Quokka\n\nThe quokka sleeps.\n",
+    );
+    let (o, started) = opened(&p, &["quokka"]);
+    assert!(o.index.is_none() && started == 1, "{:?}", o.notes);
+    assert!(!p.index.exists(), "the question built no index");
+    assert!(
+        o.notes.iter().any(|n| n.contains("not built")),
+        "{:?}",
+        o.notes
+    );
+
+    // behind: brought current in the question's path, the new file answered, nothing started
+    let p = history("behind-index");
+    p.file("mock/research/wombat.md", "# Wombat\n\nThe wombat digs.\n");
+    commit(&p, None, "docs: the wombat");
+    let (o, started) = opened(&p, &["wombat"]);
+    assert_eq!(started, 0, "{:?}", o.notes);
+    assert!(o.behind.is_empty(), "{:?}", o.behind);
+    assert!(
+        o.notes[0].contains("brought current first"),
+        "{:?}",
+        o.notes
+    );
+    let out = p.ask(&no_rows(), &["wombat"]);
+    assert!(
+        output(&out).contains("mock/research/wombat.md:"),
+        "{}",
+        out.output
+    );
+
+    // THE CONTROL: `--status` refreshes nothing, so the same change reads as behind there
+    p.file("mock/research/koala.md", "# Koala\n");
+    let (o, _) = opened(&p, &["--status"]);
+    assert!(!o.behind.is_empty(), "status read only: {:?}", o.notes);
+    assert!(
+        o.notes.iter().all(|n| !n.contains("brought current")),
+        "{:?}",
+        o.notes
     );
 }

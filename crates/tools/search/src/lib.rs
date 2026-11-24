@@ -8,8 +8,9 @@
 //!
 //! Every file of the checkout is in one index: the research, the rounds, the registry, the
 //! maintainer's captured words the repository holds, the sketches, the source, and the
-//! repository's own commits. A question is asked of the index brought current first, over what
-//! moved since it was last read, and says what the refresh read.
+//! repository's own commits. A question brings an index that exists current first, over what
+//! moved, and says what that read; it never builds one that does not exist, but starts the refresh
+//! in the background and says so.
 //!
 //! **The registry is the expansion, not only an answer.** A question first finds the rows that
 //! carry it, takes their `keywords`, and asks the documents in those words as well as its own. A
@@ -112,28 +113,43 @@ impl Tool for Search {
         if spec.mode == Mode::Refresh {
             return status::refresh(ctx, &self.maintainer);
         }
-        // A question is asked of an index brought current first, over what moved: its files and
-        // the commits past the head it read. Status only reads.
-        let refreshed = match spec.mode {
-            Mode::Status => None,
-            _ => {
-                Some(corpus::repo::refresh(
+        let opened = match corpus::repo::index_path(ctx.repo_root) {
+            Ok(path) => {
+                opened_for(
+                    &spec,
+                    &path,
+                    ctx,
+                    Some(&self.maintainer),
+                    &corpus::repo::background,
+                )
+            },
+            Err(_) => {
+                corpus::repo::open(
                     ctx.mock_dir,
                     ctx.repo_root,
                     Some(&self.maintainer),
-                ))
+                    &corpus::repo::background,
+                )
             },
         };
-        let mut opened = corpus::repo::open(
-            ctx.mock_dir,
-            ctx.repo_root,
-            Some(&self.maintainer),
-            &corpus::repo::background,
-        );
-        if let Some(r) = refreshed {
-            opened.notes.insert(0, status::refreshed_note(&r));
-        }
         answer(ctx, &spec, opened)
+    }
+}
+
+/// The index at `path` as the search's mode asks for it. A question brings an index that exists
+/// current first, over what moved, and never builds one that does not: that is started in the
+/// background with `start` and said. `--status` only reads.
+#[must_use]
+pub fn opened_for(
+    spec: &Spec,
+    path: &std::path::Path,
+    ctx: &ToolContext<'_>,
+    maintainer: Option<&corpus::Maintainer>,
+    start: &dyn Fn(&std::path::Path),
+) -> Opened {
+    match spec.mode {
+        Mode::Status => corpus::repo::open_at(path, ctx.mock_dir, ctx.repo_root, maintainer, start),
+        _ => corpus::repo::current_at(path, ctx.mock_dir, ctx.repo_root, maintainer, start),
     }
 }
 

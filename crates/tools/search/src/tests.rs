@@ -15,8 +15,8 @@ use crate::registry::rank_keywords;
 
 /// A checkout under git, and a place for its index outside it, both removed when the test ends.
 pub(super) struct Planted {
-    pub(super) repo: PathBuf,
-    index:           PathBuf,
+    pub(super) repo:  PathBuf,
+    pub(super) index: PathBuf,
 }
 
 impl Planted {
@@ -45,7 +45,7 @@ impl Planted {
         self
     }
 
-    fn mock(&self) -> PathBuf {
+    pub(super) fn mock(&self) -> PathBuf {
         self.repo.join("mock")
     }
 

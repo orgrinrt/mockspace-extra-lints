@@ -39,25 +39,6 @@ fn counts(done: &muisti::repo::Refreshed) -> String {
     )
 }
 
-/// The line a question opens with, saying what the refresh before it read, or why it read nothing.
-#[must_use]
-pub fn refreshed_note(r: &Result<Option<muisti::repo::Refreshed>, String>) -> String {
-    match r {
-        Ok(Some(done)) => {
-            let mut s = format!("the index was brought current first; {}", counts(done));
-            for c in &done.caveats {
-                s.push_str(&format!("; {c}"));
-            }
-            s
-        },
-        Ok(None) => {
-            "another refresh holds the index, so this answer is from the index as it stood"
-                .to_string()
-        },
-        Err(e) => format!("the index could not be brought current: {e}"),
-    }
-}
-
 /// The index of this checkout: where it is, what it holds by class, and how far behind it is.
 #[must_use]
 pub fn report(ctx: &ToolContext<'_>, opened: &Opened) -> ToolReport {

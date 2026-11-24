@@ -102,8 +102,8 @@ fn hit_line(h: &IndexHit, cited: &BTreeMap<String, usize>, canon_day: Option<i64
     };
     let changes = match h.changes.len() {
         0 => String::new(),
-        1 => format!(", changed {}", h.changes[0]),
-        n => format!(", changed {n} paths"),
+        1 => format!(", touched {}", h.changes[0]),
+        n => format!(", touched {n} paths"),
     };
     format!(
         "  {when}  {:<8} {}:{}  [{mark}{copies}{changed}{changes}{}]{stale}\n      {}\n",

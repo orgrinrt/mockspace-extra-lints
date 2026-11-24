@@ -1,6 +1,6 @@
 [package]
 name = "mockspace-extra-search"
-description = "The one search over the repository: documents and registry rows, narrowed by filters that compose, answered from the index and never building it."
+description = "The one search over the repository: documents, commits and registry rows, narrowed by filters that compose. A question brings an index that exists current first, over what moved, and never builds one that does not exist."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
