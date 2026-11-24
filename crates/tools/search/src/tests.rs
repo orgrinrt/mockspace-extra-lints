@@ -14,13 +14,13 @@ use super::*;
 use crate::registry::rank_keywords;
 
 /// A checkout under git, and a place for its index outside it, both removed when the test ends.
-struct Planted {
-    repo:  PathBuf,
-    index: PathBuf,
+pub(super) struct Planted {
+    pub(super) repo: PathBuf,
+    index:           PathBuf,
 }
 
 impl Planted {
-    fn new(name: &str) -> Self {
+    pub(super) fn new(name: &str) -> Self {
         let base = std::env::temp_dir().join(format!("search-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&base);
         let repo = base.join("repo");
@@ -38,7 +38,7 @@ impl Planted {
         }
     }
 
-    fn file(&self, rel: &str, body: &str) -> &Self {
+    pub(super) fn file(&self, rel: &str, body: &str) -> &Self {
         let p = self.repo.join(rel);
         std::fs::create_dir_all(p.parent().unwrap()).unwrap();
         std::fs::write(p, body).unwrap();
@@ -49,7 +49,7 @@ impl Planted {
         self.repo.join("mock")
     }
 
-    fn refresh(&self) {
+    pub(super) fn refresh(&self) {
         let done = refresh_at(&self.index, &self.mock(), &self.repo, None).unwrap();
         assert!(done.is_some(), "the refresh held the index");
     }
@@ -63,7 +63,7 @@ impl Planted {
         (opened, started.get())
     }
 
-    fn ask(&self, reg: &RegistryView, args: &[&str]) -> ToolReport {
+    pub(super) fn ask(&self, reg: &RegistryView, args: &[&str]) -> ToolReport {
         let crates = BTreeSet::new();
         let dirs: Vec<PathBuf> = Vec::new();
         let ctx = ToolContext {
@@ -88,11 +88,11 @@ impl Drop for Planted {
     }
 }
 
-fn no_rows() -> RegistryView {
+pub(super) fn no_rows() -> RegistryView {
     RegistryView::new(BTreeMap::<String, RowFields>::new(), BTreeMap::new())
 }
 
-fn output(r: &ToolReport) -> &str {
+pub(super) fn output(r: &ToolReport) -> &str {
     assert!(
         matches!(r.outcome, Outcome::Clean { .. }),
         "not answered: {:?} {}",

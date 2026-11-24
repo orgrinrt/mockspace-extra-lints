@@ -95,8 +95,18 @@ fn hit_line(h: &IndexHit, cited: &BTreeMap<String, usize>, canon_day: Option<i64
         1 => ", 1 copy folded".to_string(),
         n => format!(", {n} copies folded"),
     };
+    // A file touched since it was written says when; a commit says how many paths it changed.
+    let changed = match (h.day, h.changed) {
+        (Some(d), Some(c)) if c > d => format!(", changed {}", ymd(c)),
+        _ => String::new(),
+    };
+    let changes = match h.changes.len() {
+        0 => String::new(),
+        1 => format!(", changed {}", h.changes[0]),
+        n => format!(", changed {n} paths"),
+    };
     format!(
-        "  {when}  {:<8} {}:{}  [{mark}{copies}{}]{stale}\n      {}\n",
+        "  {when}  {:<8} {}:{}  [{mark}{copies}{changed}{changes}{}]{stale}\n      {}\n",
         h.class.label(),
         h.path,
         h.line,

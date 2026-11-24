@@ -11,6 +11,7 @@ pub const VALUE_FLAGS: &[&str] = &[
     "--under",
     "--since",
     "--until",
+    "--days",
     "--namespace",
     "--subject",
     "--linked",
@@ -38,6 +39,8 @@ pub struct Spec {
     pub under:     Option<String>,
     pub since:     Option<i64>,
     pub until:     Option<i64>,
+    /// Newest first, by the last day a document changed, rather than by the score.
+    pub newest:    bool,
     pub spoken:    bool,
     pub phrase:    bool,
     pub meaning:   bool,
@@ -56,6 +59,12 @@ pub struct Spec {
 pub const SHOWN: usize = 5;
 
 impl Spec {
+    /// Whether a window of days was given, which a search with no words lists, newest first.
+    #[must_use]
+    pub const fn windowed(&self) -> bool {
+        self.since.is_some() || self.until.is_some()
+    }
+
     /// Whether any flag narrows the registry's rows, which makes a search answer rows.
     #[must_use]
     pub fn narrows_rows(&self) -> bool {
@@ -74,6 +83,7 @@ impl Spec {
             under:     None,
             since:     None,
             until:     None,
+            newest:    false,
             spoken:    false,
             phrase:    false,
             meaning:   false,
@@ -99,14 +109,15 @@ impl Spec {
                 "--refresh" => spec.mode = Mode::Refresh,
                 "--status" => spec.mode = Mode::Status,
                 "--spoken" => spec.spoken = true,
+                "--newest" => spec.newest = true,
                 "--phrase" => spec.phrase = true,
                 "--meaning" => spec.meaning = true,
                 "--uncited" => spec.uncited = true,
                 "--rows" => spec.rows = true,
                 flag if flag.starts_with("--") => {
                     return Err(format!(
-                        "`{flag}` is no filter of search; the filters are {}, --spoken, --phrase, \
-                         --meaning, --uncited and --rows",
+                        "`{flag}` is no filter of search; the filters are {}, --spoken, --newest, \
+                         --phrase, --meaning, --uncited and --rows",
                         VALUE_FLAGS.join(", ")
                     ));
                 },
@@ -137,10 +148,31 @@ impl Spec {
                 let day = corpus::day::day_of(v)
                     .ok_or_else(|| format!("`{flag}` wants a date as YYYY-MM-DD, not `{v}`"))?;
                 if flag == "--since" {
+                    if self.since.is_some() {
+                        return Err(
+                            "`--days` and `--since` both say where the window opens; give \
+                                    one"
+                            .to_string(),
+                        );
+                    }
                     self.since = Some(day);
                 } else {
                     self.until = Some(day);
                 }
+            },
+            "--days" => {
+                if self.since.is_some() {
+                    return Err(
+                        "`--days` and `--since` both say where the window opens; give one"
+                            .to_string(),
+                    );
+                }
+                let n: i64 = v
+                    .parse()
+                    .ok()
+                    .filter(|n| *n >= 0)
+                    .ok_or_else(|| format!("`--days` wants a count of days, not `{v}`"))?;
+                self.since = Some(corpus::day::today() - n);
             },
             "--namespace" => self.namespace.extend(list().map(str::to_string)),
             "--subject" => self.subject = Some(v.to_string()),

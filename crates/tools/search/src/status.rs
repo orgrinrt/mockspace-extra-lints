@@ -15,14 +15,11 @@ use crate::registry::mock_prefix;
 pub fn refresh(ctx: &ToolContext<'_>, maintainer: &Maintainer) -> ToolReport {
     match corpus::repo::refresh(ctx.mock_dir, ctx.repo_root, Some(maintainer)) {
         Ok(Some(done)) => {
-            let mut out = format!(
-                "refreshed: {} added, {} changed, {} removed\n",
-                done.added, done.changed, done.removed
-            );
+            let mut out = format!("{}\n", counts(&done));
             for c in &done.caveats {
                 out.push_str(&format!("NOTE: {c}\n"));
             }
-            ToolReport::reported(out, done.added + done.changed + done.removed)
+            ToolReport::reported(out, done.added + done.changed + done.removed + done.commits)
         },
         Ok(None) => {
             ToolReport::reported(
@@ -31,6 +28,33 @@ pub fn refresh(ctx: &ToolContext<'_>, maintainer: &Maintainer) -> ToolReport {
             )
         },
         Err(e) => ToolReport::inconclusive(e),
+    }
+}
+
+/// What a refresh read, as one line.
+fn counts(done: &muisti::repo::Refreshed) -> String {
+    format!(
+        "refreshed: {} added, {} changed, {} removed, {} commits read",
+        done.added, done.changed, done.removed, done.commits
+    )
+}
+
+/// The line a question opens with, saying what the refresh before it read, or why it read nothing.
+#[must_use]
+pub fn refreshed_note(r: &Result<Option<muisti::repo::Refreshed>, String>) -> String {
+    match r {
+        Ok(Some(done)) => {
+            let mut s = format!("the index was brought current first; {}", counts(done));
+            for c in &done.caveats {
+                s.push_str(&format!("; {c}"));
+            }
+            s
+        },
+        Ok(None) => {
+            "another refresh holds the index, so this answer is from the index as it stood"
+                .to_string()
+        },
+        Err(e) => format!("the index could not be brought current: {e}"),
     }
 }
 
@@ -68,11 +92,15 @@ pub fn report(ctx: &ToolContext<'_>, opened: &Opened) -> ToolReport {
         out.push_str("  current with the checkout's files\n");
     } else {
         out.push_str(&format!(
-            "  {} new, {} changed, {} gone\n",
+            "  {} new, {} changed, {} gone, {} commits\n",
             b.missing.len(),
             b.moved.len(),
-            b.gone.len()
+            b.gone.len(),
+            b.commits
         ));
+        if let Some(d) = &b.definition {
+            out.push_str(&format!("  {d}\n"));
+        }
     }
     if !opened.notes.is_empty() {
         out.push('\n');

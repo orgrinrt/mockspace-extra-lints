@@ -70,7 +70,7 @@ pub fn open_at(
     {
         notes.push(unread(m.named(), words.as_deref()));
     }
-    let index = match RepoIndex::open_reader(path) {
+    let mut index = match RepoIndex::open_reader(path) {
         Ok(i) => i,
         Err(e) => {
             start(repo_root);
@@ -87,7 +87,15 @@ pub fn open_at(
     };
     let listing = list(mock_dir, repo_root, words.as_deref());
     notes.extend(listing.notes);
-    let behind = match index.behind(&listing.roots) {
+    // Measured against what a refresh would record, so a changed speaker list or row spec is behind.
+    index.set_row_spec(Some(registry_spec()));
+    index.set_speakers(
+        maintainer
+            .map_or(&[][..], Maintainer::names)
+            .iter()
+            .cloned(),
+    );
+    let behind = match index.behind(&listing.roots, Some(repo_root)) {
         Ok(b) => b,
         Err(e) => {
             notes.push(format!(
@@ -99,13 +107,20 @@ pub fn open_at(
     if !behind.is_empty() {
         start(repo_root);
         notes.push(format!(
-            "the index is behind by {} file{} ({} new, {} changed, {} gone); a refresh was \
-             started in the background, and this answer is from the index as it stood",
+            "the index is behind by {} file{} ({} new, {} changed, {} gone) and {} commit{}{}; a \
+             refresh was started in the background, and this answer is from the index as it stood",
             behind.len(),
             if behind.len() == 1 { "" } else { "s" },
             behind.missing.len(),
             behind.moved.len(),
-            behind.gone.len()
+            behind.gone.len(),
+            behind.commits,
+            if behind.commits == 1 { "" } else { "s" },
+            behind
+                .definition
+                .as_deref()
+                .map(|d| format!(", and {d}"))
+                .unwrap_or_default()
         ));
     }
     Opened {

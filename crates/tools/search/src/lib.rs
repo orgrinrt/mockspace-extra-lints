@@ -7,17 +7,20 @@
 //! by filters that compose.
 //!
 //! Every file of the checkout is in one index: the research, the rounds, the registry, the
-//! maintainer's captured words the repository holds, the sketches and the source. A question reads
-//! that index and never builds it. Where the index is absent or behind the files, the question
-//! starts a refresh in the background, says so, and answers from what stands.
+//! maintainer's captured words the repository holds, the sketches, the source, and the
+//! repository's own commits. A question is asked of the index brought current first, over what
+//! moved since it was last read, and says what the refresh read.
 //!
 //! **The registry is the expansion, not only an answer.** A question first finds the rows that
 //! carry it, takes their `keywords`, and asks the documents in those words as well as its own. A
 //! subject is easily reported absent from a corpus that specifies it in full, because the corpus
 //! calls it by other words than the question does.
 //!
-//! **Every narrowing is a filter**: by class, by path, by day, the maintainer's own words, a
-//! phrase, by meaning, by registry namespace, subject or link, and the documents no row cites.
+//! **Every narrowing is a filter**: by class, by path, by what changed in a window of days, the
+//! maintainer's own words, a phrase, by meaning, by registry namespace, subject or link, and the
+//! documents no row cites; and newest first is a sort a flag asks for. The repository's own commits
+//! are a class of hit beside its files, `history`, dated by their commit. A window or `--newest` with
+//! no words lists what the filters keep, newest first.
 
 use corpus::day::today;
 use corpus::repo::Opened;
@@ -71,8 +74,10 @@ impl Tool for Search {
             name:        "question",
             required:    false,
             description: "the words to look for, and any of the filters: `--class <c,..>` (human, \
-                          canon, design, research, sketch, source), `--under <path>`, `--since \
-                          <YYYY-MM-DD>`, `--until <YYYY-MM-DD>`, `--spoken`, `--phrase`, \
+                          canon, design, research, sketch, source, history: a commit), `--under \
+                          <path>`, `--since <YYYY-MM-DD>`, `--until <YYYY-MM-DD>` and `--days <n>`, \
+                          what changed in the window, files and commits alike, `--newest`, the \
+                          last changed first, `--spoken`, `--phrase`, \
                           `--meaning`, `--uncited`, `--namespace <ns,..>`, `--subject <s>`, \
                           `--linked <ns::id>`, `--rows`, `--limit <n>`; `--status` says what the \
                           index holds and `--refresh` brings it up to date",
@@ -107,12 +112,27 @@ impl Tool for Search {
         if spec.mode == Mode::Refresh {
             return status::refresh(ctx, &self.maintainer);
         }
-        let opened = corpus::repo::open(
+        // A question is asked of an index brought current first, over what moved: its files and
+        // the commits past the head it read. Status only reads.
+        let refreshed = match spec.mode {
+            Mode::Status => None,
+            _ => {
+                Some(corpus::repo::refresh(
+                    ctx.mock_dir,
+                    ctx.repo_root,
+                    Some(&self.maintainer),
+                ))
+            },
+        };
+        let mut opened = corpus::repo::open(
             ctx.mock_dir,
             ctx.repo_root,
             Some(&self.maintainer),
             &corpus::repo::background,
         );
+        if let Some(r) = refreshed {
+            opened.notes.insert(0, status::refreshed_note(&r));
+        }
         answer(ctx, &spec, opened)
     }
 }
@@ -123,9 +143,10 @@ pub fn answer(ctx: &ToolContext<'_>, spec: &Spec, opened: Opened) -> ToolReport 
     if spec.mode == Mode::Status {
         return status::report(ctx, &opened);
     }
-    if spec.question.trim().is_empty() && !spec.narrows_rows() {
+    let listing = spec.question.trim().is_empty() && (spec.windowed() || spec.newest);
+    if spec.question.trim().is_empty() && !spec.narrows_rows() && !listing {
         return ToolReport::inconclusive(
-            "no question and no row filter given, so nothing was searched",
+            "no question, no window and no row filter given, so nothing was searched",
         );
     }
     let Some(index) = &opened.index else {
@@ -145,7 +166,30 @@ pub fn answer(ctx: &ToolContext<'_>, spec: &Spec, opened: Opened) -> ToolReport 
     if spec.rows || (spec.narrows_rows() && spec.question.trim().is_empty()) {
         return rows::answer(out, spec, index, &built);
     }
+    if listing {
+        return changed(out, ctx, spec, index, &built);
+    }
     documents(out, ctx, spec, index, &built)
+}
+
+/// Every document the filters keep, newest first, with no words asked: what changed in a window,
+/// files and commits alike.
+fn changed(
+    mut out: String,
+    ctx: &ToolContext<'_>,
+    spec: &Spec,
+    index: &RepoIndex,
+    built: &impl Filter,
+) -> ToolReport {
+    let found = index.newest(built, spec.limit, today());
+    if found.indexed == 0 {
+        return ToolReport::inconclusive(format!(
+            "no documents are indexed for this checkout, so this establishes nothing about it. {}",
+            found.caveats.join(" ")
+        ));
+    }
+    render_corpus(&mut out, &found, &cited_files(ctx), 0, None, spec.limit);
+    ToolReport::reported(out, found.indexed)
 }
 
 /// The documents that answer, with the rows that carry the question and the verdict.
@@ -220,3 +264,5 @@ mockspace::lint_pack! {
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_history;
