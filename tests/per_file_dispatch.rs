@@ -27,8 +27,10 @@ use mockspace_extra_lints::lints::re_export_foreign_names::ReExportForeignNames;
 use mockspace_lint_rules::testkit::{self, LintFixture};
 use mockspace_lint_rules::{CrateLint, Lint, LintPack};
 
-/// A crate built on the stack's vocabulary, which with a `#![no_std]` root makes it a crate of the stack.
-const STACK_MANIFEST: &str = "[package]\nname = \"fixture\"\n\n[dependencies]\narvo = \"0.1\"\n";
+/// A crate taking the three crates the replacements live in, which with a `#![no_std]` root makes it
+/// a crate every stack lint holds.
+const STACK_MANIFEST: &str =
+    "[package]\nname = \"fixture\"\n\n[dependencies]\narvo = \"0.1\"\nnotko = \"0.1\"\nhilavitkutin-str = \"0.1\"\n";
 
 /// A crate of several files. `files[0]` is the root, as the engine documents.
 fn ctx_over(files: &[(&str, &str)]) -> LintFixture {
