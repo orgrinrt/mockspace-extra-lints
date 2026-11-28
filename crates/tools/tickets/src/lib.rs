@@ -332,6 +332,8 @@ mod choice_tests;
 #[cfg(test)]
 mod contracts_tests;
 #[cfg(test)]
+mod holds_back_tests;
+#[cfg(test)]
 mod links_tests;
 #[cfg(test)]
 mod members_tests;
