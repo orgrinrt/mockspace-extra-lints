@@ -24,11 +24,11 @@
 //! `cfg(all(debug_assertions, ...))` variants). Fires when no gate is
 //! present.
 //!
-//! An associated constant in an `impl <Trait> for <Type>` whose trait the
-//! crate does not declare is not read: the trait fixed its type, and the
+//! An associated constant in an `impl <Trait> for <Type>` whose trait is not
+//! the crate's own is not read: the trait fixed its type, and the
 //! trait's owner is where that is judged. A `const` or `static` anywhere
 //! else, a method body of the same impl included, is read as before.
-//! `crate::foreign_trait_impls` says how a trait counts as declared.
+//! `crate::foreign_trait_impls` says how a trait is told the crate's own.
 //!
 //! Escape hatch: inline `// lint:allow(no-bare-static-str) reason: ...;
 //! tracked: #N`: only when a foreign contract or macro-expansion path
@@ -97,6 +97,9 @@ impl CrateLint for NoBareStaticStr {
     }
 }
 
+/// One source read as the whole crate: the engine hands a crate lint every
+/// source in `all_sources`, and a context carrying none, as a test builds from
+/// one text, is a crate of that one file, so its own traits are the file's.
 fn scan_source(ctx: &LintContext, rel_path: &str, source: &str, out: &mut Vec<LintError>) {
     let tree = ctx.view().parse(source);
     let own = crate_traits([(source, &tree)]);

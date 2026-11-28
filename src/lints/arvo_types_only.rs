@@ -28,10 +28,10 @@
 //! `a_literal_suffix_still_reports` in
 //! `tests/the_const_generic_parameter_is_excepted.rs`.
 //!
-//! One position is excepted, and only one: the type of a const generic
+//! Two positions are excepted, and only these two. The first is the type of a const generic
 //! parameter. `pub struct Signed<const BITS: u32>;` passes, because a
 //! const generic is where the bare form buys a smoother API and there
-//! is nothing else to write there. The exception reaches the parameter
+//! is nothing else to write there. That exception reaches the parameter
 //! declaration and nothing else: an associated constant, an item
 //! constant, a field and a cast all still report, including on the
 //! same line as a parameter that passed. A literal suffix does not,
@@ -46,14 +46,14 @@
 //! demands a specific primitive and no arvo impl of its contract is
 //! possible. Prefer dropping the crate over a long-lived allowance.
 //!
-//! A signature the crate writes only because a trait of another crate fixed
+//! The second: a signature the crate writes only because a trait of another crate fixed
 //! it is not read: the signature of a method in an `impl <Trait> for <Type>`
-//! whose trait the crate does not declare, from the `fn` to its `{` or `;`,
+//! whose trait is not the crate's own, from the `fn` to its `{` or `;`, but a return type it marks as its refinement,
 //! and an associated constant's declaration up to its `=`.
 //! The trait's owner is where that signature is judged. The method's body
 //! is still read, and so is every inherent impl and every impl of a trait
-//! the crate declares. `crate::foreign_trait_impls` says how a trait counts
-//! as declared and what that misjudges.
+//! the crate declares. `crate::foreign_trait_impls` says how a trait is told
+//! the crate's own and what that misjudges.
 //!
 //! Where it applies is the crate's own nature, read by `crate::nature`, never a list.
 

@@ -13,12 +13,12 @@
 //!
 //! A signature the crate writes only because a trait of another crate fixed
 //! it is not read: the signature of a method in an `impl <Trait> for <Type>`
-//! whose trait the crate does not declare, from the `fn` to its `{` or `;`,
+//! whose trait is not the crate's own, from the `fn` to its `{` or `;`, but a return type it marks as its refinement,
 //! and an associated constant's declaration up to its `=`.
 //! The trait's owner is where that signature is judged. The method's body
 //! is still read, and so is every inherent impl and every impl of a trait
-//! the crate declares. `crate::foreign_trait_impls` says how a trait counts
-//! as declared and what that misjudges.
+//! the crate declares. `crate::foreign_trait_impls` says how a trait is told
+//! the crate's own and what that misjudges.
 //!
 //! Where it applies is the crate's own nature, read by `crate::nature`, never a list.
 

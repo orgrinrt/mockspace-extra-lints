@@ -9,26 +9,27 @@
 //! underscore in front of the name; the gap is catalogued in
 //! `tests/the_const_generic_parameter_is_excepted.rs`.
 //!
-//! One position is excepted, and only one: the type of a const generic
+//! Two positions are excepted, and only these two: the type of a const generic
 //! parameter, where the bare form buys a smoother API and there is
-//! nothing else to write. The exception reaches the parameter
+//! nothing else to write. The first reaches the parameter
 //! declaration and nothing else, so an associated constant, an item
 //! constant, a field and a cast all still report. A literal suffix
 //! does not, for the reason given above, which is a property of the
-//! scan rather than of the exception.
+//! scan rather than of the exception. The other is a signature a foreign
+//! trait fixed, below.
 //!
 //! This lint is retained alongside `arvo-types-only` so configs that
 //! named it still apply; the two are semantically equivalent today.
 //! Prefer `arvo-types-only` in new configs.
 //!
-//! A signature the crate writes only because a trait of another crate fixed
+//! The second: a signature the crate writes only because a trait of another crate fixed
 //! it is not read: the signature of a method in an `impl <Trait> for <Type>`
-//! whose trait the crate does not declare, from the `fn` to its `{` or `;`,
+//! whose trait is not the crate's own, from the `fn` to its `{` or `;`, but a return type it marks as its refinement,
 //! and an associated constant's declaration up to its `=`.
 //! The trait's owner is where that signature is judged. The method's body
 //! is still read, and so is every inherent impl and every impl of a trait
-//! the crate declares. `crate::foreign_trait_impls` says how a trait counts
-//! as declared and what that misjudges.
+//! the crate declares. `crate::foreign_trait_impls` says how a trait is told
+//! the crate's own and what that misjudges.
 //!
 //! Where it applies is the crate's own nature, read by `crate::nature`, never a list.
 

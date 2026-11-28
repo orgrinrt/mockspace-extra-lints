@@ -5,54 +5,80 @@
 //! `Visitor` returning `core::result::Result<(), Self::Error>`, or a store
 //! contract taking `&'t str`, is judged where the trait is declared, in the
 //! crate that owns it. The bare-type lints read the signature of a method in an
-//! `impl <Trait> for <Type>` block as exempt when the crate does not define
-//! `<Trait>`, and everything else as before.
+//! `impl <Trait> for <Type>` block as exempt when the trait is not the crate's
+//! own, and everything else as before.
 //!
 //! What is exempt, and only that:
 //!
 //! - a method's signature, from the start of the item (its `fn` keyword, or the
 //!   `const`, `unsafe`, `async` or `extern` in front of it) to its opening `{`,
-//!   or to its `;` where it has no body, across lines;
+//!   or to its `;` where it has no body, across lines, but for a return type
+//!   the method marks as its own refinement of the trait's, by an attribute
+//!   naming `refine` or the compiler's `refining_impl_trait` lints, which is
+//!   read like any other;
 //! - an associated constant's declaration, from `const` to its `=`, or to its
 //!   `;` where it has no value.
 //!
 //! A method body, the value of a constant, an associated type, a field, an
 //! inherent impl and an impl of a trait the crate defines are all still read.
 //!
-//! The rule for a trait the crate defines: the last segment of the impl's trait
-//! path, its generic arguments dropped, is the name of a `trait` item anywhere in
-//! the crate's parsed sources, at any depth. `impl a::b::Store<'t> for X` asks
-//! after `Store`. What it misjudges:
+//! Which trait is the crate's own is read off the path the impl names it by:
 //!
-//! - A foreign trait sharing its name with one the crate defines is read as the
-//!   crate's own, so its signatures stay checked. This errs toward reporting.
+//! - a path rooted at `crate`, `self` or `super`, or at a module the crate
+//!   declares, is the crate's own;
+//! - a path rooted at anything else, another crate's name or the prelude's, is
+//!   foreign;
+//! - a bare name the file brings in with `use`, under its own name or another
+//!   with `as`, is what the path it is brought in by is;
+//! - a bare name the file brings in from nowhere is the crate's own where a
+//!   `trait` item of that name is anywhere in the crate's parsed sources, and
+//!   foreign otherwise, as a prelude trait is.
+//!
+//! What it misjudges:
+//!
+//! - A `use` is read for the whole file, not for the module it stands in, so
+//!   two modules of one file bringing one name in from two places are read as
+//!   one of them.
+//! - A trait the crate re-exports from another crate and names by a path of the
+//!   crate is read as its own, so its signatures stay checked. This errs
+//!   toward reporting.
 //! - A trait the crate defines only through a macro expansion has no `trait`
-//!   item in the parse, so an impl of it is read as foreign and its signatures
-//!   go unchecked. This errs toward silence.
-//! - A trait the crate re-exports from another crate is foreign, which is
-//!   what it is.
+//!   item in the parse, so an impl of it by a bare name is read as foreign; the
+//!   trait's own declaration in the macro's body is still read by the line
+//!   scans, so its signatures are judged there, where it is declared.
 //! - An impl written inside a macro body is a token tree, not an impl, so
 //!   nothing in it is exempt.
+//! - A return type an impl refines without saying so is read as the trait's;
+//!   the compiler warns on such an impl.
 //!
 //! Blanking keeps every byte offset and newline, so a scan over the result
 //! reports the file's own lines, and `lint:allow` is still read off the raw line.
 
 use core::ops::Range;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use mockspace_lint_rules::LintContext;
 use tree_sitter::{Node, Tree};
 
 use crate::util::{blank_spans, txt};
 
-/// The names of every trait the checked crate declares.
-pub struct OwnTraits(BTreeSet<String>);
+/// What the checked crate declares that tells its own traits from others':
+/// the names of its traits and of its modules.
+pub struct OwnTraits {
+    traits:  BTreeSet<String>,
+    modules: BTreeSet<String>,
+}
 
 impl OwnTraits {
     /// Whether the crate declares a trait of this name.
     #[must_use]
     pub fn defines(&self, name: &str) -> bool {
-        self.0.contains(name)
+        self.traits.contains(name)
+    }
+
+    /// Whether a path rooted at `root` is a path of the crate.
+    fn roots(&self, root: &str) -> bool {
+        matches!(root, "crate" | "self" | "super") || self.modules.contains(root)
     }
 }
 
@@ -70,7 +96,10 @@ pub struct ScannedSource<'a> {
 
 /// Every source of the crate in `ctx`, each with its foreign-trait signatures blanked.
 ///
-/// A context carrying no `all_sources` falls back to its one source as `src/lib.rs`.
+/// The engine hands a crate lint every source of the crate in `all_sources`.
+/// A context carrying none, as one a test builds from a single text does, is a
+/// crate of that one file, read as `src/lib.rs`, so its own traits are the
+/// ones that file declares.
 #[must_use]
 pub fn scanned_sources<'a>(ctx: &LintContext<'a>) -> Vec<ScannedSource<'a>> {
     let files: Vec<(String, &'a str, &'a Tree)> = if ctx.all_sources().is_empty() {
@@ -95,25 +124,33 @@ pub fn scanned_sources<'a>(ctx: &LintContext<'a>) -> Vec<ScannedSource<'a>> {
         .collect()
 }
 
-/// The traits declared across the crate's sources.
+/// The traits and modules declared across the crate's sources.
 #[must_use]
 pub fn crate_traits<'a>(sources: impl IntoIterator<Item = (&'a str, &'a Tree)>) -> OwnTraits {
-    let mut names = BTreeSet::new();
+    let mut own = OwnTraits {
+        traits:  BTreeSet::new(),
+        modules: BTreeSet::new(),
+    };
     for (text, tree) in sources {
-        collect_trait_names(tree.root_node(), text, &mut names);
+        collect_declared(tree.root_node(), text, &mut own);
     }
-    OwnTraits(names)
+    own
 }
 
-fn collect_trait_names(node: Node, src: &str, names: &mut BTreeSet<String>) {
+fn collect_declared(node: Node, src: &str, own: &mut OwnTraits) {
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        if child.kind() == "trait_item"
+        let names = match child.kind() {
+            "trait_item" => Some(&mut own.traits),
+            "mod_item" => Some(&mut own.modules),
+            _ => None,
+        };
+        if let Some(names) = names
             && let Some(name) = child.child_by_field_name("name")
         {
             names.insert(txt(name, src).to_string());
         }
-        collect_trait_names(child, src, names);
+        collect_declared(child, src, own);
     }
 }
 
@@ -134,8 +171,10 @@ pub fn foreign_trait_signature_spans(
     tree: &Tree,
     own: &OwnTraits,
 ) -> Vec<Range<usize>> {
+    let mut imported = BTreeMap::new();
+    collect_uses(tree.root_node(), source, own, &mut imported);
     let mut spans = Vec::new();
-    collect_spans(tree.root_node(), source, own, &mut spans);
+    collect_spans(tree.root_node(), source, own, &imported, &mut spans);
     spans
 }
 
@@ -145,40 +184,165 @@ pub fn within(spans: &[Range<usize>], offset: usize) -> bool {
     spans.iter().any(|s| s.contains(&offset))
 }
 
-fn collect_spans(node: Node, src: &str, own: &OwnTraits, spans: &mut Vec<Range<usize>>) {
+/// Every name the file's `use` declarations bring in, each with whether the
+/// path it comes by is the crate's own.
+fn collect_uses(node: Node, src: &str, own: &OwnTraits, imported: &mut BTreeMap<String, bool>) {
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        if child.kind() == "impl_item"
-            && let Some(name) = child
-                .child_by_field_name("trait")
-                .and_then(|t| trait_name(t, src))
-            && !own.defines(name)
-            && let Some(body) = child.child_by_field_name("body")
+        if child.kind() == "use_declaration"
+            && let Some(tree) = child.child_by_field_name("argument")
         {
-            item_signatures(body, spans);
+            bindings(tree, src, None, own, imported);
+        } else {
+            collect_uses(child, src, own, imported);
         }
-        collect_spans(child, src, own, spans);
     }
 }
 
-/// The last path segment of an impl's trait, its generic arguments dropped.
-fn trait_name<'a>(node: Node<'a>, src: &'a str) -> Option<&'a str> {
+/// The names a use tree binds, `root` the first segment of the path above it.
+fn bindings(
+    node: Node,
+    src: &str,
+    root: Option<&str>,
+    own: &OwnTraits,
+    imported: &mut BTreeMap<String, bool>,
+) {
+    let mut bind = |name: &str, first: &str| {
+        imported.insert(name.to_string(), own.roots(root.unwrap_or(first)));
+    };
     match node.kind() {
-        "type_identifier" => Some(txt(node, src)),
-        "scoped_type_identifier" => node.child_by_field_name("name").map(|n| txt(n, src)),
-        "generic_type" => {
-            node.child_by_field_name("type")
-                .and_then(|t| trait_name(t, src))
+        "identifier" => bind(txt(node, src), txt(node, src)),
+        "scoped_identifier" => {
+            if let Some(name) = node.child_by_field_name("name") {
+                bind(txt(name, src), leftmost(node, src));
+            }
         },
+        "use_as_clause" => {
+            if let (Some(path), Some(alias)) = (
+                node.child_by_field_name("path"),
+                node.child_by_field_name("alias"),
+            ) {
+                bind(txt(alias, src), leftmost(path, src));
+            }
+        },
+        "scoped_use_list" => {
+            let first = node
+                .child_by_field_name("path")
+                .map_or("", |p| leftmost(p, src));
+            let root = Some(root.unwrap_or(first));
+            if let Some(list) = node.child_by_field_name("list") {
+                let mut cursor = list.walk();
+                for item in list.named_children(&mut cursor) {
+                    bindings(item, src, root, own, imported);
+                }
+            }
+        },
+        "use_list" => {
+            let mut cursor = node.walk();
+            for item in node.named_children(&mut cursor) {
+                bindings(item, src, root, own, imported);
+            }
+        },
+        _ => {},
+    }
+}
+
+/// The first segment of a path: `crate`, `self`, `super` or a name, or the
+/// empty text for a path rooted at `::`.
+fn leftmost<'a>(mut node: Node<'a>, src: &'a str) -> &'a str {
+    loop {
+        match node.kind() {
+            "scoped_identifier" | "scoped_type_identifier" => {
+                match node.child_by_field_name("path") {
+                    Some(path) => node = path,
+                    None => return "",
+                }
+            },
+            "generic_type" => {
+                match node.child_by_field_name("type") {
+                    Some(t) => node = t,
+                    None => return "",
+                }
+            },
+            _ => return txt(node, src),
+        }
+    }
+}
+
+fn collect_spans(
+    node: Node,
+    src: &str,
+    own: &OwnTraits,
+    imported: &BTreeMap<String, bool>,
+    spans: &mut Vec<Range<usize>>,
+) {
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if child.kind() == "impl_item"
+            && let Some(foreign) = child
+                .child_by_field_name("trait")
+                .and_then(|t| is_foreign(t, src, own, imported))
+            && foreign
+            && let Some(body) = child.child_by_field_name("body")
+        {
+            item_signatures(body, src, spans);
+        }
+        collect_spans(child, src, own, imported, spans);
+    }
+}
+
+/// Whether an impl's trait is another crate's, by the path it is named by;
+/// `None` for a trait written in no shape this reads.
+fn is_foreign(node: Node, src: &str, own: &OwnTraits, imported: &BTreeMap<String, bool>) -> Option<bool> {
+    match node.kind() {
+        "type_identifier" => {
+            let name = txt(node, src);
+            Some(match imported.get(name) {
+                Some(of_the_crate) => !of_the_crate,
+                None => !own.defines(name),
+            })
+        },
+        "scoped_type_identifier" => {
+            let root = leftmost(node, src);
+            let of_the_crate = own.roots(root) || imported.get(root).copied().unwrap_or(false);
+            Some(!of_the_crate)
+        },
+        "generic_type" => node.child_by_field_name("type").and_then(|t| is_foreign(t, src, own, imported)),
         _ => None,
     }
 }
 
-fn item_signatures(body: Node, spans: &mut Vec<Range<usize>>) {
+/// Whether the attributes just above `item` mark its return type as the
+/// impl's own refinement of the trait's.
+fn refines(item: Node, src: &str) -> bool {
+    let mut at = item.prev_named_sibling();
+    while let Some(node) = at {
+        if node.kind() != "attribute_item" {
+            return false;
+        }
+        let text = txt(node, src);
+        if text.contains("refining_impl_trait") || text.split(|c: char| !c.is_alphanumeric() && c != '_').any(|w| w == "refine") {
+            return true;
+        }
+        at = node.prev_named_sibling();
+    }
+    false
+}
+
+fn item_signatures(body: Node, src: &str, spans: &mut Vec<Range<usize>>) {
     let mut cursor = body.walk();
     for item in body.children(&mut cursor) {
         let end = match item.kind() {
-            "function_item" => item.child_by_field_name("body").map(|b| b.start_byte() + 1),
+            "function_item" => {
+                let own_return = refines(item, src)
+                    .then(|| item.child_by_field_name("return_type"))
+                    .flatten();
+                match own_return {
+                    // up to the `->`, which stands right before the type
+                    Some(ret) => Some(ret.start_byte()),
+                    None => item.child_by_field_name("body").map(|b| b.start_byte() + 1),
+                }
+            },
             "function_signature_item" => Some(item.end_byte()),
             "const_item" => {
                 Some(
@@ -193,6 +357,7 @@ fn item_signatures(body: Node, spans: &mut Vec<Range<usize>>) {
         }
     }
 }
+
 
 #[cfg(test)]
 mod tests {
