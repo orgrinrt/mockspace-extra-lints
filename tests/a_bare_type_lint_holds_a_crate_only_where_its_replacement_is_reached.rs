@@ -226,3 +226,44 @@ fn a_workspace_entry_the_root_renames_to_the_owner_holds_the_crate() {
         "the root names another package: {found:?}"
     );
 }
+
+/// A crate outside its workspace's directory, naming the root through `package.workspace`, and
+/// inheriting `num` from it. No directory above the crate holds the root, so only the key finds it.
+fn named_by_package_workspace(
+    root_package: &str,
+    lint: &dyn CrateLint,
+    source: &str,
+) -> Vec<LintError> {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().join("root");
+    std::fs::create_dir(&root).unwrap();
+    std::fs::write(
+        root.join("Cargo.toml"),
+        format!(
+            "[workspace]\nmembers = [\"../elsewhere/member\"]\n\n[workspace.dependencies]\nnum = {{ package = \"{root_package}\", version = \"0.1\" }}\n"
+        ),
+    )
+    .unwrap();
+    let member = dir.path().join("elsewhere").join("member");
+    let fixture = LintFixture::new(source)
+        .with_crate_name(member.to_str().unwrap(), "member")
+        .with_doc(
+            "Cargo.toml",
+            "[package]\nname = \"member\"\nworkspace = \"../../root\"\n\n[dependencies]\nnotko = \"0.1\"\nnum = { workspace = true }\n",
+        );
+    lint.check(&fixture.ctx())
+}
+
+#[test]
+fn a_root_named_by_package_workspace_renames_the_entry_for_a_crate_outside_it() {
+    let found = named_by_package_workspace("arvo", &ArvoTypesOnly, NUMBER);
+    assert!(
+        !found.is_empty(),
+        "`package.workspace` finds the root, whose entry says `num` is arvo"
+    );
+    let found = named_by_package_workspace("rusqlite", &ArvoTypesOnly, NUMBER);
+    assert!(
+        found.is_empty(),
+        "the root names another package: {found:?}"
+    );
+}
