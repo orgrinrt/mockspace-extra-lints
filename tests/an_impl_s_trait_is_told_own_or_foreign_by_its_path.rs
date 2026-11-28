@@ -103,3 +103,18 @@ fn a_return_type_an_impl_refines_is_its_own_choice() {
     let lib = "struct S;\nimpl parser::Items for S {\n    #[inline]\n    fn items(&self) -> core::option::IntoIter<u32> { None.into_iter() }\n}\n";
     assert_eq!(reported(&NoBareNumeric, lib, &[]), vec![]);
 }
+
+#[test]
+fn what_the_reading_misjudges_is_held_as_it_is() {
+    // a `use` is read for the whole file: a module bringing the name in from
+    // another crate makes the bare name foreign in a sibling module too
+    let lib = "mod a {\n    use parser::Width;\n}\nmod b {\n    struct S;\n    impl Width for S {\n        fn width(&self) -> u32 { 1 }\n    }\n}\n";
+    assert_eq!(reported(&NoBareNumeric, lib, &[OWN]), vec![("contract.rs".to_owned(), 2)]);
+    // a foreign trait re-exported and named by a path of the crate is read as
+    // the crate's own, so its signature is still checked
+    let lib = "pub mod reexport {\n    pub use parser::Width;\n}\nstruct S;\nimpl crate::reexport::Width for S {\n    fn width(&self) -> u32 { 1 }\n}\n";
+    assert_eq!(reported(&NoBareNumeric, lib, &[]), on_lib(6));
+    // an impl a macro body writes is no impl in the parse, so it is all read
+    let lib = "macro_rules! implement {\n    () => {\n        impl parser::Width for S { fn width(&self) -> u32 { 1 } }\n    };\n}\n";
+    assert_eq!(reported(&NoBareNumeric, lib, &[]), on_lib(3));
+}
