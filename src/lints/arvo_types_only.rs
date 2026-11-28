@@ -46,12 +46,13 @@
 //! demands a specific primitive and no arvo impl of its contract is
 //! possible. Prefer dropping the crate over a long-lived allowance.
 //!
-//! Where it applies is the crate's own nature, read by `crate::nature`, never a list.
+//! Where it applies is the crate's own nature, read by `crate::nature`, never a list: a crate of
+//! the stack that reaches `arvo`.
 
 use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 
 use crate::const_generic_parameters::without_const_generic_parameter_types;
-use crate::util::{categories, crate_introduces_category, err_in_file, line_lint_allowed};
+use crate::util::{categories, err_in_file, line_lint_allowed};
 
 const BARE_PRIMITIVES: &[&str] = &[
     "u8", "u16", "u32", "u64", "u128", "i8", "i16", "i32", "i64", "i128", "f32", "f64", "usize",
@@ -79,14 +80,11 @@ impl Lint for ArvoTypesOnly {
 
 impl CrateLint for ArvoTypesOnly {
     fn check(&self, ctx: &LintContext) -> Vec<LintError> {
-        // Only a crate built on the stack's vocabulary can be held to it.
-        if !crate::nature::is_of_the_stack(ctx) {
+        // Only a crate of the stack that can name arvo's types can be held to them.
+        if !crate::nature::is_held_to(ctx, categories::NUMERIC) {
             return Vec::new();
         }
         if ctx.should_skip_proc_macro_source_lint() {
-            return Vec::new();
-        }
-        if crate_introduces_category(ctx, categories::NUMERIC) {
             return Vec::new();
         }
         let mut out = Vec::new();

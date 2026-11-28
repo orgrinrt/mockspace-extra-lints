@@ -3,7 +3,9 @@
 //! `no-std` and `no-alloc` hold a crate that declares `#![no_std]`. The bare-primitive lints,
 //! `arvo-types-only` and `no-public-raw-field` hold a crate of the stack: one of the vocabulary's
 //! own crates, or a `#![no_std]` crate built on one. A `std` crate taking the vocabulary is a
-//! consumer, and the ban is not enforced on consumers.
+//! consumer, and the ban is not enforced on consumers. A bare-type lint further wants the crate its
+//! replacement lives in, which `a_bare_type_lint_holds_a_crate_only_where_its_replacement_is_reached`
+//! covers lint by lint.
 //!
 //! Each case runs all nine lints over the same drift, so a crate of the stack is shown to fail and
 //! a crate outside it to pass, on one source.
@@ -57,30 +59,46 @@ fn firing(f: &LintFixture) -> Vec<&'static str> {
 }
 
 const ON_ARVO: &str = "[package]\nname = \"stack-crate\"\n\n[dependencies]\narvo = \"0.1\"\n";
+const ON_ALL_THREE: &str = "[package]\nname = \"stack-crate\"\n\n[dependencies]\narvo = \"0.1\"\nnotko = \"0.1\"\nhilavitkutin-str = \"0.1\"\n";
 const ON_NOTKO: &str = "[package]\nname = \"muisti-engine\"\n\n[dependencies]\nnotko = { version = \"0.0.1\", default-features = false }\n";
 const ON_NOTHING: &str = "[package]\nname = \"muisti\"\n\n[dependencies]\nrusqlite = \"0.41\"\n\n[dev-dependencies]\narvo = \"0.1\"\n";
 
 #[test]
-fn a_no_std_crate_built_on_the_vocabulary_fails_all_nine() {
-    let fired = firing(&fixture(true, ON_ARVO));
+fn a_no_std_crate_built_on_all_three_owners_fails_all_nine() {
+    let fired = firing(&fixture(true, ON_ALL_THREE));
     assert_eq!(
         fired.len(),
         9,
-        "every stack lint holds a crate of the stack; fired: {fired:?}"
+        "every stack lint holds a crate of the stack reaching every owner; fired: {fired:?}"
     );
 }
 
 #[test]
-fn a_crate_of_the_vocabulary_fails_the_vocabulary_lints_whatever_its_root_declares() {
-    let fired = firing(&fixture(false, "[package]\nname = \"notko-build\"\n"));
+fn a_no_std_crate_built_on_arvo_alone_fails_the_lints_whose_replacement_is_arvos() {
+    let mut fired = firing(&fixture(true, ON_ARVO));
+    fired.sort_unstable();
     assert_eq!(
-        fired.len(),
-        7,
-        "the seven vocabulary lints hold it, and the two no-std lints wait on the attribute; fired: {fired:?}"
+        fired,
+        [
+            "arvo-types-only",
+            "no-alloc",
+            "no-bare-numeric",
+            "no-bare-static-str",
+            "no-public-raw-field",
+            "no-std",
+        ],
+        "notko's and the string crate's lints wait on their crates; the static-string gate needs none"
     );
-    assert!(
-        !fired.contains(&"no-std") && !fired.contains(&"no-alloc"),
-        "{fired:?}"
+}
+
+#[test]
+fn a_crate_of_the_vocabulary_fails_its_own_familys_lints_whatever_its_root_declares() {
+    let mut fired = firing(&fixture(false, "[package]\nname = \"notko-build\"\n"));
+    fired.sort_unstable();
+    assert_eq!(
+        fired,
+        ["no-bare-option", "no-bare-result", "no-bare-static-str"],
+        "notko's family reaches notko and no other owner, and the no-std lints wait on the attribute"
     );
 }
 
