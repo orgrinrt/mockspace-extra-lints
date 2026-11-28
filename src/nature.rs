@@ -7,12 +7,39 @@
 //! - A crate that declares `#![no_std]` has said it lives without `std`, so `no-std` and
 //!   `no-alloc` hold it to that. One that does not declare it has said nothing either lint could
 //!   hold it to.
-//! - A crate of the stack is one of the crates the vocabulary lives in, `arvo` and `notko`, or a
-//!   `#![no_std]` crate built on one of them. The bare-primitive lints, `arvo-types-only` and
-//!   `no-public-raw-field` ask a crate to use that vocabulary, which only a crate that has it can
-//!   do. A `std` crate that depends on the vocabulary is a consumer, and the ban is not enforced on
-//!   consumers, who store whatever they want (`the_no_raw_primitives_lint_is_internal_and_is_not_enforced_on_consumers`).
-//!   A crate with no edge to the vocabulary at all is not of the stack either.
+//! - A crate of the stack is one of the crates the vocabulary lives in, `arvo`, `notko` and
+//!   `hilavitkutin-str`, or a `#![no_std]` crate built on one of them. A `std` crate that depends
+//!   on the vocabulary is a consumer, and the ban is not enforced on consumers, who store whatever
+//!   they want (`the_no_raw_primitives_lint_is_internal_and_is_not_enforced_on_consumers`). A crate
+//!   with no edge to the vocabulary at all is not of the stack either.
+//! - Each bare-type lint refuses a primitive and names its replacement, and each replacement lives
+//!   in one of those crates: the numeric types in `arvo`, `Maybe`, `Outcome` and `Just` in `notko`,
+//!   `Str` in `hilavitkutin-str`. The lint holds a crate of the stack only where the crate that owns
+//!   its replacement is reachable from the crate's own source: the crate is one of that owner's
+//!   family, or its manifest names the owner as a dependency. A finding asking for a type the crate
+//!   cannot name has no fix in that crate, so it is not a finding there. That gives
+//!   `arvo-types-only` and `no-bare-numeric` to `arvo`, `no-bare-option` and `no-bare-result` to
+//!   `notko`, `no-bare-string` to `hilavitkutin-str`, and `no-public-raw-field` to the owner of each
+//!   field type it refuses, `arvo` for a number and `hilavitkutin-str` for a string.
+//! - `no-bare-static-str` is not one of them. Its fix in a crate without `hilavitkutin-str` is to
+//!   gate the item behind `#[cfg(debug_assertions)]`, which needs nothing from another crate, so it
+//!   holds every crate of the stack and only its message reads the edge: `Str` where the crate has
+//!   it, the gate alone where it does not. `no-std` and `no-alloc` read the attribute alone, since
+//!   what they ask for, `core` and storage that does not allocate, a `no_std` crate always has.
+//!
+//! The dependency test is one reading of the manifest, [`names_as_dependency`], used by both: by
+//! [`is_of_the_stack`] for the edge to the vocabulary and by [`reaches_the_owner`] for the edge to
+//! one owner. An edge counts when the crate's own source can name what it brings:
+//!
+//! - `[dependencies]` and `[target.<cfg>.dependencies]` count, a rename by the package it names, a
+//!   `workspace = true` entry by its key.
+//! - `[dev-dependencies]` do not: they build the tests, examples and benches, and the lints read
+//!   `src/`.
+//! - `[build-dependencies]` do not: they build `build.rs`, and nothing of theirs is in scope in
+//!   `src/`.
+//! - An `optional = true` dependency does not: the source written for a build without the feature
+//!   cannot name it, and a line scan cannot tell that source from the gated part. A crate taking
+//!   the owner behind a feature is held where it takes it unconditionally.
 
 use mockspace_lint_rules::LintContext;
 
