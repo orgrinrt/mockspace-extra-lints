@@ -305,6 +305,9 @@ pub fn check_store(store: &Store) -> Vec<Finding> {
                 }
             }
         }
+        if let Err(bad) = held_back_kinds(store, t.many("holds_back")) {
+            say(row.clone(), bad);
+        }
         if let Err(bad) = crate::contracts::check_fields(&t.fields) {
             say(row.clone(), bad);
         }
@@ -435,4 +438,16 @@ pub fn check_links(store: &Store, ticket: &str) -> Result<(), String> {
     }
     crate::choice::check(t.many(crate::choice::FIELD), t.many(crate::options::FIELD))?;
     Ok(())
+}
+
+/// Whether every kind a gate's `holds_back` names is a ticket kind of `store`.
+///
+/// # Errors
+///
+/// A sentence naming the first that is none.
+pub fn held_back_kinds(store: &Store, kinds: &[String]) -> Result<(), String> {
+    match kinds.iter().find(|k| !store.kinds.contains_key(*k)) {
+        Some(k) => Err(format!("`holds_back` names `{k}`, which is no ticket kind")),
+        None => Ok(()),
+    }
 }

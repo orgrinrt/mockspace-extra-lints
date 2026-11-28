@@ -135,7 +135,7 @@ fn line(out: &mut String, key: &str, values: &[String], integer: bool, list: boo
 }
 
 /// Fields in the order a ticket is written, with whether each is a list or an integer.
-const ORDER: [(&str, bool, bool); 20] = [
+const ORDER: [(&str, bool, bool); 21] = [
     ("title", false, false),
     ("kind", false, false),
     ("what", false, false),
@@ -144,6 +144,7 @@ const ORDER: [(&str, bool, bool); 20] = [
     ("needs", false, true),
     ("part_of", false, false),
     ("superseded_by", false, true),
+    ("holds_back", false, true),
     ("related", false, true),
     ("contracts", false, true),
     ("shows", false, false),

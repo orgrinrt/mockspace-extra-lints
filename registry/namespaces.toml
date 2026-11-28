@@ -325,6 +325,12 @@ required = false
 description = "The tickets that make this one stale: they retire, port or replace its work. While one of them is open the tooling never takes this one next, and it flags a lane, a brief or a branch still on it."
 
 [[registry.namespace.field]]
+name = "holds_back"
+type = "ticket_kind[]"
+required = false
+description = "The kinds of ticket this one holds back: while it is open the tooling takes no other ticket of those kinds next, whatever its own needs. A gate on a whole registry, such as work that waits until what it is built on is ready, is one ticket holding back the kinds that work is, never an edge on each."
+
+[[registry.namespace.field]]
 name = "related"
 type = "ref[]"
 required = false

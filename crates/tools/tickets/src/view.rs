@@ -108,7 +108,7 @@ pub fn list(store: &Store, plan: &Plan, filter: &Filter) -> Vec<Row> {
     rows.into_iter().map(|r| r.3).collect()
 }
 
-/// What to take next: the open tickets nobody holds and nothing blocks, the one that unblocks the
+/// What to take next: the open tickets nobody holds and nothing blocks or holds back, the one that unblocks the
 /// most open work first, then the one added earliest. A job whose branch has landed on `trunk` is not
 /// free: its work is done and its ticket missed the move.
 pub fn next(store: &Store, plan: &Plan, filter: &Filter, trunk: &impl Trunk) -> Vec<Row> {
@@ -127,11 +127,27 @@ pub fn next(store: &Store, plan: &Plan, filter: &Filter, trunk: &impl Trunk) -> 
             free && !blocked
                 && r.holder.is_empty()
                 && superseded_by(store, &r.id).is_empty()
+                && held_back_by(store, &r.id).is_empty()
                 && landed(store, &r.id, trunk).is_none()
         })
         .collect();
     rows.sort_by(|a, b| b.unblocks.cmp(&a.unblocks));
     rows
+}
+
+/// The open tickets other than `id` whose `holds_back` names the kind `id` is: while one stands, no ticket
+/// of that kind is taken next, whatever its own needs. A closed one holds nothing back.
+pub fn held_back_by<'a>(store: &'a Store, id: &str) -> Vec<&'a str> {
+    let Some(kind) = store.tickets.get(id).map(|t| t.one("kind")) else {
+        return Vec::new();
+    };
+    store
+        .tickets
+        .values()
+        .filter(|g| g.id != id && g.many("holds_back").iter().any(|k| k == kind))
+        .filter(|g| !store.state_of(&g.id).is_some_and(|st| st.closed))
+        .map(|g| g.id.as_str())
+        .collect()
 }
 
 /// The open tickets among those `id` names in `superseded_by`: while one stands, the work of `id` is on

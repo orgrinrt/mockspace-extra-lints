@@ -112,6 +112,7 @@ pub fn new_ticket(store: &Store, r: &NewRequest) -> Result<NewTicket, String> {
     let part_of = fields.get("part_of").cloned().unwrap_or_default();
     missing(store, &needs, "needs")?;
     missing(store, &part_of, "part_of")?;
+    crate::rules::held_back_kinds(store, fields.get("holds_back").map_or(&[], Vec::as_slice))?;
     crate::contracts::check_fields(&fields)?;
     crate::choice::check(
         fields.get(crate::choice::FIELD).map_or(&[], Vec::as_slice),
