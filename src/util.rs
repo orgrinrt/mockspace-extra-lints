@@ -1,5 +1,7 @@
 //! Shared helpers for stack lints.
 
+use core::ops::Range;
+
 use mockspace_lint_rules::{LintContext, LintError, Severity};
 use tree_sitter::Node;
 
@@ -226,6 +228,27 @@ pub fn names_type(hay: &str, needle: &str) -> bool {
         i += 1;
     }
     false
+}
+
+/// Replace every byte in `spans` with a space, keeping newlines where they are.
+///
+/// Byte length is preserved, so an offset outside the spans still names the same
+/// character and the line a scan reports is the line the file has.
+pub(crate) fn blank_spans(source: &str, spans: &[Range<usize>]) -> String {
+    let mut bytes = source.as_bytes().to_vec();
+    for span in spans {
+        if span.end > bytes.len() {
+            continue;
+        }
+        for byte in &mut bytes[span.start .. span.end] {
+            if *byte != b'\n' {
+                *byte = b' ';
+            }
+        }
+    }
+    // Every span starts and ends on a node boundary and every replacement is
+    // ASCII, so the result is still the original's encoding.
+    String::from_utf8(bytes).unwrap_or_else(|_| source.to_string())
 }
 
 #[cfg(test)]

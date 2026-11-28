@@ -20,6 +20,8 @@ use core::ops::Range;
 
 use tree_sitter::{Node, Tree};
 
+use crate::util::blank_spans;
+
 /// The source with the type of every const generic parameter blanked out.
 ///
 /// Returns a copy the caller scans instead of the original.
@@ -80,27 +82,6 @@ fn collect(source: &str, node: Node, spans: &mut Vec<Range<usize>>) {
             }
         collect(source, child, spans);
     }
-}
-
-/// Replace every byte in `spans` with a space, keeping newlines where they are.
-///
-/// Byte length is preserved, so an offset outside the spans still names the same
-/// character and the line a scan reports is the line the file has.
-fn blank_spans(source: &str, spans: &[Range<usize>]) -> String {
-    let mut bytes = source.as_bytes().to_vec();
-    for span in spans {
-        if span.end > bytes.len() {
-            continue;
-        }
-        for byte in &mut bytes[span.start .. span.end] {
-            if *byte != b'\n' {
-                *byte = b' ';
-            }
-        }
-    }
-    // Every replaced byte was inside one node's range and every replacement is
-    // ASCII, so the result is still the original's encoding.
-    String::from_utf8(bytes).unwrap_or_else(|_| source.to_string())
 }
 
 #[cfg(test)]

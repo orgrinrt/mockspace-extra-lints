@@ -21,11 +21,21 @@
 //! named it still apply; the two are semantically equivalent today.
 //! Prefer `arvo-types-only` in new configs.
 //!
+//! A signature the crate writes only because a trait of another crate fixed
+//! it is not read: the signature of a method in an `impl <Trait> for <Type>`
+//! whose trait the crate does not declare, from the `fn` to its `{` or `;`,
+//! and an associated constant's declaration up to its `=`.
+//! The trait's owner is where that signature is judged. The method's body
+//! is still read, and so is every inherent impl and every impl of a trait
+//! the crate declares. `crate::foreign_trait_impls` says how a trait counts
+//! as declared and what that misjudges.
+//!
 //! Where it applies is the crate's own nature, read by `crate::nature`, never a list.
 
 use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 
 use crate::const_generic_parameters::without_const_generic_parameter_types;
+use crate::foreign_trait_impls::scanned_sources;
 use crate::util::{categories, crate_introduces_category, err_in_file, line_lint_allowed};
 
 const BARE_NUMERICS: &[&str] = &[
@@ -66,20 +76,13 @@ impl CrateLint for NoBareNumeric {
         }
         let mut out = Vec::new();
 
-        let sources: Vec<(String, &str, &tree_sitter::Tree)> = if ctx.all_sources().is_empty() {
-            vec![("src/lib.rs".to_string(), ctx.source(), ctx.tree())]
-        } else {
-            ctx.all_sources()
-                .iter()
-                .map(|f| (f.rel_path.display().to_string(), f.text, f.tree()))
-                .collect()
-        };
-
-        for (rel_path, source, tree) in sources {
-            // The excepted position comes off the parse, blanked in place so the
-            // line numbering is still the file's own.
-            let excepted = without_const_generic_parameter_types(source, tree);
-            for (idx, (raw_line, kept)) in source.lines().zip(excepted.lines()).enumerate() {
+        for file in scanned_sources(ctx) {
+            let rel_path = &file.rel_path;
+            // The excepted positions come off the parse, blanked in place so the
+            // line numbering is still the file's own: a signature a foreign trait
+            // fixed, then the type of a const generic parameter.
+            let excepted = without_const_generic_parameter_types(&file.scanned, file.tree);
+            for (idx, (raw_line, kept)) in file.text.lines().zip(excepted.lines()).enumerate() {
                 let trimmed = raw_line.trim_start();
                 if trimmed.starts_with("//") {
                     continue;
@@ -95,7 +98,7 @@ impl CrateLint for NoBareNumeric {
                     if contains_bare_word(&scan, prim) {
                         out.push(err_in_file(
                             ctx,
-                            &rel_path,
+                            rel_path,
                             idx + 1,
                             "no-bare-numeric",
                             format!("bare `{prim}`; wrap in an arvo type or a domain alias grounded on one"),

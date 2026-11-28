@@ -24,15 +24,24 @@
 //! `cfg(all(debug_assertions, ...))` variants). Fires when no gate is
 //! present.
 //!
+//! An associated constant in an `impl <Trait> for <Type>` whose trait the
+//! crate does not declare is not read: the trait fixed its type, and the
+//! trait's owner is where that is judged. A `const` or `static` anywhere
+//! else, a method body of the same impl included, is read as before.
+//! `crate::foreign_trait_impls` says how a trait counts as declared.
+//!
 //! Escape hatch: inline `// lint:allow(no-bare-static-str) reason: ...;
 //! tracked: #N`: only when a foreign contract or macro-expansion path
 //! genuinely requires a bare literal at runtime.
 //!
 //! Where it applies is the crate's own nature, read by `crate::nature`, never a list.
 
+use core::ops::Range;
+
 use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 use tree_sitter::Node;
 
+use crate::foreign_trait_impls::{crate_traits, foreign_trait_signature_spans, within};
 use crate::util::{categories, crate_introduces_category, err_in_file, line_lint_allowed, txt};
 
 pub struct NoBareStaticStr;
@@ -77,9 +86,11 @@ impl CrateLint for NoBareStaticStr {
             return out;
         }
 
+        let own = crate_traits(ctx.all_sources().iter().map(|f| (f.text, f.tree())));
         for file in ctx.all_sources() {
             let rel_path = file.rel_path.display().to_string();
-            walk(file.tree().root_node(), file.text, &rel_path, &mut out, ctx);
+            let fixed = foreign_trait_signature_spans(file.text, file.tree(), &own);
+            walk(file.tree().root_node(), file.text, &rel_path, &fixed, &mut out, ctx);
         }
 
         out
@@ -88,13 +99,24 @@ impl CrateLint for NoBareStaticStr {
 
 fn scan_source(ctx: &LintContext, rel_path: &str, source: &str, out: &mut Vec<LintError>) {
     let tree = ctx.view().parse(source);
-    walk(tree.root_node(), source, rel_path, out, ctx);
+    let own = crate_traits([(source, &tree)]);
+    let fixed = foreign_trait_signature_spans(source, &tree, &own);
+    walk(tree.root_node(), source, rel_path, &fixed, out, ctx);
 }
 
-fn walk(node: Node, source: &str, rel_path: &str, out: &mut Vec<LintError>, ctx: &LintContext) {
+fn walk(
+    node: Node,
+    source: &str,
+    rel_path: &str,
+    fixed: &[Range<usize>],
+    out: &mut Vec<LintError>,
+    ctx: &LintContext,
+) {
     match node.kind() {
         "const_item" | "static_item" => {
+            // An associated constant whose type a foreign trait fixed is judged at the trait.
             if let Some(ty) = node.child_by_field_name("type")
+                && !within(fixed, ty.start_byte())
                 && type_is_str_ref(ty, source) {
                     // Check if this item or any enclosing scope has a
                     // `cfg(debug_assertions)` gate.
@@ -126,7 +148,7 @@ fn walk(node: Node, source: &str, rel_path: &str, out: &mut Vec<LintError>, ctx:
 
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        walk(child, source, rel_path, out, ctx);
+        walk(child, source, rel_path, fixed, out, ctx);
     }
 }
 

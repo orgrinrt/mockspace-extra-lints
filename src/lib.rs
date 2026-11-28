@@ -24,6 +24,7 @@
 
 mod const_generic_parameters;
 mod dep_surface;
+mod foreign_trait_impls;
 mod manifest_toml;
 mod nature;
 mod paths;

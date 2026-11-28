@@ -6,13 +6,23 @@
 //! borrowed state across API boundaries.
 //!
 //! Scans every non-comment, non-string line; any appearance in any
-//! position is drift. Line-local `lint:allow(no-bare-string)` is the
-//! only escape hatch, for foreign-crate boundaries.
+//! position is drift. Beyond the foreign-trait signature below,
+//! line-local `lint:allow(no-bare-string)` is the only escape hatch.
+//!
+//! A signature the crate writes only because a trait of another crate fixed
+//! it is not read: the signature of a method in an `impl <Trait> for <Type>`
+//! whose trait the crate does not declare, from the `fn` to its `{` or `;`,
+//! and an associated constant's declaration up to its `=`.
+//! The trait's owner is where that signature is judged. The method's body
+//! is still read, and so is every inherent impl and every impl of a trait
+//! the crate declares. `crate::foreign_trait_impls` says how a trait counts
+//! as declared and what that misjudges.
 //!
 //! Where it applies is the crate's own nature, read by `crate::nature`, never a list.
 
 use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 
+use crate::foreign_trait_impls::scanned_sources;
 use crate::util::{
     categories,
     crate_introduces_category,
@@ -51,20 +61,13 @@ impl CrateLint for NoBareString {
         }
         let mut out = Vec::new();
 
-        let sources: Vec<(String, &str)> = if ctx.all_sources().is_empty() {
-            vec![("src/lib.rs".to_string(), ctx.source())]
-        } else {
-            ctx.all_sources()
-                .iter()
-                .map(|f| (f.rel_path.display().to_string(), f.text))
-                .collect()
-        };
-
         if crate_introduces_category(ctx, categories::STRING) {
             return Vec::new();
         }
-        for (rel_path, source) in sources {
-            for (idx, raw_line) in source.lines().enumerate() {
+        // A signature a foreign trait fixed is blanked, so it is judged at the trait.
+        for file in scanned_sources(ctx) {
+            let rel_path = &file.rel_path;
+            for (idx, (raw_line, kept)) in file.text.lines().zip(file.scanned.lines()).enumerate() {
                 let trimmed = raw_line.trim_start();
                 if trimmed.starts_with("//") {
                     continue;
@@ -73,13 +76,13 @@ impl CrateLint for NoBareString {
                     continue;
                 }
 
-                let scan = strip_strings_and_chars(raw_line);
+                let scan = strip_strings_and_chars(kept);
                 let scan = strip_line_comment(&scan);
 
                 if names_type(&scan, "String") {
                     out.push(err_in_file(
                         ctx,
-                        &rel_path,
+                        rel_path,
                         idx + 1,
                         "no-bare-string",
                         "bare `String`; use `hilavitkutin_str::Str`".to_string(),
@@ -89,7 +92,7 @@ impl CrateLint for NoBareString {
                 if contains_non_static_str_ref(&scan) {
                     out.push(err_in_file(
                         ctx,
-                        &rel_path,
+                        rel_path,
                         idx + 1,
                         "no-bare-string",
                         "non-static `&str`; use `&'static str` or `hilavitkutin_str::Str`".to_string(),

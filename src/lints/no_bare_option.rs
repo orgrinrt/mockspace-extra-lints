@@ -4,17 +4,24 @@
 //! `Option` type name (word boundary, followed by `<` or used as the
 //! standalone type) is drift, regardless of context: pub API, private
 //! impl, let bindings, struct fields, match arms with
-//! `Option::Some(...)`, etc. The only form that passes silently is
-//! an explicit `lint:allow(no-bare-option)` on the offending line.
+//! `Option::Some(...)`, etc. Beyond the foreign-trait signature
+//! below, the only form that passes is an explicit
+//! `lint:allow(no-bare-option)` on the offending line.
 //!
-//! Allowed via line-local exemption when implementing a std trait
-//! method whose signature is fixed externally
-//! (`fn next(&mut self) -> Option<Self::Item>`).
+//! A signature the crate writes only because a trait of another crate fixed
+//! it is not read: the signature of a method in an `impl <Trait> for <Type>`
+//! whose trait the crate does not declare, from the `fn` to its `{` or `;`,
+//! and an associated constant's declaration up to its `=`.
+//! The trait's owner is where that signature is judged. The method's body
+//! is still read, and so is every inherent impl and every impl of a trait
+//! the crate declares. `crate::foreign_trait_impls` says how a trait counts
+//! as declared and what that misjudges.
 //!
 //! Where it applies is the crate's own nature, read by `crate::nature`, never a list.
 
 use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 
+use crate::foreign_trait_impls::scanned_sources;
 use crate::util::{categories, crate_introduces_category, err_in_file, line_lint_allowed};
 
 pub struct NoBareOption;
@@ -47,20 +54,13 @@ impl CrateLint for NoBareOption {
         }
         let mut out = Vec::new();
 
-        let sources: Vec<(String, &str)> = if ctx.all_sources().is_empty() {
-            vec![("src/lib.rs".to_string(), ctx.source())]
-        } else {
-            ctx.all_sources()
-                .iter()
-                .map(|f| (f.rel_path.display().to_string(), f.text))
-                .collect()
-        };
-
         if crate_introduces_category(ctx, categories::FALLIBILITY) {
             return Vec::new();
         }
-        for (rel_path, source) in sources {
-            for (idx, raw_line) in source.lines().enumerate() {
+        // A signature a foreign trait fixed is blanked, so it is judged at the trait.
+        for file in scanned_sources(ctx) {
+            let rel_path = &file.rel_path;
+            for (idx, (raw_line, kept)) in file.text.lines().zip(file.scanned.lines()).enumerate() {
                 let trimmed = raw_line.trim_start();
                 if trimmed.starts_with("//") {
                     continue;
@@ -69,13 +69,13 @@ impl CrateLint for NoBareOption {
                     continue;
                 }
 
-                let scan = strip_strings_and_chars(raw_line);
+                let scan = strip_strings_and_chars(kept);
                 let scan = strip_line_comment(&scan);
 
                 if contains_option_token(&scan) {
                     out.push(err_in_file(
                         ctx,
-                        &rel_path,
+                        rel_path,
                         idx + 1,
                         "no-bare-option",
                         "bare `Option`; use `notko::Maybe<T>`".to_string(),
