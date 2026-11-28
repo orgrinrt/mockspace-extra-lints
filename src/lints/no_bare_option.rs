@@ -15,7 +15,7 @@
 
 use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 
-use crate::util::{categories, crate_introduces_category, err_in_file, line_lint_allowed};
+use crate::util::{categories, err_in_file, line_lint_allowed};
 
 pub struct NoBareOption;
 
@@ -38,8 +38,8 @@ impl Lint for NoBareOption {
 
 impl CrateLint for NoBareOption {
     fn check(&self, ctx: &LintContext) -> Vec<LintError> {
-        // Only a crate built on the stack's vocabulary can be held to it.
-        if !crate::nature::is_of_the_stack(ctx) {
+        // Only a crate of the stack that can name notko's types can be held to them.
+        if !crate::nature::is_held_to(ctx, categories::FALLIBILITY) {
             return Vec::new();
         }
         if ctx.should_skip_proc_macro_source_lint() {
@@ -56,9 +56,6 @@ impl CrateLint for NoBareOption {
                 .collect()
         };
 
-        if crate_introduces_category(ctx, categories::FALLIBILITY) {
-            return Vec::new();
-        }
         for (rel_path, source) in sources {
             for (idx, raw_line) in source.lines().enumerate() {
                 let trimmed = raw_line.trim_start();

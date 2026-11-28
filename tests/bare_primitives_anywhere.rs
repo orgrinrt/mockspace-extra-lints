@@ -17,8 +17,9 @@ use mockspace_extra_lints::lints::no_public_raw_field::NoPublicRawField;
 use mockspace_lint_rules::CrateLint;
 use mockspace_lint_rules::testkit::LintFixture;
 
-/// A crate of the stack's vocabulary, which every stack lint holds whatever its root declares.
-const VOCABULARY_MANIFEST: &str = "[package]\nname = \"arvo-fixture\"\n";
+/// A crate of arvo's family taking notko and the string crate, so every stack lint holds it whatever
+/// its root declares.
+const VOCABULARY_MANIFEST: &str = "[package]\nname = \"arvo-fixture\"\n\n[dependencies]\nnotko = \"0.1\"\nhilavitkutin-str = \"0.1\"\n";
 
 /// An ordinary crate of one file. Source lints skip proc-macro crates by default, because a proc
 /// macro's own heap-using parser never ships in a consumer binary, and these fixtures are not

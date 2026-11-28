@@ -1,4 +1,4 @@
-use super::{crate_prelude, manifest_is_of_the_stack};
+use super::{Owner, crate_prelude, manifest_is_of_the_stack, manifest_reaches};
 
 #[test]
 fn an_attribute_past_a_long_module_doc_is_still_found() {
@@ -96,4 +96,89 @@ fn a_crate_with_no_edge_to_the_vocabulary_is_not_of_the_stack() {
     // A name that only opens like the vocabulary's is not one of its crates.
     let near = "[package]\nname = \"arvoisa\"\n\n[dependencies]\nnotkoja = \"1\"\n";
     assert!(!manifest_is_of_the_stack(&manifest(near), true));
+}
+
+#[test]
+fn a_build_or_optional_edge_to_the_vocabulary_does_not_make_a_crate_of_the_stack() {
+    let build = "[package]\nname = \"x\"\n\n[build-dependencies]\narvo = \"0.1\"\n";
+    assert!(
+        !manifest_is_of_the_stack(&manifest(build), true),
+        "a build-dependency builds build.rs, not the crate"
+    );
+    let optional = "[package]\nname = \"x\"\n\n[dependencies]\nnotko = { version = \"0.1\", optional = true }\n";
+    assert!(!manifest_is_of_the_stack(&manifest(optional), true));
+    let string = "[package]\nname = \"x\"\n\n[dependencies]\nhilavitkutin-str = \"0.1\"\n";
+    assert!(
+        manifest_is_of_the_stack(&manifest(string), true),
+        "the string crate is one of the vocabulary's"
+    );
+}
+
+#[test]
+fn a_crate_of_the_owners_family_reaches_the_owner() {
+    assert!(manifest_reaches(
+        &manifest("[package]\nname = \"arvo\"\n"),
+        Owner::ARVO
+    ));
+    assert!(manifest_reaches(
+        &manifest("[package]\nname = \"arvo-bits\"\n"),
+        Owner::ARVO
+    ));
+    assert!(manifest_reaches(
+        &manifest("[package]\nname = \"hilavitkutin-str\"\n"),
+        Owner::HILAVITKUTIN_STR
+    ));
+    assert!(
+        !manifest_reaches(&manifest("[package]\nname = \"notko\"\n"), Owner::ARVO),
+        "another vocabulary crate is not arvo's family"
+    );
+    assert!(
+        !manifest_reaches(
+            &manifest("[package]\nname = \"hilavitkutin-api\"\n"),
+            Owner::HILAVITKUTIN_STR
+        ),
+        "a sibling of the string crate is not of its family"
+    );
+}
+
+#[test]
+fn a_normal_dependency_on_any_target_reaches_the_owner() {
+    let plain = "[package]\nname = \"x\"\n\n[dependencies]\narvo = \"0.1\"\n";
+    assert!(manifest_reaches(&manifest(plain), Owner::ARVO));
+    let member =
+        "[package]\nname = \"x\"\n\n[dependencies]\narvo-bits = { path = \"../arvo-bits\" }\n";
+    assert!(manifest_reaches(&manifest(member), Owner::ARVO));
+    let renamed = "[package]\nname = \"x\"\n\n[dependencies]\nfallible = { package = \"notko\", version = \"0.1\" }\n";
+    assert!(manifest_reaches(&manifest(renamed), Owner::NOTKO));
+    let inherited = "[package]\nname = \"x\"\n\n[dependencies]\nnotko = { workspace = true }\n";
+    assert!(manifest_reaches(&manifest(inherited), Owner::NOTKO));
+    let target = "[package]\nname = \"x\"\n\n[target.'cfg(unix)'.dependencies]\nhilavitkutin-str = \"0.1\"\n";
+    assert!(manifest_reaches(&manifest(target), Owner::HILAVITKUTIN_STR));
+}
+
+#[test]
+fn a_dev_build_or_optional_edge_does_not_reach_the_owner() {
+    let dev = "[package]\nname = \"x\"\n\n[dependencies]\nnotko = \"0.1\"\n\n[dev-dependencies]\narvo = \"0.1\"\n";
+    assert!(
+        !manifest_reaches(&manifest(dev), Owner::ARVO),
+        "a dev-dependency builds the tests"
+    );
+    let build = "[package]\nname = \"x\"\n\n[build-dependencies]\narvo = \"0.1\"\n";
+    assert!(
+        !manifest_reaches(&manifest(build), Owner::ARVO),
+        "a build-dependency builds build.rs"
+    );
+    let target_build =
+        "[package]\nname = \"x\"\n\n[target.'cfg(unix)'.build-dependencies]\narvo = \"0.1\"\n";
+    assert!(!manifest_reaches(&manifest(target_build), Owner::ARVO));
+    let target_dev =
+        "[package]\nname = \"x\"\n\n[target.'cfg(unix)'.dev-dependencies]\narvo = \"0.1\"\n";
+    assert!(!manifest_reaches(&manifest(target_dev), Owner::ARVO));
+    let optional = "[package]\nname = \"x\"\n\n[dependencies]\narvo = { version = \"0.1\", optional = true }\n";
+    assert!(
+        !manifest_reaches(&manifest(optional), Owner::ARVO),
+        "source written for a build without the feature cannot name it"
+    );
+    let near = "[package]\nname = \"x\"\n\n[dependencies]\narvoisa = \"1\"\n";
+    assert!(!manifest_reaches(&manifest(near), Owner::ARVO));
 }
