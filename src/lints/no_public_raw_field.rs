@@ -10,14 +10,15 @@
 //! retained for config compatibility; the scope is no longer
 //! restricted to public fields.
 //!
-//! Where it applies is the crate's own nature, read by `crate::nature`, never a list.
+//! Where it applies is the crate's own nature, read by `crate::nature`, never a list, and per field
+//! type: a number where the crate reaches `arvo`, a string where it reaches `hilavitkutin-str`.
 
 use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 use tree_sitter::Node;
 
 use crate::util::{
     categories,
-    crate_introduces_category,
+    Category,
     err_in_file,
     for_each_struct,
     line_lint_allowed,
@@ -29,7 +30,7 @@ use crate::util::{
 /// the check skips forbidden types in that category but continues
 /// scanning types in other categories. A `["numeric"]`-tagged
 /// crate still gets its `String` fields flagged.
-const FORBIDDEN_FIELD_TYPES: &[(&str, &str)] = &[
+const FORBIDDEN_FIELD_TYPES: &[(&str, Category)] = &[
     ("u8", categories::NUMERIC),
     ("u16", categories::NUMERIC),
     ("u32", categories::NUMERIC),
@@ -77,9 +78,11 @@ impl CrateLint for NoPublicRawField {
         if ctx.should_skip_proc_macro_source_lint() {
             return Vec::new();
         }
-        // Per-category skip happens inside `report_if_forbidden`: a
-        // `["numeric"]` crate skips numeric field types but still gets
-        // `String` / `&str` field drift flagged.
+        // Per-category scope happens inside `report_if_forbidden`: a
+        // field type is refused only where its category holds the crate,
+        // so a crate reaching arvo and not hilavitkutin-str gets numeric
+        // field drift flagged and `String` / `&str` fields left alone,
+        // and a `["numeric"]` crate the other way round.
         let mut out = Vec::new();
 
         // Scan every src/*.rs file, not just lib.rs. Parse each file
@@ -200,10 +203,9 @@ fn report_if_forbidden(
 ) {
     for (forbidden, category) in FORBIDDEN_FIELD_TYPES {
         if type_is(type_text, forbidden) {
-            // Skip this specific field type when the crate introduces
-            // its category; keep scanning so an unrelated-category
-            // type later in the list still fires.
-            if crate_introduces_category(ctx, category) {
+            // The first matching entry decides: a field type its category
+            // does not hold this crate to is left alone.
+            if !crate::nature::is_held_to(ctx, *category) {
                 return;
             }
             out.push(err_in_file(
@@ -212,7 +214,8 @@ fn report_if_forbidden(
                 line,
                 "no-public-raw-field",
                 format!(
-                    "field `{field_name}: {type_text}` uses raw `{forbidden}`; wrap in a domain newtype or arvo type"
+                    "field `{field_name}: {type_text}` uses raw `{forbidden}`; wrap in a domain newtype or a type of `{}`",
+                    category.owner.name()
                 ),
             ));
             return;

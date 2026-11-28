@@ -32,32 +32,35 @@ use tree_sitter::Node;
 /// introduces from its DESIGN.md.tmpl / source parse, eliminating the
 /// manual TOML declaration entirely.
 pub mod categories {
-    pub const NUMERIC: &str = "numeric";
-    pub const FALLIBILITY: &str = "fallibility";
-    pub const STRING: &str = "string";
+    use super::Category;
+    use crate::nature::Owner;
+
+    pub const NUMERIC: Category = Category { name: "numeric", owner: Owner::ARVO };
+    pub const FALLIBILITY: Category = Category { name: "fallibility", owner: Owner::NOTKO };
+    pub const STRING: Category = Category { name: "string", owner: Owner::HILAVITKUTIN_STR };
     /// Compile-time static string identity. The introducing crate
     /// (hilavitkutin-str) defines interned string handles that replace
     /// bare `const NAME: &str` / `static NAME: &str` across the stack;
     /// other crates must gate any remaining static-string literals
     /// behind `#[cfg(debug_assertions)]` so release builds drop them.
-    pub const STATIC_STRING: &str = "static-string";
+    pub const STATIC_STRING: Category = Category { name: "static-string", owner: Owner::HILAVITKUTIN_STR };
 }
 
-/// Whether the current crate is declared (via
-/// `[primitive-introductions]`) to introduce the `category`.
-/// Bare-primitive lints call this once at the top of `check`: if the
-/// crate introduces the category the lint enforces, the lint returns
-/// an empty violation set for that crate, unconditionally.
+/// A category of primitives the stack replaces: the name a crate's
+/// `[primitive-introductions]` entry lists it by, and the crate its
+/// replacement lives in.
 ///
-/// Matching is exact string compare against the crate's list. Adding
-/// an unknown category to a crate's list has no effect; no lint
-/// watches that category. Adding `"numeric"` or `"fallibility"` to a
-/// crate's list is an auditable architectural claim (the crate must
-/// actually define those types) rather than a list of
-/// forbidden tokens to bypass.
-#[must_use]
-pub fn crate_introduces_category(ctx: &LintContext, category: &str) -> bool {
-    ctx.introduces(category)
+/// Matching the name is exact string compare against the crate's
+/// list. Adding an unknown category to a crate's list has no effect;
+/// no lint watches that category. Adding `"numeric"` or
+/// `"fallibility"` to a crate's list is an auditable architectural
+/// claim (the crate must actually define those types) rather than a
+/// list of forbidden tokens to bypass. Where a bare-type lint holds a
+/// crate at all is `crate::nature::is_held_to`, which reads both.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Category {
+    pub name: &'static str,
+    pub owner: crate::nature::Owner,
 }
 
 /// Slice of source for a node.

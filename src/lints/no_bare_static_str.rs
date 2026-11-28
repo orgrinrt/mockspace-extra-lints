@@ -28,12 +28,14 @@
 //! tracked: #N`: only when a foreign contract or macro-expansion path
 //! genuinely requires a bare literal at runtime.
 //!
-//! Where it applies is the crate's own nature, read by `crate::nature`, never a list.
+//! Where it applies is the crate's own nature, read by `crate::nature`, never a list: every crate
+//! of the stack, since the gate needs no other crate. Whether the crate reaches `hilavitkutin-str`
+//! decides only whether the finding offers `Str`.
 
 use mockspace_lint_rules::{CrateLint, Lint, LintContext, LintError, Severity};
 use tree_sitter::Node;
 
-use crate::util::{categories, crate_introduces_category, err_in_file, line_lint_allowed, txt};
+use crate::util::{categories, err_in_file, line_lint_allowed, txt};
 
 pub struct NoBareStaticStr;
 
@@ -66,32 +68,39 @@ impl CrateLint for NoBareStaticStr {
         // hilavitkutin-str introduces this category; it is the interning
         // home and its own internals are the legitimate site for static
         // string tables.
-        if crate_introduces_category(ctx, categories::STATIC_STRING) {
+        if ctx.introduces(categories::STATIC_STRING.name) {
             return Vec::new();
         }
+        // The gate is the fix everywhere; `Str` is one only where the
+        // crate can name it.
+        let fix = if crate::nature::reaches_the_owner(ctx, categories::STATIC_STRING.owner) {
+            "use `hilavitkutin_str::Str::const!()`, or gate it behind `#[cfg(debug_assertions)]`"
+        } else {
+            "gate it behind `#[cfg(debug_assertions)]`"
+        };
 
         let mut out = Vec::new();
 
         if ctx.all_sources().is_empty() {
-            scan_source(ctx, "src/lib.rs", ctx.source(), &mut out);
+            scan_source(ctx, "src/lib.rs", ctx.source(), fix, &mut out);
             return out;
         }
 
         for file in ctx.all_sources() {
             let rel_path = file.rel_path.display().to_string();
-            walk(file.tree().root_node(), file.text, &rel_path, &mut out, ctx);
+            walk(file.tree().root_node(), file.text, &rel_path, fix, &mut out, ctx);
         }
 
         out
     }
 }
 
-fn scan_source(ctx: &LintContext, rel_path: &str, source: &str, out: &mut Vec<LintError>) {
+fn scan_source(ctx: &LintContext, rel_path: &str, source: &str, fix: &str, out: &mut Vec<LintError>) {
     let tree = ctx.view().parse(source);
-    walk(tree.root_node(), source, rel_path, out, ctx);
+    walk(tree.root_node(), source, rel_path, fix, out, ctx);
 }
 
-fn walk(node: Node, source: &str, rel_path: &str, out: &mut Vec<LintError>, ctx: &LintContext) {
+fn walk(node: Node, source: &str, rel_path: &str, fix: &str, out: &mut Vec<LintError>, ctx: &LintContext) {
     match node.kind() {
         "const_item" | "static_item" => {
             if let Some(ty) = node.child_by_field_name("type")
@@ -114,7 +123,7 @@ fn walk(node: Node, source: &str, rel_path: &str, out: &mut Vec<LintError>, ctx:
                                 line,
                                 "no-bare-static-str",
                                 format!(
-                                    "bare `{keyword} {name}: &str`; use `hilavitkutin_str::Str::const!()`, or gate it behind `#[cfg(debug_assertions)]` in crates without hilavitkutin-str"
+                                    "bare `{keyword} {name}: &str`; {fix}"
                                 ),
                             ));
                         }
@@ -126,7 +135,7 @@ fn walk(node: Node, source: &str, rel_path: &str, out: &mut Vec<LintError>, ctx:
 
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        walk(child, source, rel_path, out, ctx);
+        walk(child, source, rel_path, fix, out, ctx);
     }
 }
 
