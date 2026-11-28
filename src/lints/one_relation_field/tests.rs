@@ -131,3 +131,29 @@ fn the_relation_field_is_the_one_the_project_names() {
     lint.configure(&HashMap::from([(RELATION_KEY.to_string(), "links".to_string())]));
     assert_eq!(run_with(&lint, d.path()).len(), 1);
 }
+
+#[test]
+fn a_gate_s_holds_back_says_what_the_row_is_and_is_let_through() {
+    let text = |field: &str| {
+        format!(
+            r#"
+[[registry.namespace]]
+key = "ticket_kind"
+
+[[registry.namespace]]
+key = "ticket"
+
+[[registry.namespace.field]]
+name = "related"
+type = "ref[]"
+
+[[registry.namespace.field]]
+name = "{field}"
+type = "ticket_kind[]"
+"#
+        )
+    };
+    assert!(run(&text("holds_back")).is_empty());
+    // the control: the same list under another name is a field per target
+    assert_eq!(run(&text("kinds")).len(), 1);
+}

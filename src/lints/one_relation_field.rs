@@ -11,7 +11,7 @@
 //! namespace's slugs, the namespace's own included (`bevy[]`, `tenet[]`, `ticket[]` in `ticket`), is a
 //! finding, unless its name is one of the structural
 //! fields, which say what the row itself is rather than what it relates to: `superseded_by`,
-//! `migrated_from`, `qualified_by`, `cites`, `needs` and `part_of` by default, replaced by the
+//! `migrated_from`, `qualified_by`, `cites`, `needs`, `part_of` and `holds_back` by default, replaced by the
 //! `structural` list where a project names one.
 //!
 //! A namespace that declares no relation field is not read, since it has no one field to fold into.
@@ -33,7 +33,7 @@ const STRUCTURAL_KEY: &str = "structural";
 
 const DEFAULT_RELATION: &str = "related";
 const DEFAULT_STRUCTURAL: &[&str] =
-    &["superseded_by", "migrated_from", "qualified_by", "cites", "needs", "part_of"];
+    &["superseded_by", "migrated_from", "qualified_by", "cites", "needs", "part_of", "holds_back"];
 
 /// The namespaces the engine adds to a schema of its own.
 const BUILTIN: &[&str] = &["vocab", "reference"];
