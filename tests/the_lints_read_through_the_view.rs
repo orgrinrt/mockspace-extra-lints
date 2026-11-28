@@ -1,26 +1,67 @@
 //! Every lint of the pack reads the repository through the view it is handed, so what a unit
 //! reads is what its trace says, and a saved finding replays only while its answers are unchanged.
 //!
-//! The guard reads every directory of the pack that holds source and is no tool's: the root's
-//! `src/` and each crate of `crates/` outside `crates/tools/`. A lint declared anywhere the guard
-//! does not read, a tool's crate above all, is never held to it, so every lint the pack registers
-//! has to be declared where the guard reads.
+//! The guard reads every directory of the pack that holds source the lints are built from: the
+//! root's `src/` and each crate of `crates/` the root package depends on, directly or through
+//! another, outside `crates/tools/`. A crate only the tools build on is the tools' and is not read.
+//! A lint declared anywhere the guard does not read, a tool's crate above all, is never held to it,
+//! so every lint the pack registers has to be declared where the guard reads.
 
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 const ROOT: &str = env!("CARGO_MANIFEST_DIR");
 
-/// Every source directory the guard is run over: the root's, and each crate's outside the tools.
+fn manifest(dir: &Path) -> toml::Table {
+    let text = std::fs::read_to_string(dir.join("Cargo.toml")).expect("a crate has a manifest");
+    text.parse().expect("a manifest is toml")
+}
+
+/// The path of every crate `manifest` depends on in `[dependencies]`, relative to the root, with
+/// a `workspace = true` entry read from the root's `[workspace.dependencies]`.
+fn path_dependencies(dir: &Path, root: &toml::Table) -> Vec<PathBuf> {
+    let workspace = root
+        .get("workspace")
+        .and_then(|w| w.get("dependencies"))
+        .and_then(|d| d.as_table());
+    let Some(deps) = manifest(dir).get("dependencies").and_then(|d| d.as_table()).cloned() else {
+        return Vec::new();
+    };
+    deps.iter()
+        .filter_map(|(name, spec)| {
+            if let Some(path) = spec.get("path").and_then(|p| p.as_str()) {
+                return Some(dir.join(path));
+            }
+            let inherited = spec.get("workspace").and_then(|w| w.as_bool()) == Some(true);
+            let path = workspace?.get(name)?.get("path")?.as_str()?;
+            inherited.then(|| Path::new(ROOT).join(path))
+        })
+        .map(|p| p.canonicalize().expect("a path dependency is there"))
+        .collect()
+}
+
+/// Every source directory the guard is run over: the root's, and each crate's the root package
+/// reaches outside the tools.
 fn guarded() -> Vec<PathBuf> {
+    let root_dir = Path::new(ROOT).canonicalize().expect("the root is there");
+    let root = manifest(&root_dir);
+    let tools = root_dir.join("crates/tools");
+    let mut reached = BTreeSet::new();
+    let mut next = path_dependencies(&root_dir, &root);
+    while let Some(dir) = next.pop() {
+        if dir == root_dir || dir.starts_with(&tools) || !reached.insert(dir.clone()) {
+            continue;
+        }
+        next.extend(path_dependencies(&dir, &root));
+    }
     let mut dirs = vec![Path::new(ROOT).join("src")];
-    let mut crates: Vec<PathBuf> = std::fs::read_dir(Path::new(ROOT).join("crates"))
-        .expect("the pack has `crates/`")
-        .map(|e| e.expect("a listing of `crates/`").path())
-        .filter(|p| p.file_name().is_some_and(|n| n != "tools") && p.join("src").is_dir())
-        .map(|p| p.join("src"))
-        .collect();
-    crates.sort();
-    dirs.extend(crates);
+    dirs.extend(
+        reached
+            .into_iter()
+            .filter_map(|d| d.strip_prefix(&root_dir).ok().map(|rel| Path::new(ROOT).join(rel)))
+            .map(|d| d.join("src"))
+            .filter(|d| d.is_dir()),
+    );
     dirs
 }
 
@@ -115,4 +156,15 @@ fn a_tool_crate_is_not_where_the_guard_reads() {
     assert!(!read_by_the_guard(Path::new("crates/tools/tickets/src/lint.rs")));
     assert!(!read_by_the_guard(Path::new("crates/registry-lints/src/ratchets_tests.rs")));
     assert!(read_by_the_guard(Path::new("crates/registry-lints/src/ratchets.rs")));
+}
+
+#[test]
+fn a_crate_only_the_tools_build_on_is_not_where_the_guard_reads() {
+    let dirs = guarded();
+    // `corpus` opens the index for the query tools and no lint reaches it; `stamp` is one a lint
+    // reaches through `registry-lints`, and `planning` one it reaches only through another crate.
+    assert!(!dirs.contains(&Path::new(ROOT).join("crates/corpus/src")), "{dirs:?}");
+    for reached in ["crates/stamp/src", "crates/planning/src", "crates/ticket-model/src"] {
+        assert!(dirs.contains(&Path::new(ROOT).join(reached)), "{reached}: {dirs:?}");
+    }
 }
